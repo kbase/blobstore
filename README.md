@@ -2,7 +2,7 @@
 
 The blob store is a simple file storage service backed by an S3 compatible storage system
 such as [Minio](https://min.io/). Storing a file provides a key - currently a UUID - that
-allows retrival of the file when provided along with proper credentials
+allows retrival of the file when provided along with proper credentials.
 
 The user is responsible for saving the key for use later - in the context of KBase, that means
 creating a handle for the file via the [handle service](https://github.com/kbase/handle_service2)
