@@ -12,11 +12,27 @@ import (
 	"github.com/kbase/blobstore/service"
 )
 
+// note that the contents of this file are tested manually.
+
+const (
+	name = "blobstore"
+	version = "0.1.0"
+	shockname = "Shock"
+	shockver = "0.9.6"
+	deprecation = "The id and version fields are deprecated."
+)
+
 
 func main() {
-	serv := service.New()
+	serv := service.New(service.ServerStaticConf{
+		ServerName: name,
+		ServerVersion: version,
+		ID: shockname,
+		ServerVersionCompat: shockver,
+		DeprecationWarning: deprecation,
+	})
 	server := &http.Server{
-		Addr:    ":30000",
+		Addr:    "localhost:30000", // TODO get from config
 		Handler: serv,
 	}
 
