@@ -4,6 +4,7 @@ language: go
 go: "1.12"
 
 install:
+  - pwd
   - ls -l
   - go build app/blobstore.go
 
