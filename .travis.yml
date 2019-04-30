@@ -4,8 +4,8 @@ language: go
 go: "1.12"
 
 install:
-  ls -l
-  go build app/blobstore.go
+  - ls -l
+  - go build app/blobstore.go
 
 script:
-  go test ./...
+  - go test ./...
