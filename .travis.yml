@@ -4,6 +4,7 @@ language: go
 go: "1.12"
 
 install:
+  - export GO111MODULE=on
   - pwd
   - ls -l
   - go build app/blobstore.go
