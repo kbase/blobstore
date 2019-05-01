@@ -82,6 +82,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure how to test
 	}
+	// TODO check for non-200 response and handle
 	return &StoreFileOutput{
 			ID:       p.id,
 			Filename: p.filename,
