@@ -1,9 +1,9 @@
 package service
 
 import (
-	"time"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -27,12 +27,12 @@ type ServerStaticConf struct {
 
 // Server the blobstore server
 type Server struct {
-	mux *mux.Router
+	mux        *mux.Router
 	staticconf ServerStaticConf
 }
 
 // New create a new server.
-func New(sconf ServerStaticConf) (*Server) {
+func New(sconf ServerStaticConf) *Server {
 	router := mux.NewRouter()
 	s := &Server{mux: router, staticconf: sconf}
 	// r.Use(loggingMiddleWare)
@@ -40,18 +40,19 @@ func New(sconf ServerStaticConf) (*Server) {
 	return s
 }
 
+// ServeHTTP implementation of the http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
 func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	ret := map[string]interface{}{
-		"servername": s.staticconf.ServerName,
-		"serverversion": s.staticconf.ServerVersion,
-		"id": s.staticconf.ID,
-		"version": s.staticconf.ServerVersionCompat,
+		"servername":         s.staticconf.ServerName,
+		"serverversion":      s.staticconf.ServerVersion,
+		"id":                 s.staticconf.ID,
+		"version":            s.staticconf.ServerVersionCompat,
 		"deprecationwarning": s.staticconf.DeprecationWarning,
-		"servertime": time.Now().UnixNano() / 1000000,
+		"servertime":         time.Now().UnixNano() / 1000000,
 		//TODO git commit hash
 	}
 	enc := json.NewEncoder(w)
