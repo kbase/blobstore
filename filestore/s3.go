@@ -31,15 +31,18 @@ func NewS3FileStore(client *s3.S3, bucket string) (*S3FileStore, error) {
 	}
 	err := createBucket(client, bucket)
 	if err != nil {
+		// this case is hard to test without adding minio accounts which is a chunk of work.
+		// Ignore for now.
 		return nil, err
 	}
 	//TODO check bucket for illegal chars and max length
 
 	return &S3FileStore{client: client, bucket: bucket}, nil
-
 }
 
 func createBucket(s3Client *s3.S3, bucket string) error {
+	// most of the error cases are hard to test without adding minio accounts which is a
+	// chunk of work. Ignore for now.
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	_, err := s3Client.CreateBucket(input)
 	if err != nil {
@@ -56,6 +59,11 @@ func createBucket(s3Client *s3.S3, bucket string) error {
 		return err
 	}
 	return nil
+}
+
+// GetBucket returns the bucket in which files are stored.
+func (fs *S3FileStore) GetBucket() string {
+	return fs.bucket
 }
 
 // StoreFile stores a file.

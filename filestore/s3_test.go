@@ -1,10 +1,13 @@
 package filestore
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/kbase/blobstore/test/miniocontroller"
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
@@ -49,7 +52,41 @@ func ptr(s string) *string {
 	return &s
 }
 
-//TODO test file store with existing bucket
+func (t *TestSuite) TestConstructFail() {
+	constructFail(t, nil, "s", errors.New("client cannot be nil"))
+	cli := t.minio.CreateS3Client("us-west-1")
+	constructFail(t, cli, "   \t   \n   ", errors.New("bucket cannot be empty or whitespace only"))
+
+}
+
+func constructFail(t *TestSuite, client *s3.S3, bucket string, expected error) {
+	fstore, err := NewS3FileStore(client, bucket)
+	if err == nil {
+		t.Fail("expected error")
+	}
+	if fstore != nil {
+		t.Fail("storage is not nil when error is present")
+	}
+	t.Equal(expected, err, "incorrect error")
+}
+
+func (t *TestSuite) TestConstructWithExistingBucket() {
+	mclient := t.minio.CreateS3Client("us-west-1")
+	bucket := "somebucket"
+	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
+	_, err := mclient.CreateBucket(input)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	fstore, err := NewS3FileStore(mclient, bucket)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	if fstore == nil {
+		t.Fail("expected configured store")
+	}
+	t.Equal(fstore.GetBucket(), bucket, "incorrect bucket")
+}
 
 func (t *TestSuite) TestGetAndPut() {
 	mclient := t.minio.CreateS3Client("us-west-1")
