@@ -3,6 +3,7 @@ package filestore
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -74,11 +75,11 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		Key:    &p.id,
 	})
 
-	url, _, err := putObj.PresignRequest(15 * time.Minute) // headers is nil in this case
+	presignedurl, _, err := putObj.PresignRequest(15 * time.Minute) // headers is nil in this case
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure how to test
 	}
-	req, err := http.NewRequest("PUT", url, p.data)
+	req, err := http.NewRequest("PUT", presignedurl, p.data)
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure now to test
 	}
@@ -88,7 +89,8 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err // may want to wrap error here, not sure how to test
+		// don't expose the presigned url in the returned error
+		return nil, err.(*url.Error).Err
 	}
 	stored, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
 	if err != nil {
