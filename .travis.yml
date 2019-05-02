@@ -3,14 +3,22 @@ sudo: required
 language: go
 go: "1.12"
 
+env: 
+  - MINIO=2019-04-23T23-50-36Z
+
 install:
   - export GO111MODULE=on
-  - pwd
-  - ls -l
   - go build app/blobstore.go
 
 script:
-  - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+  - wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.$MINIO -O minio
+  - chmod a+x minio
+  - export MINIOD=`pwd`/minio
+  - cp test.cfg.example test.cfg
+  - sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIOD#" test.cfg
+  - cat test.cfg
+  - export TCFG=`pwd`/test.cfg
+  - BLOBSTORE_TEST_CFG=$TCFG go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

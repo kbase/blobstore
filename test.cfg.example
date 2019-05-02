@@ -1,0 +1,11 @@
+[BlobstoreTest]
+
+# the path to the Minio executable to use.
+test.minio.exe=minio
+
+# Where to store temporary files generated during the test.
+test.temp.dir=temp_test_dir
+
+# Whether test files should be discarded after testing is complete.
+# Anything other than 'false' is considered true.
+test.delete.temp.dir=true

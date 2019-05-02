@@ -8,7 +8,6 @@ import (
 )
 
 // TODO may need limits for strings.
-//TODO in implementation, check for valid object names https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
 
 // StoreFileParams input parameters for storing a file.
 type StoreFileParams struct {
@@ -109,4 +108,5 @@ type FileStore interface {
 	StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error)
 	// Get a file by the ID of the file.
 	GetFile(id string) (out *GetFileOutput, err error)
+	//TODO CopyFile, DeleteFile
 }
