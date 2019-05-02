@@ -39,7 +39,7 @@ func FileName(filename string) func(*StoreFileParams) error {
 // To set the file format and name (both optional and arbitrary) use the Format() and
 // FileName() functions in the options argument.
 // The ID, format, and name will be whitespace-trimmed.
-// The reader will be closed when empty.
+// The user is responsible for closing the reader, if closable.
 func NewStoreFileParams(
 	id string,
 	size int64,
@@ -99,7 +99,7 @@ type GetFileOutput struct {
 	// The time the file was stored.
 	Stored time.Time
 	// The file's contents.
-	Data io.Reader
+	Data io.ReadCloser
 }
 
 // FileStore an interface to a file storage system that allows storing and retrieving files
