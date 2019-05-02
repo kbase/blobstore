@@ -90,6 +90,11 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure how to test
 	}
+	stored, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
+	if err != nil {
+		// TODO delete file if this occurs, but it should never really happen
+		return nil, err
+	}
 	// TODO check for non-200 response and handle
 	return &StoreFileOutput{
 			ID:       p.id,
@@ -100,7 +105,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 			// That means that we can't return the md5 in get file though.
 			MD5:    strings.Trim(resp.Header.Get("Etag"), `"`),
 			Size:   p.size,
-			Stored: time.Now(), // TODO get time from header
+			Stored: stored,
 		},
 		nil
 }
