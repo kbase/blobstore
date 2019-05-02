@@ -151,8 +151,6 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 	if res != nil {
 		t.Fail("returned object is not nil")
 	}
-	// I don't understand why the below doesn't work,
-	// t.Equal(errors.New("http: ContentLength=11 with Body length 12"), err, "incorrect error")
 	// might want a different error message here
-	t.Equal("http: ContentLength=11 with Body length 12", err.Error(), "incorrect error")
+	t.Equal(errors.New("http: ContentLength=11 with Body length 12"), err, "incorrect error")
 }

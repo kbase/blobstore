@@ -90,7 +90,8 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// don't expose the presigned url in the returned error
-		return nil, err.(*url.Error).Err
+		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
+		return nil, errors.New(err.(*url.Error).Err.Error())
 	}
 	stored, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
 	if err != nil {
