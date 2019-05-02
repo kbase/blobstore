@@ -12,6 +12,7 @@ install:
 
 script:
   - wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.$MINIO -O minio
+  - chmod a+x minio
   - export MINIOD=`pwd`/minio
   - cp test.cfg.example test.cfg
   - sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIOD#" test.cfg
