@@ -15,7 +15,7 @@ import (
 	"github.com/phayes/freeport"
 )
 
-// Params are Parameters for creating a Minio controller.
+// Params are Parameters for creating a Minio controller. All the entries are required.
 type Params struct {
 	// ExecutablePath is the path of the minio executable.
 	ExecutablePath string
@@ -25,6 +25,8 @@ type Params struct {
 	SecretKey string
 	// RootTempDir is where temporary files should be placed.
 	RootTempDir string
+	// Region is the region string, e.g. 'us-west-1'.
+	Region string
 }
 
 // Controller is a Minio controller.
@@ -33,6 +35,7 @@ type Controller struct {
 	tempDir   string
 	accessKey string
 	secretKey string
+	region    string
 	cmd       *exec.Cmd
 }
 
@@ -72,7 +75,7 @@ func New(p Params) (*Controller, error) {
 	// at 200, sometimes gets connection refused.
 	time.Sleep(500 * time.Millisecond) // wait for server to start
 
-	return &Controller{port, tdir, p.AccessKey, p.SecretKey, cmd}, nil
+	return &Controller{port, tdir, p.AccessKey, p.SecretKey, p.Region, cmd}, nil
 }
 
 // GetPort returns the port on which Minio is listening.
@@ -98,9 +101,7 @@ func (c *Controller) Destroy(deleteTempDir bool) error {
 }
 
 // CreateS3Client creates a Amazon S3 client pointed at the minio instance.
-//
-// region sets the region to use - e.g. "us-west-1".
-func (c *Controller) CreateS3Client(region string) *s3.S3 {
+func (c *Controller) CreateS3Client() *s3.S3 {
 	trueref := true
 	endpoint := "localhost:" + strconv.Itoa(c.port)
 
@@ -109,9 +110,40 @@ func (c *Controller) CreateS3Client(region string) *s3.S3 {
 	return s3.New(sess, &aws.Config{
 		Credentials:      creds,
 		Endpoint:         &endpoint,
-		Region:           &region,
+		Region:           &c.region,
 		DisableSSL:       &trueref,
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
 }
 
-//TODO destroy all buckets
+// Clear removes all data from the Minio instance, but is limited to the first 1000 objects in
+// each of the buckets.
+func (c *Controller) Clear() error {
+	client := c.CreateS3Client()
+	buckets, err := client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		return err
+	}
+	for _, bucket := range buckets.Buckets {
+		objects, err := client.ListObjects(&s3.ListObjectsInput{Bucket: bucket.Name})
+		if err != nil {
+			return err
+		}
+		objlist := make([]*s3.ObjectIdentifier, 1)
+		for _, object := range objects.Contents {
+			objlist = append(objlist, &s3.ObjectIdentifier{Key: object.Key})
+		}
+		if len(objlist) > 0 {
+			_, err := client.DeleteObjects(&s3.DeleteObjectsInput{
+				Bucket: bucket.Name,
+				Delete: &s3.Delete{Objects: objlist}})
+			if err != nil {
+				return err
+			}
+		}
+		_, err = client.DeleteBucket(&s3.DeleteBucketInput{Bucket: bucket.Name})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

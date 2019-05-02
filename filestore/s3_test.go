@@ -29,7 +29,9 @@ func (t *TestSuite) SetupSuite() {
 		ExecutablePath: tcfg.MinioExePath,
 		AccessKey:      "ackey",
 		SecretKey:      "sooporsecret",
-		RootTempDir:    tcfg.TempDir})
+		RootTempDir:    tcfg.TempDir,
+		Region:         "us-west-1",
+	})
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -43,7 +45,9 @@ func (t *TestSuite) TearDownSuite() {
 	}
 }
 
-// TODO clear minio between tests
+func (t *TestSuite) SetupTest() {
+	t.minio.Clear()
+}
 
 func TestRunSuite(t *testing.T) {
 	suite.Run(t, new(TestSuite))
@@ -55,7 +59,7 @@ func ptr(s string) *string {
 
 func (t *TestSuite) TestConstructFail() {
 	constructFail(t, nil, "s", errors.New("client cannot be nil"))
-	cli := t.minio.CreateS3Client("us-west-1")
+	cli := t.minio.CreateS3Client()
 	constructFail(t, cli, "   \t   \n   ", errors.New("bucket cannot be empty or whitespace only"))
 
 }
@@ -72,7 +76,7 @@ func constructFail(t *TestSuite, client *s3.S3, bucket string, expected error) {
 }
 
 func (t *TestSuite) TestConstructWithExistingBucket() {
-	mclient := t.minio.CreateS3Client("us-west-1")
+	mclient := t.minio.CreateS3Client()
 	bucket := "somebucket"
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	_, err := mclient.CreateBucket(input)
@@ -90,7 +94,7 @@ func (t *TestSuite) TestConstructWithExistingBucket() {
 }
 
 func (t *TestSuite) TestGetAndPut() {
-	mclient := t.minio.CreateS3Client("us-west-1")
+	mclient := t.minio.CreateS3Client()
 	fstore, err := NewS3FileStore(mclient, "mybucket")
 	if err != nil {
 		t.Fail(err.Error())
