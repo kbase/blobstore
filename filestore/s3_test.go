@@ -93,7 +93,7 @@ func (t *TestSuite) TestConstructWithExistingBucket() {
 	t.Equal(fstore.GetBucket(), bucket, "incorrect bucket")
 }
 
-func (t *TestSuite) TestGetAndPut() {
+func (t *TestSuite) TestStoreAndGet() {
 	mclient := t.minio.CreateS3Client()
 	fstore, err := NewS3FileStore(mclient, "mybucket")
 	if err != nil {
@@ -129,4 +129,28 @@ func (t *TestSuite) TestGetAndPut() {
 	t.Equal(expected, res, "unexpected output")
 
 	//TODO get file and check contents
+}
+
+func (t *TestSuite) TestStoreWithIncorrectSize() {
+	mclient := t.minio.CreateS3Client()
+	fstore, err := NewS3FileStore(mclient, "mybucket")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	p, err := NewStoreFileParams(
+		"myid",
+		11,
+		strings.NewReader("012345678910"),
+		Format("json"),
+		FileName("fn"),
+	)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	res, err := fstore.StoreFile(p)
+	if res != nil {
+		t.Fail("returned object is not nil")
+	}
+	// might want a different error message here
+	t.Equal(errors.New("http: ContentLength=11 with Body length 12"), err, "incorrect error")
 }
