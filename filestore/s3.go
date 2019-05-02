@@ -48,15 +48,13 @@ func createBucket(s3Client *s3.S3, bucket string) error {
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	_, err := s3Client.CreateBucket(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				// TODO LOG here, need to pass in logger
-				// log.Println("Bucket already exists")
-				return nil // everything's groovy
-			default:
-				// do nothing
-			}
+		switch err.(awserr.Error).Code() {
+		case s3.ErrCodeBucketAlreadyOwnedByYou:
+			// TODO LOG here, need to pass in logger
+			// log.Println("Bucket already exists")
+			return nil // everything's groovy
+		default:
+			// do nothing
 		}
 		return err
 	}
@@ -84,8 +82,8 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		return nil, err // may want to wrap error here, not sure now to test
 	}
 	req.ContentLength = p.size
-	req.Header.Set("x-amz-meta-filename", p.filename)
-	req.Header.Set("x-amz-meta-format", p.format)
+	req.Header.Set("x-amz-meta-Filename", p.filename)
+	req.Header.Set("x-amz-meta-Format", p.format)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -112,14 +110,37 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 			// That means that we can't return the md5 in get file though.
 			MD5:    strings.Trim(resp.Header.Get("Etag"), `"`),
 			Size:   p.size,
-			Stored: stored,
+			Stored: stored.UTC(),
 		},
 		nil
 }
 
 // GetFile Get a file by the ID of the file.
+// The user is responsible for closing the reader.
 func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
-	// TODO implement
-	return nil, nil
-
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, errors.New("id cannot be empty or whitespace only")
+	}
+	res, err := fs.client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
+	if err != nil {
+		switch err.(awserr.Error).Code() {
+		case s3.ErrCodeNoSuchKey:
+			// TODO ERROR change to own error code system so can be converted to HTTP codes (404 here)
+			return nil, fmt.Errorf("No such id: " + id)
+		default:
+			// do nothing - not sure how to test this
+		}
+		return nil, err
+	}
+	return &GetFileOutput{
+			ID:       id,
+			Size:     *res.ContentLength,
+			Filename: *res.Metadata["Filename"], // never nil per save method
+			Format:   *res.Metadata["Format"],   // never nil per save method
+			MD5:      strings.Trim(*res.ETag, `"`),
+			Data:     res.Body,
+			Stored:   res.LastModified.UTC(),
+		},
+		nil
 }

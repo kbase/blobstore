@@ -2,9 +2,9 @@ package filestore
 
 import (
 	"errors"
+	"io/ioutil"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -94,63 +94,100 @@ func (t *TestSuite) TestConstructWithExistingBucket() {
 }
 
 func (t *TestSuite) TestStoreAndGet() {
+	t.storeAndGet("", "")
+}
+func (t *TestSuite) TestStoreAndGetWithMeta() {
+	t.storeAndGet("fn", "json")
+}
+
+func (t *TestSuite) storeAndGet(filename string, format string) {
 	mclient := t.minio.CreateS3Client()
-	fstore, err := NewS3FileStore(mclient, "mybucket")
-	if err != nil {
-		t.Fail(err.Error())
-	}
-	p, err := NewStoreFileParams(
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	p, _ := NewStoreFileParams(
 		"myid",
 		12,
 		strings.NewReader("012345678910"),
-		Format("json"),
-		FileName("fn"),
+		Format(format),
+		FileName(filename),
 	)
-	if err != nil {
-		t.Fail(err.Error())
-	}
-	res, err := fstore.StoreFile(p)
-	if err != nil {
-		t.Fail(err.Error())
-	}
+	res, _ := fstore.StoreFile(p)
 
-	testhelpers.AssertCloseToNow1S(t.T(), res.Stored)
-	fakestored := time.Now()
-	res.Stored = fakestored
+	stored := res.Stored
+	testhelpers.AssertCloseToNow1S(t.T(), stored)
 	expected := &StoreFileOutput{
 		ID:       "myid",
 		Size:     12,
-		Stored:   fakestored,
-		Filename: "fn",
-		Format:   "json",
+		Stored:   stored, // fake
+		Filename: filename,
+		Format:   format,
 		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
 	}
 
 	t.Equal(expected, res, "unexpected output")
 
-	//TODO get file and check contents
+	obj, _ := fstore.GetFile("  myid   ")
+	defer obj.Data.Close()
+	b, _ := ioutil.ReadAll(obj.Data)
+	t.Equal("012345678910", string(b), "incorrect object contents")
+	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
+
+	expected2 := &GetFileOutput{
+		ID:       "myid",
+		Size:     12,
+		Filename: filename,
+		Format:   format,
+		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
+		Stored:   stored,
+	}
+	t.Equal(expected2, obj, "incorrect object")
 }
 
 func (t *TestSuite) TestStoreWithIncorrectSize() {
 	mclient := t.minio.CreateS3Client()
-	fstore, err := NewS3FileStore(mclient, "mybucket")
-	if err != nil {
-		t.Fail(err.Error())
-	}
-	p, err := NewStoreFileParams(
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	p, _ := NewStoreFileParams(
 		"myid",
 		11,
 		strings.NewReader("012345678910"),
 		Format("json"),
 		FileName("fn"),
 	)
-	if err != nil {
-		t.Fail(err.Error())
-	}
 	res, err := fstore.StoreFile(p)
 	if res != nil {
 		t.Fail("returned object is not nil")
 	}
 	// might want a different error message here
 	t.Equal(errors.New("http: ContentLength=11 with Body length 12"), err, "incorrect error")
+}
+
+func (t *TestSuite) TestGetWithBlankID() {
+	mclient := t.minio.CreateS3Client()
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+
+	res, err := fstore.GetFile("")
+	if res != nil {
+		t.Fail("returned object is not null")
+	}
+	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")
+}
+
+func (t *TestSuite) TestGetWithNonexistentID() {
+	mclient := t.minio.CreateS3Client()
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+	)
+	_, err := fstore.StoreFile(p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+
+	res, err := fstore.GetFile(" no file ")
+	if res != nil {
+		t.Fail("returned object is not null")
+	}
+	t.Equal(errors.New("No such id: no file"), err, "incorrect err")
 }
