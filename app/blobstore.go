@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"syscall"
-	"os/signal"
-	"os"
-	"time"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/kbase/blobstore/service"
 )
@@ -15,21 +15,20 @@ import (
 // note that the contents of this file are tested manually.
 
 const (
-	name = "blobstore"
-	version = "0.1.0"
-	shockname = "Shock"
-	shockver = "0.9.6"
+	name        = "blobstore"
+	version     = "0.1.0"
+	shockname   = "Shock"
+	shockver    = "0.9.6"
 	deprecation = "The id and version fields are deprecated."
 )
 
-
 func main() {
 	serv := service.New(service.ServerStaticConf{
-		ServerName: name,
-		ServerVersion: version,
-		ID: shockname,
+		ServerName:          name,
+		ServerVersion:       version,
+		ID:                  shockname,
 		ServerVersionCompat: shockver,
-		DeprecationWarning: deprecation,
+		DeprecationWarning:  deprecation,
 	})
 	server := &http.Server{
 		Addr:    "localhost:30000", // TODO get from config
@@ -37,7 +36,7 @@ func main() {
 	}
 
 	go func() {
-		// TODO log ip
+		// TODO LOG ip
 		// logger.Printf("Listening on http://0.0.0.0%s\n", hs.Addr)
 
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
@@ -61,7 +60,7 @@ func graceful(hs *http.Server, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// TODO handle logging
+	// TODO LOG handle logging
 
 	// logger.Printf("\nShutdown with timeout: %s\n", timeout)
 

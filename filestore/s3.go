@@ -2,6 +2,7 @@ package filestore
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -36,7 +37,7 @@ func NewS3FileStore(client *s3.S3, bucket string) (*S3FileStore, error) {
 		// Ignore for now.
 		return nil, err
 	}
-	//TODO check bucket for illegal chars and max length
+	//TODO INPUT check bucket name for illegal chars and max length
 
 	return &S3FileStore{client: client, bucket: bucket}, nil
 }
@@ -50,7 +51,7 @@ func createBucket(s3Client *s3.S3, bucket string) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				// TODO log here, need to pass in logger
+				// TODO LOG here, need to pass in logger
 				// log.Println("Bucket already exists")
 				return nil // everything's groovy
 			default:
@@ -69,7 +70,6 @@ func (fs *S3FileStore) GetBucket() string {
 
 // StoreFile stores a file.
 func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error) {
-	//TODO check for valid object names https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
 	putObj, _ := fs.client.PutObjectRequest(&s3.PutObjectInput{ // PutObjectOutput is never filled
 		Bucket: &fs.bucket,
 		Key:    &p.id,
@@ -93,12 +93,16 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
 		return nil, errors.New(err.(*url.Error).Err.Error())
 	}
+	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
+		// not sure how to test this either, other than shutting down Minio
+		// TODO LOG body
+		return nil, fmt.Errorf("Unexpected status code uploading to S3: %v", resp.StatusCode)
+	}
 	stored, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
 	if err != nil {
-		// TODO delete file if this occurs, but it should never really happen
+		// should delete file if this occurs, but it should never happen
 		return nil, err
 	}
-	// TODO check for non-200 response and handle
 	return &StoreFileOutput{
 			ID:       p.id,
 			Filename: p.filename,
@@ -115,7 +119,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 
 // GetFile Get a file by the ID of the file.
 func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
-	// TODO
+	// TODO implement
 	return nil, nil
 
 }
