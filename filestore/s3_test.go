@@ -15,30 +15,31 @@ import (
 
 type TestSuite struct {
 	suite.Suite
-	minio *miniocontroller.Controller
+	minio         *miniocontroller.Controller
+	deleteTempDir bool
 }
 
 func (t *TestSuite) SetupSuite() {
-	// TODO get from test files
-	miniopath := "minio"
-	testdir := "temp_test_dir"
+	tcfg, err := testhelpers.GetConfig()
+	if err != nil {
+		t.Fail(err.Error())
+	}
 
 	minio, err := miniocontroller.New(miniocontroller.Params{
-		ExecutablePath: miniopath,
+		ExecutablePath: tcfg.MinioExePath,
 		AccessKey:      "ackey",
 		SecretKey:      "sooporsecret",
-		RootTempDir:    testdir})
+		RootTempDir:    tcfg.TempDir})
 	if err != nil {
 		t.Fail(err.Error())
 	}
 	t.minio = minio
+	t.deleteTempDir = tcfg.DeleteTempDir
 }
 
 func (t *TestSuite) TearDownSuite() {
-	// TODO get from test files
-	deleteTempFiles := true
 	if t.minio != nil {
-		t.minio.Destroy(deleteTempFiles)
+		t.minio.Destroy(t.deleteTempDir)
 	}
 }
 

@@ -15,6 +15,17 @@ The API is nominally compatible with a minimal subset of the
 not supported; only those required for the KBase codebase are included.
 
 
+# Testing
+
+Copy `test.cfg.example` to `test.cfg` and adjust the values as necessary.
+
+```
+BLOBSTORE_TEST_CFG=[absolute path to test.cfg] go test ./...
+```
+
+Each package gets its own working directory during tests so the path to the `test.cfg` file
+cannot be relative.
+
 # TODO
 * HTTP2 support
 
