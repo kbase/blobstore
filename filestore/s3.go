@@ -195,7 +195,8 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
 	src := minio.NewSourceInfo(fs.bucket, sourceID, nil)
 	// err is returned on invalid bucket & object names.
 	dst, _ := minio.NewDestinationInfo(fs.bucket, targetID, nil, nil)
-	//TODO BLOCKER test with > 5G object
+	// tested this manually with 12G object. Locally takes about the same amount of time
+	// as StoreFile. Disk limited, presumably
 	err := fs.minioClient.CopyObject(dst, src)
 	if err != nil {
 		err2 := err.(minio.ErrorResponse)

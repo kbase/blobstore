@@ -1,6 +1,8 @@
 package filestore
 
 import (
+	"fmt"
+	"os"
 	"bytes"
 	"time"
 	"github.com/stretchr/testify/assert"
@@ -390,4 +392,47 @@ func (t *TestSuite) TestCopyNonExistentFile() {
 		t.Fail(err.Error())
 	}
 	t.copyFail(fstore, "  myid2   ", "   myid3  ", errors.New("File ID myid2 does not exist"))
+}
+
+func (t* TestSuite) testCopyLargeObject() {
+	// this takes a long time so should not be part of the regular test suite.
+	// run it manually as needed
+	largefilepath := os.Getenv("TEST_LARGE_FILE_PATH")
+	fmt.Println(largefilepath)
+	reader, err := os.Open(largefilepath)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	fi, err := reader.Stat()
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+	p, _ := NewStoreFileParams("myid", fi.Size(), reader)
+	start := time.Now()
+	obj, err := fstore.StoreFile(p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	fmt.Printf("Store took %s\n", time.Since(start))
+	stored := time.Now()
+	fmt.Println(obj)
+
+	err = fstore.CopyFile("myid", "myid2")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	fmt.Printf("Copy took %s\n", time.Since(stored))
+	copied := time.Now()
+	res, err := fstore.GetFile("myid2")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	fmt.Printf("Get took %s\n", time.Since(copied))
+	res.Data.Close()
+	fmt.Println(res)
+	// test passed
+
 }
