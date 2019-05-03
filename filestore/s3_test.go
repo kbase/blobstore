@@ -184,10 +184,65 @@ func (t *TestSuite) TestGetWithNonexistentID() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
+	t.assertNoFile(fstore, " no file ")
+}
 
-	res, err := fstore.GetFile(" no file ")
+func (t *TestSuite) assertNoFile(fstore FileStore, id string) {
+	res, err := fstore.GetFile(id)
 	if res != nil {
 		t.Fail("returned object is not null")
 	}
-	t.Equal(errors.New("No such id: no file"), err, "incorrect err")
+	t.Equal(errors.New("No such id: "+strings.TrimSpace(id)), err, "incorrect err")
+}
+
+func (t *TestSuite) TestDeleteObject() {
+	mclient := t.minio.CreateS3Client()
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+	)
+	_, err := fstore.StoreFile(p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	err = fstore.DeleteFile("  myid   ")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	t.assertNoFile(fstore, "   myid   ")
+}
+
+func (t *TestSuite) TestDeleteObjectWrongID() {
+	mclient := t.minio.CreateS3Client()
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+	)
+	_, err := fstore.StoreFile(p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	err = fstore.DeleteFile("  myid2   ") // S3 returns no error here, which is weird
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	obj, err := fstore.GetFile("  myid   ")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	if obj == nil {
+		t.Fail("expected object")
+	}
+}
+
+func (t *TestSuite) TestDeleteWithBlankID() {
+	mclient := t.minio.CreateS3Client()
+	fstore, _ := NewS3FileStore(mclient, "mybucket")
+
+	err := fstore.DeleteFile("")
+	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")
 }
