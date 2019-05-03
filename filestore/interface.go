@@ -84,11 +84,6 @@ type StoreFileOutput struct {
 	Stored time.Time
 }
 
-// CopyFileOutput the output of the file copy operation.
-type CopyFileOutput struct {
-	StoreFileOutput
-}
-
 // GetFileOutput the output when getting a file. The user is responsible for closing the reader.
 type GetFileOutput struct {
 	// The id by which the file can be accessed.
@@ -111,11 +106,11 @@ type GetFileOutput struct {
 // by ID.
 type FileStore interface {
 	// Store a file.
-	StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error)
+	StoreFile(p *StoreFileParams) (*StoreFileOutput, error)
 	// Get a file by the ID of the file.
-	GetFile(id string) (out *GetFileOutput, err error)
+	GetFile(id string) (*GetFileOutput, error)
 	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
 	DeleteFile(id string) error
 	// CopyFile copies a file from one ID to another.
-	CopyFile(sourceID string, targetID string) (out *CopyFileOutput, err error)
+	CopyFile(sourceID string, targetID string) error
 }
