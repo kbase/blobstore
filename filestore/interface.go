@@ -109,5 +109,7 @@ type FileStore interface {
 	StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error)
 	// Get a file by the ID of the file.
 	GetFile(id string) (out *GetFileOutput, err error)
-	//TODO CopyFile, DeleteFile
+	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
+	DeleteFile(id string) error
+	//TODO CopyFile (minio client looks better here)
 }

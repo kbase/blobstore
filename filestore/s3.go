@@ -144,3 +144,20 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 		},
 		nil
 }
+
+// DeleteFile deletes the file with the given ID. Deleting and ID that does not exist is not an
+// error
+func (fs *S3FileStore) DeleteFile(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("id cannot be empty or whitespace only")
+	}
+	_, err := fs.client.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: &fs.bucket,
+		Key:    &id,
+	})
+	if err != nil {
+		return err // no idea how to test this - could delete bucket? But that shouldn't happen
+	}
+	return nil
+}
