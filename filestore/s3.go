@@ -144,17 +144,24 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 		}
 		return nil, err
 	}
-	//TODO ERROR allow null metadata. Older files may not have metadata. Test via manually putting data
 	return &GetFileOutput{
 			ID:       id,
 			Size:     *res.ContentLength,
-			Filename: *res.Metadata["Filename"], // never nil per save method
-			Format:   *res.Metadata["Format"],   // never nil per save method
+			Filename: getMeta(res.Metadata, "Filename"),
+			Format:   getMeta(res.Metadata, "Format"),
 			MD5:      strings.Trim(*res.ETag, `"`),
 			Data:     res.Body,
 			Stored:   res.LastModified.UTC(),
 		},
 		nil
+}
+
+func getMeta(meta map[string]*string, key string) string {
+	val := meta[key]
+	if val == nil {
+		return ""
+	}
+	return *val
 }
 
 // DeleteFile deletes the file with the given ID. Deleting an ID that does not exist is not an
@@ -197,5 +204,5 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
 			return fmt.Errorf("File ID %s does not exist", sourceID)
 		}
 	}
-	return err // don't know how to test this easily
+	return err // don't know how to test this easily if it's an error
 }

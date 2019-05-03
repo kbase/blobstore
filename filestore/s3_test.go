@@ -1,6 +1,7 @@
 package filestore
 
 import (
+	"bytes"
 	"time"
 	"github.com/stretchr/testify/assert"
 	"errors"
@@ -205,6 +206,51 @@ func (t *TestSuite) assertNoFile(fstore FileStore, id string) {
 		t.Fail("returned object is not null")
 	}
 	t.Equal(errors.New("No such id: "+strings.TrimSpace(id)), err, "incorrect err")
+}
+
+func (t *TestSuite) TestGetWithoutMetaData() {
+	// files not saved by this code may not have expected user metadata fields
+	// e.g. files transferred from Shock
+	bkt := "mybucket"
+	id := "myid"
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, bkt)
+
+	_, err := s3client.PutObject(&s3.PutObjectInput{
+		Bucket: &bkt,
+		Body: bytes.NewReader([]byte("012345678910")),
+		Key: &id,
+	})
+	if err != nil {
+		t.Fail(err.Error())
+	}
+
+	obj, err := fstore.GetFile(id)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	defer obj.Data.Close()
+	b, _ := ioutil.ReadAll(obj.Data)
+	t.Equal("012345678910", string(b), "incorrect object contents")
+	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
+
+	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
+
+	faketime := time.Now()
+	obj.Stored = faketime
+
+	expected := &GetFileOutput{
+		ID:       id,
+		Size:     12,
+		Filename: "",
+		Format:   "",
+		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
+		Stored:   faketime,
+	}
+
+	t.Equal(expected, obj, "incorrect return")
 }
 
 func (t *TestSuite) TestDeleteObject() {
