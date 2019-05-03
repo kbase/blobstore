@@ -11,27 +11,37 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/minio/minio-go"
 )
 
 // S3FileStore is a file store that stores files in an S3 API compatible storage system.
 // It impelements FileStore.
 type S3FileStore struct {
-	client *s3.S3
-	bucket string
+	s3client *s3.S3
+	bucket   string
 }
 
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
-// bucket, which will be created if it doesn't exist. The provided client must have write
+// bucket, which will be created if it doesn't exist. The provided clients must have write
 // privileges for the bucket.
-func NewS3FileStore(client *s3.S3, bucket string) (*S3FileStore, error) {
-	if client == nil {
-		return nil, errors.New("client cannot be nil")
+// Two clients are currently required because they are better at different operations.
+// This may change in a future version if one client provides all the necessary operations.
+func NewS3FileStore(
+	s3client *s3.S3,
+	minioClient *minio.Client,
+	bucket string) (*S3FileStore, error) {
+
+	if s3client == nil {
+		return nil, errors.New("s3client cannot be nil")
+	}
+	if minioClient == nil {
+		return nil, errors.New("minioClient cannot be nil")
 	}
 	bucket = strings.TrimSpace(bucket)
 	if bucket == "" {
 		return nil, errors.New("bucket cannot be empty or whitespace only")
 	}
-	err := createBucket(client, bucket)
+	err := createBucket(s3client, bucket)
 	if err != nil {
 		// this case is hard to test without adding minio accounts which is a chunk of work.
 		// Ignore for now.
@@ -39,7 +49,7 @@ func NewS3FileStore(client *s3.S3, bucket string) (*S3FileStore, error) {
 	}
 	//TODO INPUT check bucket name for illegal chars and max length
 
-	return &S3FileStore{client: client, bucket: bucket}, nil
+	return &S3FileStore{s3client: s3client, bucket: bucket}, nil
 }
 
 func createBucket(s3Client *s3.S3, bucket string) error {
@@ -68,7 +78,7 @@ func (fs *S3FileStore) GetBucket() string {
 
 // StoreFile stores a file.
 func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error) {
-	putObj, _ := fs.client.PutObjectRequest(&s3.PutObjectInput{ // PutObjectOutput is never filled
+	putObj, _ := fs.s3client.PutObjectRequest(&s3.PutObjectInput{ // PutObjectOutput is never filled
 		Bucket: &fs.bucket,
 		Key:    &p.id,
 	})
@@ -122,7 +132,7 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
-	res, err := fs.client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
+	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:
@@ -145,14 +155,14 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 		nil
 }
 
-// DeleteFile deletes the file with the given ID. Deleting and ID that does not exist is not an
+// DeleteFile deletes the file with the given ID. Deleting an ID that does not exist is not an
 // error
 func (fs *S3FileStore) DeleteFile(id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return errors.New("id cannot be empty or whitespace only")
 	}
-	_, err := fs.client.DeleteObject(&s3.DeleteObjectInput{
+	_, err := fs.s3client.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: &fs.bucket,
 		Key:    &id,
 	})
@@ -160,4 +170,10 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 		return err // no idea how to test this - could delete bucket? But that shouldn't happen
 	}
 	return nil
+}
+
+// CopyFile copies the file with the source ID to the target ID.
+func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*CopyFileOutput, error) {
+	//TODO implement
+	return nil, nil
 }

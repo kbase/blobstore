@@ -11,6 +11,8 @@ import (
 	"github.com/kbase/blobstore/test/miniocontroller"
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
+	"github.com/minio/minio-go"
+	
 )
 
 type TestSuite struct {
@@ -58,14 +60,17 @@ func ptr(s string) *string {
 }
 
 func (t *TestSuite) TestConstructFail() {
-	constructFail(t, nil, "s", errors.New("client cannot be nil"))
+	min, _ := t.minio.CreateMinioClient()
 	cli := t.minio.CreateS3Client()
-	constructFail(t, cli, "   \t   \n   ", errors.New("bucket cannot be empty or whitespace only"))
+	constructFail(t, nil, min, "s", errors.New("s3client cannot be nil"))
+	constructFail(t, cli, nil, "s", errors.New("minioClient cannot be nil"))
+	constructFail(t, cli, min, "   \t   \n   ",
+		errors.New("bucket cannot be empty or whitespace only"))
 
 }
 
-func constructFail(t *TestSuite, client *s3.S3, bucket string, expected error) {
-	fstore, err := NewS3FileStore(client, bucket)
+func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, bucket string, expected error) {
+	fstore, err := NewS3FileStore(client, min, bucket)
 	if err == nil {
 		t.Fail("expected error")
 	}
@@ -76,14 +81,15 @@ func constructFail(t *TestSuite, client *s3.S3, bucket string, expected error) {
 }
 
 func (t *TestSuite) TestConstructWithExistingBucket() {
-	mclient := t.minio.CreateS3Client()
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
 	bucket := "somebucket"
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
-	_, err := mclient.CreateBucket(input)
+	_, err := s3client.CreateBucket(input)
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	fstore, err := NewS3FileStore(mclient, bucket)
+	fstore, err := NewS3FileStore(s3client, mclient, bucket)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -101,8 +107,9 @@ func (t *TestSuite) TestStoreAndGetWithMeta() {
 }
 
 func (t *TestSuite) storeAndGet(filename string, format string) {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
 		"myid",
 		12,
@@ -144,8 +151,9 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 }
 
 func (t *TestSuite) TestStoreWithIncorrectSize() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
 		"myid",
 		11,
@@ -162,8 +170,9 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 }
 
 func (t *TestSuite) TestGetWithBlankID() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 
 	res, err := fstore.GetFile("")
 	if res != nil {
@@ -173,8 +182,9 @@ func (t *TestSuite) TestGetWithBlankID() {
 }
 
 func (t *TestSuite) TestGetWithNonexistentID() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
 		"myid",
 		12,
@@ -196,8 +206,9 @@ func (t *TestSuite) assertNoFile(fstore FileStore, id string) {
 }
 
 func (t *TestSuite) TestDeleteObject() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
 		"myid",
 		12,
@@ -215,8 +226,9 @@ func (t *TestSuite) TestDeleteObject() {
 }
 
 func (t *TestSuite) TestDeleteObjectWrongID() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
 		"myid",
 		12,
@@ -240,8 +252,9 @@ func (t *TestSuite) TestDeleteObjectWrongID() {
 }
 
 func (t *TestSuite) TestDeleteWithBlankID() {
-	mclient := t.minio.CreateS3Client()
-	fstore, _ := NewS3FileStore(mclient, "mybucket")
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 
 	err := fstore.DeleteFile("")
 	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")

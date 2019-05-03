@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
+	"github.com/minio/minio-go"
 	"github.com/phayes/freeport"
 )
 
@@ -113,6 +114,17 @@ func (c *Controller) CreateS3Client() *s3.S3 {
 		Region:           &c.region,
 		DisableSSL:       &trueref,
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
+}
+
+// CreateMinioClient creates a Minio S3 client pointed at the minio instance.
+func (c *Controller) CreateMinioClient() (*minio.Client, error) {
+	endpoint := "localhost:" + strconv.Itoa(c.port)
+	minioClient, err := minio.NewWithRegion(
+		endpoint, c.accessKey, c.secretKey, false, c.region)
+	if err != nil {
+		return nil, err
+	}
+	return minioClient, err
 }
 
 // Clear removes all data from the Minio instance, but is limited to the first 1000 objects in
