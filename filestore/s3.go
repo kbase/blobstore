@@ -17,8 +17,9 @@ import (
 // S3FileStore is a file store that stores files in an S3 API compatible storage system.
 // It impelements FileStore.
 type S3FileStore struct {
-	s3client *s3.S3
-	bucket   string
+	s3client    *s3.S3
+	minioClient *minio.Client
+	bucket      string
 }
 
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
@@ -49,7 +50,7 @@ func NewS3FileStore(
 	}
 	//TODO INPUT check bucket name for illegal chars and max length
 
-	return &S3FileStore{s3client: s3client, bucket: bucket}, nil
+	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket}, nil
 }
 
 func createBucket(s3Client *s3.S3, bucket string) error {
@@ -136,13 +137,14 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:
-			// TODO ERROR change to own error code system so can be converted to HTTP codes (404 here)
+			// TODO ERRORS change to own error code system so can be converted to HTTP codes (404 here)
 			return nil, fmt.Errorf("No such id: " + id)
 		default:
 			// do nothing - not sure how to test this
 		}
 		return nil, err
 	}
+	//TODO ERROR allow null metadata. Older files may not have metadata. Test via manually putting data
 	return &GetFileOutput{
 			ID:       id,
 			Size:     *res.ContentLength,
@@ -173,7 +175,27 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 }
 
 // CopyFile copies the file with the source ID to the target ID.
-func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*CopyFileOutput, error) {
-	//TODO implement
-	return nil, nil
+func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
+	sourceID = strings.TrimSpace(sourceID)
+	targetID = strings.TrimSpace(targetID)
+	if sourceID == "" {
+		return errors.New("sourceID cannot be empty or whitespace only")
+	}
+	if targetID == "" {
+		return errors.New("targetID cannot be empty or whitespace only")
+	}
+	// TODO INPUT check valid source and target IDs
+	src := minio.NewSourceInfo(fs.bucket, sourceID, nil)
+	// err is returned on invalid bucket & object names.
+	dst, _ := minio.NewDestinationInfo(fs.bucket, targetID, nil, nil)
+	//TODO BLOCKER test with > 5G object
+	err := fs.minioClient.CopyObject(dst, src)
+	if err != nil {
+		err2 := err.(minio.ErrorResponse)
+		if err2.Code == "NoSuchKey" { //TODO CONSTANT
+			// TODO ERRORS change to own error code system so can be converted to HTTP codes (404 here)
+			return fmt.Errorf("File ID %s does not exist", sourceID)
+		}
+	}
+	return err // don't know how to test this easily
 }

@@ -1,6 +1,8 @@
 package filestore
 
 import (
+	"time"
+	"github.com/stretchr/testify/assert"
 	"errors"
 	"io/ioutil"
 	"strings"
@@ -258,4 +260,88 @@ func (t *TestSuite) TestDeleteWithBlankID() {
 
 	err := fstore.DeleteFile("")
 	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")
+}
+
+func (t *TestSuite) TestCopy() {
+	t.copy("", "")
+}
+func (t *TestSuite) TestCopyWithMeta() {
+	t.copy("fn", "json")
+}
+
+func (t *TestSuite) copy(filename string, format string) {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+		Format(format),
+		FileName(filename),
+	)
+	res, _ := fstore.StoreFile(p)
+	time.Sleep(1 * time.Second) // otherwise the store times are the same
+	err := fstore.CopyFile("  myid   ", "   myid3  ")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+
+	obj, _ := fstore.GetFile("  myid3   ")
+	defer obj.Data.Close()
+	b, _ := ioutil.ReadAll(obj.Data)
+	t.Equal("012345678910", string(b), "incorrect object contents")
+	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
+
+	stored := obj.Stored
+	testhelpers.AssertCloseToNow1S(t.T(), stored)
+	assert.True(t.T(), stored.After(res.Stored), "expected copy time later than source time")
+
+	expected := &GetFileOutput{
+		ID:       "myid3",
+		Size:     12,
+		Filename: filename,
+		Format:   format,
+		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
+		Stored:   stored,
+	}
+	t.Equal(expected, obj, "incorrect object")
+}
+
+func (t *TestSuite) TestCopyBadInput() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+
+	t.copyFail(fstore, "  \t  \n  ", "bar",
+		errors.New("sourceID cannot be empty or whitespace only"))
+
+	t.copyFail(fstore, "foo", "  \t  \n  ",
+		errors.New("targetID cannot be empty or whitespace only"))
+
+}
+
+func (t *TestSuite) copyFail(fstore FileStore, src string, dst string, expected error) {
+	err := fstore.CopyFile(src, dst)
+	if err == nil {
+		t.Fail("expected error")
+	}
+	t.Equal(err, expected, "incorrect error")
+}
+
+func (t *TestSuite) TestCopyNonExistentFile() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+	)
+	_, err := fstore.StoreFile(p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	t.copyFail(fstore, "  myid2   ", "   myid3  ", errors.New("File ID myid2 does not exist"))
 }
