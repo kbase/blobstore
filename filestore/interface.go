@@ -84,6 +84,11 @@ type StoreFileOutput struct {
 	Stored time.Time
 }
 
+// CopyFileOutput the output of the file copy operation.
+type CopyFileOutput struct {
+	StoreFileOutput
+}
+
 // GetFileOutput the output when getting a file. The user is responsible for closing the reader.
 type GetFileOutput struct {
 	// The id by which the file can be accessed.
@@ -111,5 +116,6 @@ type FileStore interface {
 	GetFile(id string) (out *GetFileOutput, err error)
 	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
 	DeleteFile(id string) error
-	//TODO CopyFile (minio client looks better here)
+	// CopyFile copies a file from one ID to another.
+	CopyFile(sourceID string, targetID string) (out *CopyFileOutput, err error)
 }
