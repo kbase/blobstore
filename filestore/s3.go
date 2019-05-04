@@ -79,6 +79,9 @@ func (fs *S3FileStore) GetBucket() string {
 
 // StoreFile stores a file.
 func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error) {
+	if p == nil {
+		return nil, errors.New("Params cannot be nil")
+	}
 	putObj, _ := fs.s3client.PutObjectRequest(&s3.PutObjectInput{ // PutObjectOutput is never filled
 		Bucket: &fs.bucket,
 		Key:    &p.id,
