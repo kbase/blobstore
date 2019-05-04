@@ -155,6 +155,18 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 	t.Equal(expected2, obj, "incorrect object")
 }
 
+func (t *TestSuite) TestStoreWithNilInput() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+
+	res, err := fstore.StoreFile(nil)
+	if res != nil {
+		t.Fail("returned object is not nil")
+	}
+	t.Equal(errors.New("Params cannot be nil"), err, "incorrect error")
+}
+
 func (t *TestSuite) TestStoreWithIncorrectSize() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
