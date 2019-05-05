@@ -83,8 +83,6 @@ func TestNodeImmutable(t *testing.T) {
 	owner, _ := NewUser(uuid.New(), " owner ")
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	r2, _ := NewUser(uuid.New(), " r2")
-	r3, _ := NewUser(uuid.New(), " r3")
-	r4, _ := NewUser(uuid.New(), " r4")
 	n, _ := NewNode(
 		uuid.New(),
 		*owner,
@@ -94,14 +92,9 @@ func TestNodeImmutable(t *testing.T) {
 		Reader(*r1),
 		)
 	
-	// this test isn't really failsafe since it's not clear when append returns a new
-	// slice, but hopefully at least one of these is an in-place modification
+	// this test isn't really failsafe since it's not clear when append returns a new slice
 	readers := []User{*r1}
 	_ = append(*n.GetReaders(), *r2)
-	assert.Equal(t, &readers, n.GetReaders(), "incorrect readers")
-	_ = append(*n.GetReaders(), *r3)
-	assert.Equal(t, &readers, n.GetReaders(), "incorrect readers")
-	_ = append(*n.GetReaders(), *r4)
 	assert.Equal(t, &readers, n.GetReaders(), "incorrect readers")
 }
 
