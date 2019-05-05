@@ -37,3 +37,8 @@ cannot be relative.
 # TODO
 * HTTP2 support
 
+# S3/Minio experimental server
+
+While exploring upload speeds with various upload methods,
+[this server](https://github.com/MrCreosote/minioAWSAndGoClient) was generated.
+

@@ -49,7 +49,7 @@ type Node struct {
 	public   bool
 }
 
-// Format provide an arbitrary file format (e.g. json, txt) to the NewStoreFileParams() method.
+// Format provides an arbitrary file format (e.g. json, txt) to the NewStoreFileParams() method.
 func Format(format string) func(*Node) error {
 	return func(n *Node) error {
 		n.format = strings.TrimSpace(format)
@@ -57,7 +57,7 @@ func Format(format string) func(*Node) error {
 	}
 }
 
-// FileName provide an arbitrary file name to the NewStoreFileParams() method.
+// FileName provides an arbitrary file name to the NewStoreFileParams() method.
 func FileName(filename string) func(*Node) error {
 	return func(n *Node) error {
 		n.filename = strings.TrimSpace(filename)
