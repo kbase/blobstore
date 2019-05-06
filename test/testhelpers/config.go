@@ -17,6 +17,10 @@ const (
 	TestSection = "BlobstoreTest"
 	// TestMinioExe is the key in the config file for the minio executable path.
 	TestMinioExe = "test.minio.exe"
+	// TestMongoExe is the key in the config file for the mongo executable path.
+	TestMongoExe = "test.mongo.exe"
+	// TestUseWiredTiger denotes that the MongoDB WiredTiger storage engine should be used.
+	TestUseWiredTiger = "test.mongo.wired_tiger"
 	// TestTempDir is the key in the config file for the temporary directory.
 	TestTempDir = "test.temp.dir"
 	// TestDeleteTempDir is the key in the config file for whether the temporary directory
@@ -28,6 +32,8 @@ const (
 // TestConfig contains the test configuration.
 type TestConfig struct {
 	MinioExePath  string
+	MongoExePath  string
+	UseWiredTiger bool
 	TempDir       string
 	DeleteTempDir bool
 }
@@ -50,11 +56,19 @@ func GetConfig() (*TestConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	minio, err := getValue(sec, TestMinioExe, configfile, false)
+	minio, err := getValue(sec, TestMinioExe, configfile, true)
 	if err != nil {
 		return nil, err
 	}
-	tempDir, err := getValue(sec, TestTempDir, configfile, false)
+	mongo, err := getValue(sec, TestMongoExe, configfile, true)
+	if err != nil {
+		return nil, err
+	}
+	wiredTiger, err := getValue(sec, TestUseWiredTiger, configfile, false)
+	if err != nil {
+		return nil, err
+	}
+	tempDir, err := getValue(sec, TestTempDir, configfile, true)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +79,8 @@ func GetConfig() (*TestConfig, error) {
 
 	return &TestConfig{
 			MinioExePath:  minio,
+			MongoExePath:  mongo,
+			UseWiredTiger: wiredTiger == "true",
 			TempDir:       tempDir,
 			DeleteTempDir: del != "false",
 		},

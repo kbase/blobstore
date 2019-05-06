@@ -3,6 +3,13 @@
 # the path to the Minio executable to use.
 test.minio.exe=minio
 
+# the path to the MongoDB executable to use.
+test.mongo.exe=mongod
+
+# whether to use the wired tiger storage engine for MongoDB. 'true' means yes, anything else means
+# no.
+test.mongo.wired_tiger=false
+
 # Where to store temporary files generated during the test.
 test.temp.dir=temp_test_dir
 
