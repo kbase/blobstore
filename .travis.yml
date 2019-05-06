@@ -4,19 +4,35 @@ language: go
 go: "1.12"
 
 env: 
-  - MINIO=2019-04-23T23-50-36Z
+  - MONGODB_VER=mongodb-linux-x86_64-2.6.12 MINIO=2019-04-23T23-50-36Z WIRED_TIGER=false
+  - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-04-23T23-50-36Z WIRED_TIGER=false
+  - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-04-23T23-50-36Z WIRED_TIGER=true
 
 install:
   - export GO111MODULE=on
   - go build app/blobstore.go
 
 script:
+  # set up minio
   - wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.$MINIO -O minio
   - chmod a+x minio
   - export MINIOD=`pwd`/minio
+
+  # set up mongo
+  - cd ..
+  - wget http://fastdl.mongodb.org/linux/$MONGODB_VER.tgz
+  - tar xfz $MONGODB_VER.tgz
+  - export MONGOD=`pwd`/$MONGODB_VER/bin/mongod
+  - cd -
+
+  # set up test config
   - cp test.cfg.example test.cfg
   - sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIOD#" test.cfg
+  - sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
+  - sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=$WIRED_TIGER#" test.cfg
   - cat test.cfg
+
+  # run tests
   - export TCFG=`pwd`/test.cfg
   - BLOBSTORE_TEST_CFG=$TCFG go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
