@@ -1,6 +1,8 @@
 package nodestore
 
 import (
+	"go.mongodb.org/mongo-driver/bson"
+	"errors"
 	"testing"
 	"context"
 	"strconv"
@@ -73,6 +75,23 @@ func ptr(s string) *string {
 	return &s
 }
 
+func (t *TestSuite) TestConstructFail() {
+	t.failConstruct(nil, errors.New("db cannot be nil"))
+
+	// construct a broken client so the create indexes calls fail. Can only test the 1st call
+	// though.
+	copts := options.ClientOptions{Hosts: []string{
+		"localhost:" + strconv.Itoa(t.mongo.GetPort())}}
+	client, _ := mongo.NewClient(&copts)
+	t.failConstruct(client.Database(testDB), errors.New("topology is closed"))
+}
+
+func (t *TestSuite) failConstruct(client *mongo.Database, expected error) {
+	cli, err := NewMongoNodeStore(client)
+	t.Nil(cli, "expected nil result")
+	t.Equal(expected, err, "incorrect error")
+} 
+
 func (t *TestSuite) TestGetUser() {
 	ns, err := NewMongoNodeStore(t.client.Database(testDB))
 	if err != nil {
@@ -82,7 +101,59 @@ func (t *TestSuite) TestGetUser() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
+	uid := u.GetID()
 	t.Equal("myusername", u.GetAccountName(), "incorrect account name")
+	u, err = ns.GetUser("   myusername   ")
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	// now we can check the UUID is the same
+	expected, _ := NewUser(uid, "myusername")
+	t.Equal(expected, u, "incorrect user")
 }
 
-//TODO test indexes are correct
+func (t *TestSuite) TestGetUserFailBadInput() {
+	ns, err := NewMongoNodeStore(t.client.Database(testDB))
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	u, err := ns.GetUser("  \t \n   ")
+	t.Nil(u, "expected nil user")
+	t.Equal(errors.New("accountName cannot be empty or whitespace only"), err, "incorrect error")
+}
+
+func (t *TestSuite) TestCollectionsAndIndexes() {
+	// for some reason that's beyond me the mongo go client returns the collection names and
+	// the index names in the same list...
+	_, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	ctx := context.Background()
+	cur, err := t.client.Database(testDB).ListCollections(nil, bson.D{})
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	defer cur.Close(ctx)
+
+	names := map[string]struct{}{}
+	for cur.Next(ctx) {
+		elem := &bson.D{}
+		if err := cur.Decode(elem); err != nil {
+			t.Fail(err.Error())
+		}
+		m := elem.Map()
+		names[m["name"].(string)] = struct{}{}
+	}
+	if (cur.Err() != nil) {
+		t.Fail(err.Error())
+	}
+	expected := map[string]struct{}{
+		"users": struct{}{},
+		"system.indexes": struct{}{},
+		"users.$_id_": struct{}{},
+		"users.$user_1": struct{}{},
+		"users.$id_1": struct{}{},
+	}
+	t.Equal(expected, names, "incorrect collection and index names")
+}
