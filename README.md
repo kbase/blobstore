@@ -22,6 +22,7 @@ not supported; only those required for the KBase codebase are included.
 # Requirements:
 * go 1.12
 * An S3 compatible storage system. The Blobstore is tested with Minio version 2019-04-23T23-50-36Z.
+* MongoDB 2.6+
 
 # Testing
 
