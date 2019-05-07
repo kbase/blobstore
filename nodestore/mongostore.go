@@ -70,11 +70,18 @@ func (s *MongoNodeStore) GetUser(accountName string) (*User, error) {
 	col := s.db.Collection(colUsers)
 	res := col.FindOne(context.Background(), map[string]string{keyUsersUser: accountName})
 	if res.Err() != nil {
-		return toUser(res)
+		return nil, res.Err() // don't know how to test this
+	}
+	u, err := toUser(res)
+	if err != nil {
+		return nil, err // don't know how to test this
+	}
+	if u != nil {
+		return u, nil
 	}
 	// try creating a new user
 	uid := uuid.New()
-	_, err := col.InsertOne(context.Background(), map[string]string{
+	_, err = col.InsertOne(context.Background(), map[string]string{
 		keyUsersUser: accountName,
 		keyUsersUUID: uid.String()})
 	if err == nil {
@@ -113,6 +120,9 @@ func toUser(sr *mongo.SingleResult) (*User, error) {
 	var udoc map[string]interface{}
 	err := sr.Decode(&udoc)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
 		return nil, err // dunno how to test this either
 	}
 	// err should always be nil unless db is corrupt
