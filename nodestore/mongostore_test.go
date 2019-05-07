@@ -148,12 +148,21 @@ func (t *TestSuite) TestCollectionsAndIndexes() {
 	if (cur.Err() != nil) {
 		t.Fail(err.Error())
 	}
-	expected := map[string]struct{}{
-		"users": struct{}{},
-		"system.indexes": struct{}{},
-		"users.$_id_": struct{}{},
-		"users.$user_1": struct{}{},
-		"users.$id_1": struct{}{},
+	var expected map[string]struct{}
+	if t.mongo.GetIncludesIndexes() {
+		e := map[string]struct{}{
+			"users": struct{}{},
+			"system.indexes": struct{}{},
+			"users.$_id_": struct{}{},
+			"users.$user_1": struct{}{},
+			"users.$id_1": struct{}{},
+		}
+		expected = e
+	} else {
+		e := map[string]struct{}{
+			"users": struct{}{},
+		}
+		expected = e
 	}
 	t.Equal(expected, names, "incorrect collection and index names")
 }
