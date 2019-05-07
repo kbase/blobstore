@@ -125,6 +125,49 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 	t.Equal(errors.New("accountName cannot be empty or whitespace only"), err, "incorrect error")
 }
 
+type mDup struct {
+	err error
+	isDup bool
+}
+
+func (t *TestSuite) TestIternalsIsMongoDuplicateKey() {
+	// testing internals is often considered naughty
+	tests := []mDup{
+		mDup{
+			err: errors.New("some error"),
+			isDup: false},
+		mDup{
+			err: mongo.WriteException{
+				WriteConcernError: &mongo.WriteConcernError{Code: 1},
+				WriteErrors: []mongo.WriteError{mongo.WriteError{Code: 11000}},
+			},
+			isDup: false},
+		mDup{
+			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
+				mongo.WriteError{Code: 11000},
+				mongo.WriteError{Code: 11000},
+				},
+			},
+			isDup: false},
+		mDup{
+			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
+				mongo.WriteError{Code: 10000},
+				},
+			},
+			isDup: false},
+		mDup{
+			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
+				mongo.WriteError{Code: 11000},
+				},
+			},
+			isDup: true},
+	
+	}
+	for _, d := range tests {
+		t.Equal(d.isDup, isMongoDuplicateKey(d.err), "incorrect duplicate detection")
+	}
+}
+
 func (t *TestSuite) TestCollections() {
 	// for some reason that's beyond me the mongo go client returns the collection names and
 	// the index names in the same list for mongo 2.X...
