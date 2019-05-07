@@ -99,24 +99,27 @@ func (s *MongoNodeStore) GetUser(accountName string) (*User, error) {
 	if u != nil {
 		return u, nil
 	}
-	// TODO NOW test this in a naughty way by splitting the methods
+	return s.createUser(accountName)
+}
+
+// we split this method out for readability and so we can test a race condition where
+// between the read in GetUser and the InsertOne call here the same user is already inserted
+// Consider this method part of GetUser though
+func (s *MongoNodeStore) createUser(accountName string) (*User, error) {
 	// try creating a new user
+	col := s.db.Collection(colUsers)
 	uid := uuid.New()
-	_, err = col.InsertOne(context.Background(), map[string]string{
+	_, err := col.InsertOne(context.Background(), map[string]string{
 		keyUsersUser: accountName,
 		keyUsersUUID: uid.String()})
 	if err == nil {
 		return &User{accountName: accountName, id: uid}, nil
 	}
-	// this whole block of code is tricky to test. It can only occur if a user with
-	// the same user name is inserted by another routine between the read and the write above.
-	// Tested manually by commenting out the read.
 	if isMongoDuplicateKey(err) {
 		// we assume that a duplicate key error is from the user, not the uuid, since
 		// we just created a new uuid. If that's the case we're all good and
 		// can just pull the user.
-		// this was tested manually
-		// TODO NOW retest
+		// Assumes users are never deleted, which they shouldn't be.
 		res := col.FindOne(nil, map[string]string{keyUsersUser: accountName})
 		if res.Err() != nil {
 			// ok, give up. Dunno how to test this either.
