@@ -1,6 +1,9 @@
 package nodestore
 
 import (
+	"fmt"
+	"time"
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"errors"
 	"testing"
@@ -122,9 +125,9 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 	t.Equal(errors.New("accountName cannot be empty or whitespace only"), err, "incorrect error")
 }
 
-func (t *TestSuite) TestCollectionsAndIndexes() {
+func (t *TestSuite) TestCollections() {
 	// for some reason that's beyond me the mongo go client returns the collection names and
-	// the index names in the same list...
+	// the index names in the same list for mongo 2.X...
 	_, err := NewMongoNodeStore(t.client.Database(testDB))
 	if (err != nil) {
 		t.Fail(err.Error())
@@ -151,18 +154,195 @@ func (t *TestSuite) TestCollectionsAndIndexes() {
 	var expected map[string]struct{}
 	if t.mongo.GetIncludesIndexes() {
 		e := map[string]struct{}{
-			"users": struct{}{},
 			"system.indexes": struct{}{},
+			"users": struct{}{},
 			"users.$_id_": struct{}{},
 			"users.$user_1": struct{}{},
 			"users.$id_1": struct{}{},
+			"nodes": struct{}{},
+			"nodes.$_id_": struct{}{},
+			"nodes.$id_1": struct{}{},
 		}
 		expected = e
 	} else {
 		e := map[string]struct{}{
 			"users": struct{}{},
+			"nodes": struct{}{},
 		}
 		expected = e
 	}
 	t.Equal(expected, names, "incorrect collection and index names")
+}
+
+func (t *TestSuite) TestStoreAndGetNodeMinimal() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	nid := uuid.New()
+	oid := uuid.New()
+	own, _ := NewUser(oid, "owner")
+	tme := time.Now()
+	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	err = mns.StoreNode(n)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	ngot, err := mns.GetNode(nid)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	// time loses precision when stored in mongo
+	testhelpers.AssertWithin1MS(t.T(), tme, ngot.GetStoredTime())
+	nexpected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", ngot.GetStoredTime())
+	t.Equal(nexpected, ngot, "incorrect node")
+}
+
+
+func (t *TestSuite) TestStoreAndGetNodeMaximal() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	nid := uuid.New()
+	oid := uuid.New()
+	rid1 := uuid.New()
+	rid2 := uuid.New()
+	own, _ := NewUser(oid, "owner")
+	r1, _ := NewUser(rid1, "reader1")
+	r2, _ := NewUser(rid2, "reader2")
+	tme := time.Now()
+	n, _ := NewNode(
+		nid,
+		*own,
+		78,
+		"1b9554867d35f0d59e4705f6b2712cd1",
+		tme,
+		Format("json"),
+		FileName("fn.txt"),
+		Public(true),
+		Reader(*r1),
+		Reader(*r2),
+		)
+	err = mns.StoreNode(n)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	ngot, err := mns.GetNode(nid)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	// time loses precision when stored in mongo
+	testhelpers.AssertWithin1MS(t.T(), tme, ngot.GetStoredTime())
+	nexpected, _ := NewNode(
+		nid,
+		*own,
+		78,
+		"1b9554867d35f0d59e4705f6b2712cd1",
+		ngot.GetStoredTime(),
+		Format("json"),
+		FileName("fn.txt"),
+		Public(true),
+		Reader(*r1),
+		Reader(*r2),
+		)
+	t.Equal(nexpected, ngot, "incorrect node")
+}
+
+func (t *TestSuite) TestFailStoreNodeFailBadInput() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	err = mns.StoreNode(nil)
+	t.Equal(errors.New("Node cannot be nil"), err, "incorrect err")
+}
+
+
+func (t *TestSuite) TestStoreNodeFailWithSameID() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	nid := uuid.New()
+	oid := uuid.New()
+	own, _ := NewUser(oid, "owner")
+	tme := time.Now()
+	n1, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	err = mns.StoreNode(n1)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	n2, _ := NewNode(nid, *own, 82, "189e725f4587b679740f0f7783745056", time.Now())
+	err = mns.StoreNode(n2)
+	t.Equal(fmt.Errorf("Node %v already exists", nid.String()), err, "incorrect error")
+}
+
+func (t *TestSuite) TestGetNodeFailNoNode() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	nid := uuid.New()
+	oid := uuid.New()
+	own, _ := NewUser(oid, "owner")
+	tme := time.Now()
+	n1, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	err = mns.StoreNode(n1)
+	t.Nil(err, "expected no error")
+
+	nid2 := uuid.New()
+	n2, err := mns.GetNode(nid2)
+	t.Nil(n2, "expected nil node")
+	t.Equal(fmt.Errorf("No such node %v", nid2.String()), err, "incorrect error")
+}
+
+func (t *TestSuite) TestUserIndexes() {
+	expected := map[string]bool{
+		"_id_": false,
+		"user_1": true,
+		"id_1": true,
+	}
+	t.checkIndexes("users", testDB + ".users", expected)
+}
+
+func (t *TestSuite) TestNodeIndexes() {
+	expected := map[string]bool{
+		"_id_": false,
+		"id_1": true,
+	}
+	t.checkIndexes("nodes", testDB + ".nodes", expected)
+}
+
+func (t *TestSuite) checkIndexes(
+		collection string,
+	 	expectedNamespace string,
+	  	expectedIndexes map[string]bool) {
+	_, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	ctx := context.Background()
+	idx := t.client.Database(testDB).Collection(collection).Indexes()
+	cur, err := idx.List(ctx)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	defer cur.Close(ctx)
+	names := map[string]bool{}
+	for cur.Next(ctx) {
+		elem := &bson.D{}
+		if err := cur.Decode(elem); err != nil {
+			t.Fail(err.Error())
+		}
+		m := elem.Map()
+		t.Equal(expectedNamespace, m["ns"], "incorrect name space")
+		if un, ok := m["unique"]; ok {
+			names[m["name"].(string)] = un.(bool)
+		} else {
+			names[m["name"].(string)] = false
+		}
+	}
+	if (cur.Err() != nil) {
+		t.Fail(err.Error())
+	}
+	t.Equal(expectedIndexes, names, "incorrect indexes")
 }
