@@ -130,7 +130,27 @@ type mDup struct {
 	isDup bool
 }
 
-func (t *TestSuite) TestIternalsIsMongoDuplicateKey() {
+func (t *TestSuite) TestInternalsCreateUser() {
+	// testing internals is often considered naughty
+	
+	// tests the case where two different concurrent processes are trying to create the same user.
+	// P1 reads the user, finds nothing.
+	// P2 reads the user, finds nothing.
+	// P1 writes the user and returns.
+	// P2 writes the user and fails because the user already exists.
+	// P2 reads the user and returns.
+
+	ns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "unexpected error")
+	u, err := ns.GetUser("  foo  ")
+	t.Equal("foo", u.GetAccountName(), "incorrect account name")
+	// normally the next process to call GetUser would just read the foo record.
+	// calling createUser() simulates the race condition
+	u2, err := ns.createUser("foo")
+	t.Equal(u2, u, "incorrect user")
+}
+
+func (t *TestSuite) TestInternalsIsMongoDuplicateKey() {
 	// testing internals is often considered naughty
 	tests := []mDup{
 		mDup{
