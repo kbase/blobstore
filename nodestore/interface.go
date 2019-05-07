@@ -168,6 +168,6 @@ type NodeStore interface {
 	// GetUser gets a user. If the user does not exist in the system, a new ID will be assigned
 	// to the user.
 	GetUser(accountName string) (*User, error)
-	//TODO NODE AddReader, RemoveReader
+	//TODO NODE AddReader, RemoveReader, SetPublic
 
 }
