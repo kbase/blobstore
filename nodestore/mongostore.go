@@ -66,7 +66,6 @@ func createIndexes(db *mongo.Database) error {
 	if err != nil {
 		return err // hard to test
 	}
-	// add more indexes here
 	return nil
 }
 
@@ -135,16 +134,16 @@ func (s *MongoNodeStore) createUser(accountName string) (*User, error) {
 func isMongoDuplicateKey(err error) bool {
 	wex, ok := err.(mongo.WriteException)
 	if !ok {
-		return false // not sure how to test this
+		return false
 	}
 	if wex.WriteConcernError != nil {
-		return false // or this
+		return false
 	}
 	if len(wex.WriteErrors) > 1 {
-		return false //or this
+		return false
 	}
 	if wex.WriteErrors[0].Code != mongoDuplicateKeyCode {
-		return false // or this
+		return false
 	}
 	return true
 }
@@ -242,4 +241,18 @@ func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 // https://github.com/mongodb/mongo-go-driver/blob/229a9c94a4735eccfc431ea183e0942de7569f58/bson/primitive/primitive.go#L45
 func toTime(d primitive.DateTime) time.Time {
 	return time.Unix(int64(d)/1000, int64(d)%1000*1000000)
+}
+
+// DeleteNode deletes a node.
+func (s *MongoNodeStore) DeleteNode(id uuid.UUID) error {
+	res, err := s.db.Collection(colNodes).DeleteOne(
+		nil, map[string]string{keyNodesID: id.String()})
+	if err != nil {
+		return err // dunno how to test this
+	}
+	if res.DeletedCount < 1 {
+		// TODO ERROR match shock error and add error code
+		return fmt.Errorf("No such node %v", id.String())
+	}
+	return nil
 }
