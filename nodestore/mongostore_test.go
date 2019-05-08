@@ -188,55 +188,6 @@ func (t *TestSuite) TestInternalsIsMongoDuplicateKey() {
 	}
 }
 
-func (t *TestSuite) TestCollections() {
-	// for some reason that's beyond me the mongo go client returns the collection names and
-	// the index names in the same list for mongo 2.X...
-	_, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
-		t.Fail(err.Error())
-	}
-	ctx := context.Background()
-	cur, err := t.client.Database(testDB).ListCollections(nil, bson.D{})
-	if err != nil {
-		t.Fail(err.Error())
-	}
-	defer cur.Close(ctx)
-
-	names := map[string]struct{}{}
-	for cur.Next(ctx) {
-		elem := &bson.D{}
-		if err := cur.Decode(elem); err != nil {
-			t.Fail(err.Error())
-		}
-		m := elem.Map()
-		names[m["name"].(string)] = struct{}{}
-	}
-	if (cur.Err() != nil) {
-		t.Fail(err.Error())
-	}
-	var expected map[string]struct{}
-	if t.mongo.GetIncludesIndexes() {
-		e := map[string]struct{}{
-			"system.indexes": struct{}{},
-			"users": struct{}{},
-			"users.$_id_": struct{}{},
-			"users.$user_1": struct{}{},
-			"users.$id_1": struct{}{},
-			"nodes": struct{}{},
-			"nodes.$_id_": struct{}{},
-			"nodes.$id_1": struct{}{},
-		}
-		expected = e
-	} else {
-		e := map[string]struct{}{
-			"users": struct{}{},
-			"nodes": struct{}{},
-		}
-		expected = e
-	}
-	t.Equal(expected, names, "incorrect collection and index names")
-}
-
 func (t *TestSuite) TestStoreAndGetNodeMinimal() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	if (err != nil) {
@@ -356,6 +307,85 @@ func (t *TestSuite) TestGetNodeFailNoNode() {
 	n2, err := mns.GetNode(nid2)
 	t.Nil(n2, "expected nil node")
 	t.Equal(fmt.Errorf("No such node %v", nid2.String()), err, "incorrect error")
+}
+
+func (t *TestSuite) TestDeleteNode() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	nid := uuid.New()
+	own, _ := NewUser(uuid.New(), "owner")
+	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	err = mns.DeleteNode(nid)
+	t.Nil(err, "expected no error")
+
+	n2, err := mns.GetNode(nid)
+	t.Nil(n2, "expected nil node")
+	t.Equal(fmt.Errorf("No such node %v", nid.String()), err, "incorrect error") 
+}
+
+func (t *TestSuite) TestDeleteNodeFailNoNode() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	nid2 := uuid.New()
+	err = mns.DeleteNode(nid2)
+	t.Equal(fmt.Errorf("No such node %v", nid2.String()), err, "incorrect error")
+}
+
+func (t *TestSuite) TestCollections() {
+	// for some reason that's beyond me the mongo go client returns the collection names and
+	// the index names in the same list for mongo 2.X...
+	_, err := NewMongoNodeStore(t.client.Database(testDB))
+	if (err != nil) {
+		t.Fail(err.Error())
+	}
+	ctx := context.Background()
+	cur, err := t.client.Database(testDB).ListCollections(nil, bson.D{})
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	defer cur.Close(ctx)
+
+	names := map[string]struct{}{}
+	for cur.Next(ctx) {
+		elem := &bson.D{}
+		if err := cur.Decode(elem); err != nil {
+			t.Fail(err.Error())
+		}
+		m := elem.Map()
+		names[m["name"].(string)] = struct{}{}
+	}
+	if (cur.Err() != nil) {
+		t.Fail(err.Error())
+	}
+	var expected map[string]struct{}
+	if t.mongo.GetIncludesIndexes() {
+		e := map[string]struct{}{
+			"system.indexes": struct{}{},
+			"users": struct{}{},
+			"users.$_id_": struct{}{},
+			"users.$user_1": struct{}{},
+			"users.$id_1": struct{}{},
+			"nodes": struct{}{},
+			"nodes.$_id_": struct{}{},
+			"nodes.$id_1": struct{}{},
+		}
+		expected = e
+	} else {
+		e := map[string]struct{}{
+			"users": struct{}{},
+			"nodes": struct{}{},
+		}
+		expected = e
+	}
+	t.Equal(expected, names, "incorrect collection and index names")
 }
 
 func (t *TestSuite) TestUserIndexes() {
