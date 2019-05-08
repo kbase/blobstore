@@ -10,6 +10,10 @@ test.mongo.exe=mongod
 # no.
 test.mongo.wired_tiger=false
 
+# The path to the jars dir inside the jars repo (https://github.com/kbase/jars), e.g.
+# [path to jars repo]/lib/jars
+test.jars.dir =
+
 # Where to store temporary files generated during the test.
 test.temp.dir=temp_test_dir
 

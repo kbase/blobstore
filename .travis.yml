@@ -10,9 +10,7 @@ env:
 
 install:
   - export GO111MODULE=on
-  - go build app/blobstore.go
 
-script:
   # set up minio
   - wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.$MINIO -O minio
   - chmod a+x minio
@@ -25,12 +23,23 @@ script:
   - export MONGOD=`pwd`/$MONGODB_VER/bin/mongod
   - cd -
 
+  # set up jars
+  - cd ..
+  - git clone https://github.com/kbase/jars
+  - export JARSDIR=`pwd`/jars/lib/jars/
+  - cd -
+
+
   # set up test config
   - cp test.cfg.example test.cfg
   - sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIOD#" test.cfg
   - sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
+  - sed -i "s#^test.jars.dir.*#test.jars.dir=$JARSDIR#" test.cfg
   - sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=$WIRED_TIGER#" test.cfg
   - cat test.cfg
+
+script:
+  - go build app/blobstore.go
 
   # run tests
   - export TCFG=`pwd`/test.cfg
