@@ -245,14 +245,11 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 		t.Fail(err.Error())
 	}
 	defer obj.Data.Close()
+	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
+	
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
-
-	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
-
-	faketime := time.Now()
-	obj.Stored = faketime
 
 	expected := &GetFileOutput{
 		ID:       id,
@@ -261,7 +258,7 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 		Format:   "",
 		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
-		Stored:   faketime,
+		Stored:   obj.Stored, //fake
 	}
 
 	t.Equal(expected, obj, "incorrect return")
