@@ -195,7 +195,7 @@ func (c *Controller) CreateTestUser(username string, displayname string) error {
 	ep, _ := url.Parse("api/V2/testmodeonly/user")
 	aurl := c.testURL().ResolveReference(ep)
 	body := map[string]interface{}{"user": username, "display": displayname}
-	_, err := postJSON(aurl, body)
+	_, err := sendJSON(http.MethodPost, aurl, body)
 	return err
 }
 
@@ -204,7 +204,7 @@ func (c *Controller) CreateTestToken(username string) (string, error) {
 	ep, _ := url.Parse("api/V2/testmodeonly/token")
 	aurl := c.testURL().ResolveReference(ep)
 	body := map[string]interface{}{"user": username, "type": "Login"}
-	retbody, err := postJSON(aurl, body)
+	retbody, err := sendJSON(http.MethodPost, aurl, body)
 	if err != nil {
 		return "", err
 	}
@@ -216,9 +216,32 @@ func (c *Controller) CreateTestToken(username string) (string, error) {
 	return bd["token"].(string), nil
 }
 
-func postJSON(u *url.URL, body map[string]interface{}) (*[]byte, error) {
+// CreateTestRole creates a role in the auth system
+func (c *Controller) CreateTestRole(role string, description string) error {
+	ep, _ := url.Parse("api/V2/testmodeonly/customroles")
+	aurl := c.testURL().ResolveReference(ep)
+	body := map[string]interface{}{"id": role, "description": description}
+	_, err := sendJSON(http.MethodPost, aurl, body)
+	return err
+}
+
+// SetTestUserRoles sets custom roles for a test user and removes all built-in roles.
+func (c *Controller) SetTestUserRoles(username string, roles *[]string) error {
+	ep, _ := url.Parse("api/V2/testmodeonly/userroles")
+	aurl := c.testURL().ResolveReference(ep)
+	body := map[string]interface{}{"user": username, "customroles": roles}
+	_, err := sendJSON(http.MethodPut, aurl, body)
+	return err
+}
+
+func sendJSON(method string, u *url.URL, body map[string]interface{}) (*[]byte, error) {
 	js, _ := json.Marshal(body)
-	res, err := http.Post(u.String(), "application/json", bytes.NewBuffer(js))
+	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(js))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("content-type", "application/json")
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

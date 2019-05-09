@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,8 +13,10 @@ func AssertCloseToNow1S(t *testing.T, tme time.Time) {
 	et := time.Now()
 
 	// testify has comparisons in the works but not released as of this wring
-	assert.True(t, et.Add(time.Second*-1).Before(tme), "time earlier than expected")
-	assert.True(t, et.Add(time.Second*1).After(tme), "time later than expected")
+	assert.True(t, et.Add(time.Second*-1).Before(tme),
+		fmt.Sprintf("time %v earlier than expected %v", tme, et.Add(time.Second*-1)))
+	assert.True(t, et.Add(time.Second*1).After(tme),
+		fmt.Sprintf("time %v later than expected %v", tme, et.Add(time.Second*1)))
 }
 
 // AssertWithin1MS asserts that the given times are within 1ms of each other.
