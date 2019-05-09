@@ -59,32 +59,48 @@ func (t *TestSuite) SetupSuite() {
 }
 
 func (t *TestSuite) setUpUsersAndRoles() {
-	err := t.auth.CreateTestUser("notadmin", "display1")
-	if err != nil {
-		t.FailNow(err.Error())
-	}
-	err = t.auth.CreateTestUser("admin_std_role", "display2")
-	if err != nil {
-		t.FailNow(err.Error())
-	}
-	err = t.auth.CreateTestUser("admin_kbase", "display3")
-	if err != nil {
-		t.FailNow(err.Error())
-	}
+	t.createTestUser("notadmin")
+	t.createTestUser("admin_std_role")
+	t.createTestUser("admin_kbase")
 
-	t.tokenNoRole, err = t.auth.CreateTestToken("notadmin")
+	t.tokenNoRole = t.createTestToken("notadmin")
+	t.tokenStdRole = t.createTestToken("admin_std_role")
+	t.tokenKBaseAdmin = t.createTestToken("admin_kbase")
+
+	t.createTestRole("SOME_MEANINGLESS_ROLE")
+	t.createTestRole("BLOBSTORE_ADMIN")
+	t.createTestRole("KBASE_ADMIN")
+
+	t.addTestRole("notadmin", "SOME_MEANINGLESS_ROLE")
+	t.addTestRole("admin_std_role", "BLOBSTORE_ADMIN")
+	t.addTestRole("admin_kbase", "KBASE_ADMIN")
+}
+
+func (t *TestSuite) createTestUser(username string) {
+	if err := t.auth.CreateTestUser(username, "displayname"); err != nil {
+		t.FailNow(err.Error())
+	}
+}
+
+func (t *TestSuite) createTestToken(username string) string {
+	token, err := t.auth.CreateTestToken(username)
 	if err != nil {
 		t.FailNow(err.Error())
 	}
-	t.tokenStdRole, err = t.auth.CreateTestToken("admin_std_role")
-	if err != nil {
+	return token
+}
+
+func (t *TestSuite) createTestRole(role string) {
+	if err := t.auth.CreateTestRole(role, "description"); err != nil {
 		t.FailNow(err.Error())
 	}
-	t.tokenKBaseAdmin, err = t.auth.CreateTestToken("admin_kbase")
-	if err != nil {
+}
+
+func (t *TestSuite) addTestRole(username string, role string) {
+	r := []string{role}
+	if err := t.auth.SetTestUserRoles(username, &r); err != nil {
 		t.FailNow(err.Error())
 	}
-	//TODO NOW add roles
 }
 
 func (t *TestSuite) TearDownSuite() {
