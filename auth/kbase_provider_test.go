@@ -18,12 +18,15 @@ type TestSuite struct {
 	auth          *kbaseauthcontroller.Controller
 	authURL *url.URL
 	deleteTempDir bool
+	tokenNoRole string
+	tokenStdRole string
+	tokenKBaseAdmin string
 }
 
 func (t *TestSuite) SetupSuite() {
 	tcfg, err := testhelpers.GetConfig()
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 
 	mongoctl, err := mongocontroller.New(mongocontroller.Params{
@@ -32,7 +35,7 @@ func (t *TestSuite) SetupSuite() {
 		RootTempDir: tcfg.TempDir,
 	})
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 	t.mongo = mongoctl
 	
@@ -43,16 +46,45 @@ func (t *TestSuite) SetupSuite() {
 		RootTempDir: tcfg.TempDir,
 	})
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 	t.authURL, err = url.Parse("http://localhost:" + strconv.Itoa(auth.GetPort()) + "/testmode/")
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 	t.auth = auth
 	t.deleteTempDir = tcfg.DeleteTempDir
 
-	//TODO NOW add users, tokens, roles
+	t.setUpUsersAndRoles()
+}
+
+func (t *TestSuite) setUpUsersAndRoles() {
+	err := t.auth.CreateTestUser("notadmin", "display1")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+	err = t.auth.CreateTestUser("admin_std_role", "display2")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+	err = t.auth.CreateTestUser("admin_kbase", "display3")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+
+	t.tokenNoRole, err = t.auth.CreateTestToken("notadmin")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+	t.tokenStdRole, err = t.auth.CreateTestToken("admin_std_role")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+	t.tokenKBaseAdmin, err = t.auth.CreateTestToken("admin_kbase")
+	if err != nil {
+		t.FailNow(err.Error())
+	}
+	//TODO NOW add roles
 }
 
 func (t *TestSuite) TearDownSuite() {

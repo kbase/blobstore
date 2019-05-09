@@ -87,7 +87,7 @@ func (kb *KBaseProvider) GetUser(token string) (*User, error) {
 	authenticate(&req.Header, token)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, err // dunno how to test this
 	}
 	fmt.Printf("res: %v\nbody\n:", res)
 	io.Copy(os.Stdout, res.Body)

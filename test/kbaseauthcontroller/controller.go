@@ -3,10 +3,13 @@ package kbaseauthcontroller
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -185,4 +188,70 @@ func (c *Controller) Destroy(deleteTempDir bool) error {
 		os.RemoveAll(c.tempDir)
 	}
 	return nil
+}
+
+// CreateTestUser creates a test user in the auth system
+func (c *Controller) CreateTestUser(username string, displayname string) error {
+	ep, _ := url.Parse("api/V2/testmodeonly/user")
+	aurl := c.testURL().ResolveReference(ep)
+	body := map[string]interface{}{"user": username, "display": displayname}
+	_, err := postJSON(aurl, body)
+	return err
+}
+
+// CreateTestToken creates a token for the given user
+func (c *Controller) CreateTestToken(username string) (string, error) {
+	ep, _ := url.Parse("api/V2/testmodeonly/token")
+	aurl := c.testURL().ResolveReference(ep)
+	body := map[string]interface{}{"user": username, "type": "Login"}
+	retbody, err := postJSON(aurl, body)
+	if err != nil {
+		return "", err
+	}
+	var bd map[string]interface{}
+	err = json.Unmarshal(*retbody, &bd)
+	if err != nil {
+		return "", err
+	}
+	return bd["token"].(string), nil
+}
+
+func postJSON(u *url.URL, body map[string]interface{}) (*[]byte, error) {
+	js, _ := json.Marshal(body)
+	res, err := http.Post(u.String(), "application/json", bytes.NewBuffer(js))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	err = checkError(res)
+	if err != nil {
+		return nil, err
+	}
+	buf, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &buf, nil
+}
+
+func checkError(resp *http.Response) error {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		fmt.Printf("Response code: %v\n", resp.StatusCode)
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		s := string(buf)
+		fmt.Println(s)
+		if len(s) > 200 { // could be unicode, but meh
+			s = s[:200]
+		}
+		return errors.New(s)
+	}
+	return nil
+}
+
+func (c *Controller) testURL() *url.URL {
+	authURL, _ := url.Parse("http://localhost:" + strconv.Itoa(c.port) + "/testmode/")
+	return authURL
 }
