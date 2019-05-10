@@ -1,0 +1,7 @@
+# Config file for the blobstore service.
+
+[BlobStore]
+
+# The host under which the server will run, typically localhost:[port] or 0.0.0.0:[port]
+host = localhost:45678
+
