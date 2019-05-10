@@ -23,6 +23,7 @@ type KBaseProvider struct {
 	adminRoles    *[]string
 	endpointToken url.URL
 	endpointMe    url.URL
+	endpointUser  string
 }
 
 // AdminRole is an option for NewKBaseProvider that designates that users with the specified
@@ -57,6 +58,8 @@ func NewKBaseProvider(url url.URL, options ...func(*KBaseProvider) error,
 	kb.endpointToken = *token
 	me, _ := url.Parse("api/V2/me")
 	kb.endpointMe = *me
+	u, _ := url.Parse("api/V2/users")
+	kb.endpointUser = u.String() + "?list="
 	// TODO LATER check url is valid when auth testmode root returns correct info
 	// could also check custom roles are valid & clock skew, probably not worth it
 	return kb, nil
@@ -141,4 +144,41 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 		return nil, errors.New("Error from KBase auth server: " + aerr["message"].(string))
 	}
 	return authresp, nil
+}
+
+// ValidateUserNames validates that user names exist in the auth system.
+// If one or more users are invalid, InvalidUsersError is returned.
+// token can be any valid token - it's used only to look up the userName.
+func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (bool, error) {
+	if userNames == nil || len(*userNames) < 1 {
+		return false, errors.New("userNames cannot be nil or empty")
+	}
+	names := []string{}
+	for _, n := range *userNames {
+		n = strings.TrimSpace(n)
+		if n == "" {
+			return false, bserr.WhiteSpaceError("names in userNames array")
+		}
+		names = append(names, n) // don't modify input
+
+	}
+	if strings.TrimSpace(token) == "" {
+		return false, bserr.WhiteSpaceError("token")
+	}
+	u, _ := url.Parse(kb.endpointUser + strings.Join(names, ","))
+	userjson, err := get(*u, token)
+	if err != nil {
+		return false, err
+	}
+	invalid := []string{}
+	for _, n := range names {
+		if _, ok := userjson[n]; !ok {
+			invalid = append(invalid, n)
+		}
+	}
+	if len(invalid) > 0 {
+		return false, InvalidUserError{&invalid}
+	}
+	// TODO CACHE return expiration time
+	return true, nil
 }
