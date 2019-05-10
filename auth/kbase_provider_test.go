@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"errors"
 	"net/url"
 	"strconv"
@@ -201,6 +202,80 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 		t.Nil(err, "unexpected error")
 		u, err := kb.GetUser("fake")
 		t.Nil(u, "expected error")
+		t.Equal(errors.New(errstr), err, "incorrect error")
+	}
+}
+
+func (t *TestSuite) TestValidateUserName() {
+	tc := [][]string{
+		[]string{"   noroles  "},
+		[]string{"   noroles  ", "  \t   admin_std_role  \n"},
+	}
+	kb, err := NewKBaseProvider(*t.authURL)
+	t.Nil(err, "unexpected error")
+
+	for _, names := range tc {
+		gotvalid, err := kb.ValidateUserNames(&names, t.tokenNoRole)
+		t.Nil(err, "unexpected error")
+		t.Equal(true, gotvalid, fmt.Sprintf("incorrect validation for users: %v", names))
+	}
+}
+
+func (t *TestSuite) TestValidateUserNamesBadNameInput() {
+	type tvun struct {
+		names *[]string
+		err error
+	}
+
+	tc := []tvun{
+		tvun{nil, errors.New("userNames cannot be nil or empty")},
+		tvun{&[]string{}, errors.New("userNames cannot be nil or empty")},
+		tvun{&[]string{"user", "  \t \n  "},
+			errors.New("names in userNames array cannot be empty or whitespace only")},
+		tvun{&[]string{"noroles", "   foo   ", "admin_std_role", "   bar   "},
+			InvalidUserError{&[]string{"foo", "bar"}}},
+	}
+
+	kb, err := NewKBaseProvider(*t.authURL)
+	t.Nil(err, "unexpected error")
+
+	for _, tcase := range tc {
+		b, err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
+		t.Equal(false, b, "expected error")
+		t.Equal(tcase.err, err, "incorrect error")
+	}
+}
+
+func (t *TestSuite) TestValidateUserNameFailBadToken() {
+	tc := map[string]string{
+		"   \t    \n   ": "token cannot be empty or whitespace only",
+		"no such token":  "KBase auth server reported token was invalid",
+	}
+	
+	kb, err := NewKBaseProvider(*t.authURL)
+	t.Nil(err, "unexpected error")
+	
+	for token, errstr := range tc {
+		b, err := kb.ValidateUserNames(&[]string{"noroles"}, token)
+		t.Equal(false, b, "expected error")
+		t.Equal(errors.New(errstr), err, "incorrect error")
+	}
+}
+
+func (t *TestSuite) TestValidateUserNameFailBadURL() {
+	tc := map[string]string{
+		"https://ci.kbase.us/services":
+			"Non-JSON response from KBase auth server, status code: 404",
+		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
+			"Unexpectedly long body from auth service",
+	}
+	
+	for ur, errstr := range tc {
+		urp, _ := url.Parse(ur)
+		kb, err := NewKBaseProvider(*urp)
+		t.Nil(err, "unexpected error")
+		b, err := kb.ValidateUserNames(&[]string{"noroles"}, "fake")
+		t.Equal(false, b, "expected error")
 		t.Equal(errors.New(errstr), err, "incorrect error")
 	}
 }
