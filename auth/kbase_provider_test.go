@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 	"strconv"
 	"github.com/kbase/blobstore/test/mongocontroller"
@@ -10,6 +10,11 @@ import (
 
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
+)
+
+const (
+	blobstoreRole = "BLOBSTORE_ADMIN"
+	adminRole = "KBASE_ADMIN"
 )
 
 type TestSuite struct {
@@ -59,21 +64,19 @@ func (t *TestSuite) SetupSuite() {
 }
 
 func (t *TestSuite) setUpUsersAndRoles() {
-	t.createTestUser("notadmin")
+	t.createTestUser("noroles")
 	t.createTestUser("admin_std_role")
 	t.createTestUser("admin_kbase")
 
-	t.tokenNoRole = t.createTestToken("notadmin")
+	t.tokenNoRole = t.createTestToken("noroles")
 	t.tokenStdRole = t.createTestToken("admin_std_role")
 	t.tokenKBaseAdmin = t.createTestToken("admin_kbase")
 
-	t.createTestRole("SOME_MEANINGLESS_ROLE")
-	t.createTestRole("BLOBSTORE_ADMIN")
-	t.createTestRole("KBASE_ADMIN")
+	t.createTestRole(blobstoreRole)
+	t.createTestRole(adminRole)
 
-	t.addTestRole("notadmin", "SOME_MEANINGLESS_ROLE")
-	t.addTestRole("admin_std_role", "BLOBSTORE_ADMIN")
-	t.addTestRole("admin_kbase", "KBASE_ADMIN")
+	t.addTestRole("admin_std_role", blobstoreRole)
+	t.addTestRole("admin_kbase", adminRole)
 }
 
 func (t *TestSuite) createTestUser(username string) {
@@ -116,11 +119,88 @@ func TestRunSuite(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
-func (t *TestSuite) TestGetUserNoRoles() {
-	kb, err := NewKBaseProvider(*t.authURL, "faketoken")
+func (t *TestSuite) TestConstructFailBadArgs() {
+	u, _ := url.Parse("foo.bar")
+	kb, err := NewKBaseProvider(*u)
+	t.Nil(kb, "expected error")
+	t.Equal(errors.New("url must be absolute"), err, "incorrect error")
+
+	u, _ = url.Parse("http://foo.bar")
+	kb, err = NewKBaseProvider(*u, AdminRole("   \t   \n  "))
+	t.Nil(kb, "expected error")
+	t.Equal(errors.New("role cannot be empty or whitespace only"), err, "incorrect error")
+}
+
+type tgu struct {
+	Token string
+	AdminRoles *[]string
+	UserName string
+	IsAdmin bool
+}
+
+func (t *TestSuite) TestGetUser() {
+
+	testcases := []tgu{
+		tgu{t.tokenNoRole, &[]string{}, "noroles", false},
+		tgu{t.tokenNoRole, &[]string{blobstoreRole, adminRole}, "noroles", false},
+
+		tgu{t.tokenStdRole, &[]string{}, "admin_std_role", false},
+		tgu{t.tokenStdRole, &[]string{"foo"}, "admin_std_role", false},
+		tgu{t.tokenStdRole, &[]string{adminRole}, "admin_std_role", false},
+		tgu{t.tokenStdRole, &[]string{blobstoreRole, adminRole}, "admin_std_role", true},
+
+		tgu{t.tokenKBaseAdmin, &[]string{blobstoreRole}, "admin_kbase", false},
+		tgu{t.tokenKBaseAdmin, &[]string{blobstoreRole, adminRole}, "admin_kbase", true},
+	}
+
+	for _, tc := range testcases {
+		t.checkUser(&tc)
+	}
+}
+
+func (t *TestSuite) checkUser(tc *tgu) {
+	opts := []func(*KBaseProvider) error{}
+	for _, r := range *tc.AdminRoles {
+		opts = append(opts, AdminRole(r))
+	}
+
+	kb, err := NewKBaseProvider(*t.authURL, opts...)
 	t.Nil(err, "unexpected error")
-	u, err := kb.GetUser("sometoken")
+	u, err := kb.GetUser(tc.Token)
 	t.Nil(err, "unexpected error")
-	//TODO NOW complete test
-	fmt.Printf("%v\n", u)
+	expected := User{tc.UserName, tc.IsAdmin}
+	t.Equal(&expected, u, "incorrect user")
+}
+
+func (t *TestSuite) TestGetUserFailBadInput() {
+	tc := map[string]string{
+		"   \t    \n   ": "token cannot be empty or whitespace only",
+		"no such token":  "KBase auth server reported token was invalid",
+	}
+	kb, err := NewKBaseProvider(*t.authURL)
+	t.Nil(err, "unexpected error")
+
+	for token, errstr := range tc {
+		u, err := kb.GetUser(token)
+		t.Nil(u, "expected error")
+		t.Equal(errors.New(errstr), err, "incorrect error")
+	}
+}
+
+func (t *TestSuite) TestGetUserFailBadURL() {
+	tc := map[string]string{
+		"https://ci.kbase.us/services":
+			"Non-JSON response from KBase auth server, status code: 404",
+		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
+			"Unexpectedly long body from auth service",
+	}
+	
+	for ur, errstr := range tc {
+		urp, _ := url.Parse(ur)
+		kb, err := NewKBaseProvider(*urp)
+		t.Nil(err, "unexpected error")
+		u, err := kb.GetUser("fake")
+		t.Nil(u, "expected error")
+		t.Equal(errors.New(errstr), err, "incorrect error")
+	}
 }

@@ -91,10 +91,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure how to test
 	}
-	req, err := http.NewRequest("PUT", presignedurl, p.data)
-	if err != nil {
-		return nil, err // may want to wrap error here, not sure now to test
-	}
+	req, _ := http.NewRequest("PUT", presignedurl, p.data)
 	req.ContentLength = p.size
 	req.Header.Set("x-amz-meta-Filename", p.filename)
 	req.Header.Set("x-amz-meta-Format", p.format)
