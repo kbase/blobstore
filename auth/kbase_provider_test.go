@@ -133,7 +133,7 @@ func (t *TestSuite) TestConstructFailBadArgs() {
 }
 
 type tgu struct {
-	Token string
+	Token string	
 	AdminRoles *[]string
 	UserName string
 	IsAdmin bool

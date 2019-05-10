@@ -1,8 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"github.com/kbase/blobstore/config"
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kbase/blobstore/service"
+	"github.com/jessevdk/go-flags"
 )
 
 // note that the contents of this file are tested manually.
@@ -22,7 +24,23 @@ const (
 	deprecation = "The id and version fields are deprecated."
 )
 
+type options struct {
+	// ConfigFile is the path to the config file for the server
+	ConfigFile string `long:"conf" required:"true" description:"service config file location"`
+}
+
 func main() {
+	var opts options
+	_, err := flags.Parse(&opts)
+	if err != nil {
+		os.Exit(1)
+	}
+	cfg, err := config.New(opts.ConfigFile)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	_ = cfg // TODO NOW pass into service.New
 	serv := service.New(service.ServerStaticConf{
 		ServerName:          name,
 		ServerVersion:       version,
@@ -31,18 +49,15 @@ func main() {
 		DeprecationWarning:  deprecation,
 	})
 	server := &http.Server{
-		Addr:    "localhost:30000", // TODO get from config
+		Addr:    cfg.Host,
 		Handler: serv,
 	}
 
+	fmt.Printf("Listening on " + cfg.Host + "\n")
 	go func() {
-		// TODO LOG ip
-		// logger.Printf("Listening on http://0.0.0.0%s\n", hs.Addr)
-
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			// TODO is this what we want?
-			log.Fatal(err)
-
+			fmt.Println(err.Error())
+			os.Exit(1)
 		}
 	}()
 
@@ -60,13 +75,11 @@ func graceful(hs *http.Server, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// TODO LOG handle logging
-
-	// logger.Printf("\nShutdown with timeout: %s\n", timeout)
+	fmt.Printf("\nShutdown with timeout: %s\n", timeout)
 
 	if err := hs.Shutdown(ctx); err != nil {
-		// logger.Printf("Error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		// logger.Println("Server stopped")
+		fmt.Println("Server stopped")
 	}
 }
