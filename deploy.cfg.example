@@ -5,3 +5,21 @@
 # The host under which the server will run, typically localhost:[port] or 0.0.0.0:[port]
 host = localhost:45678
 
+# MongoDB parameters. The user and password must both be supplied if either is supplied.
+mongodb-host = localhost:27017
+mongodb-database = blobstore
+#mongodb-user = [username]
+#mongodb-pwd = [password]
+
+# S3 API parameters. All are required other than region.
+s3-host: localhost:9000
+s3-bucket: blobstore
+s3-access-key: [access key goes here]
+s3-access-secret: [access secret goes here]
+#s3-region: us-west-1
+
+# KBase auth server parameters.
+# The root url of the auth server.
+kbase-auth-url: https://kbase.us/services/auth
+# KBase auth server custom roles that denote the user is a blobstore admin. Comma delimited.
+kbase-auth-admin-roles: KBASE_ADMIN, BLOBSTORE_ADMIN
