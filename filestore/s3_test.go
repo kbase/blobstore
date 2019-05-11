@@ -77,10 +77,10 @@ func (t *TestSuite) TestConstructFail() {
 func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, bucket string, expected error) {
 	fstore, err := NewS3FileStore(client, min, bucket)
 	if err == nil {
-		t.Fail("expected error")
+		t.FailNow("expected error")
 	}
 	if fstore != nil {
-		t.Fail("storage is not nil when error is present")
+		t.FailNow("storage is not nil when error is present")
 	}
 	t.Equal(expected, err, "incorrect error")
 }
@@ -92,14 +92,14 @@ func (t *TestSuite) TestConstructWithExistingBucket() {
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	_, err := s3client.CreateBucket(input)
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 	fstore, err := NewS3FileStore(s3client, mclient, bucket)
 	if err != nil {
-		t.Fail(err.Error())
+		t.FailNow(err.Error())
 	}
 	if fstore == nil {
-		t.Fail("expected configured store")
+		t.FailNow("expected configured store")
 	}
 	t.Equal(fstore.GetBucket(), bucket, "incorrect bucket")
 }
@@ -345,14 +345,13 @@ func (t *TestSuite) copy(filename string, format string) {
 	}
 
 	obj, _ := fstore.GetFile("  myid3   ")
+	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
 
-	stored := obj.Stored
-	testhelpers.AssertCloseToNow1S(t.T(), stored)
-	assert.True(t.T(), stored.After(res.Stored), "expected copy time later than source time")
+	assert.True(t.T(), obj.Stored.After(res.Stored), "expected copy time later than source time")
 
 	expected := &GetFileOutput{
 		ID:       "myid3",
@@ -361,7 +360,7 @@ func (t *TestSuite) copy(filename string, format string) {
 		Format:   format,
 		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
-		Stored:   stored,
+		Stored:   obj.Stored, // fake
 	}
 	t.Equal(expected, obj, "incorrect object")
 }
