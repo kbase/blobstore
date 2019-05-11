@@ -8,6 +8,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// TODO LOG log or ignore X-IP headers
+// TODO LOG insecure urls
+
 // ServerStaticConf Static configuration items for the Server.
 type ServerStaticConf struct {
 	// ServerName the name of the server, servername in the JSON output.
