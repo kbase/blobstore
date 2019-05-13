@@ -3,14 +3,35 @@ package auth
 import (
 	"fmt"
 	"strings"
+
+	"github.com/kbase/blobstore/errors"
 )
 
 // User is a user of an authentication system. The user account name (which is expected to
 // be a unique, permanent identifier for the user) and whether the user is an administrator
 // of the blob store is provided.
 type User struct {
-	UserName string
-	IsAdmin  bool
+	userName string
+	isAdmin  bool
+}
+
+// NewUser creates a new user.
+func NewUser(userName string, isAdmin bool) (*User, error) {
+	userName = strings.TrimSpace(userName)
+	if userName == "" {
+		return nil, errors.WhiteSpaceError("userName")
+	}
+	return &User{userName, isAdmin}, nil
+}
+
+// GetUserName returns the user's user name.
+func (u *User) GetUserName() string {
+	return u.userName
+}
+
+// IsAdmin returns whether the user is a blob store administrator.
+func (u *User) IsAdmin() bool {
+	return u.isAdmin
 }
 
 // InvalidUserError occurs when invalid user names are submitted to ValidateUserNames.

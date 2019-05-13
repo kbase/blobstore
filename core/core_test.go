@@ -46,9 +46,10 @@ func TestStoreBasic(t *testing.T) {
 
 	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
 	nsmock.On("StoreNode", node).Return(nil)
+	auser, _ := auth.NewUser("username", false)
 
 	bnode, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+		*auser,
 		strings.NewReader("012345678910"),
 		12,
 		"",
@@ -101,8 +102,10 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		uid, *nuser, 12, "fakemd5", tme, nodestore.FileName("myfile"), nodestore.Format("excel"))
 	nsmock.On("StoreNode", node).Return(nil)
 
+	auser, _ := auth.NewUser("username", false)
+
 	bnode, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+		*auser,
 		strings.NewReader("012345678910"),
 		12,
 		"myfile",
@@ -126,14 +129,16 @@ func TestStoreFailSize(t *testing.T) {
 
 	bs := New(fsmock, nsmock)
 
-	bn, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+	auser, _ := auth.NewUser("username", false)
+
+	bnode, err := bs.Store(
+		*auser,
 		strings.NewReader("012345678910"),
 		0,
 		"myfile",
 		"excel",
 	)
-	assert.Nil(t, bn, "expected error")
+	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect error")
 }
 
@@ -149,8 +154,10 @@ func TestStoreFailGetUser(t *testing.T) {
 	uidmock.On("GetUUID").Return(uid)
 	nsmock.On("GetUser", "username").Return(nil, errors.New("lovely error"))
 
+	auser, _ := auth.NewUser("username", false)
+
 	bnode, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+		*auser,
 		strings.NewReader("012345678910"),
 		12,
 		"myfile",
@@ -180,8 +187,10 @@ func TestStoreFailStoreFile(t *testing.T) {
 		strings.NewReader("012345678910"))
 	fsmock.On("StoreFile", p).Return(nil, errors.New("even more lovely"))
 
+	auser, _ := auth.NewUser("username", false)
+
 	bnode, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+		*auser,
 		strings.NewReader("012345678910"),
 		12,
 		"",
@@ -223,8 +232,10 @@ func TestStoreFailStoreNode(t *testing.T) {
 	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
 	nsmock.On("StoreNode", node).Return(errors.New("the loveliest of them all"))
 
+	auser, _ := auth.NewUser("username", false)
+
 	bnode, err := bs.Store(
-		auth.User{UserName: "username", IsAdmin: false},
+		*auser,
 		strings.NewReader("012345678910"),
 		12,
 		"",
