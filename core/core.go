@@ -28,6 +28,7 @@ type BlobNode struct {
 
 // UUIDGen is an interface for a type that generates random UUIDs.
 type UUIDGen interface {
+	// GetUUID generates a random UUID.
 	GetUUID() uuid.UUID
 }
 
@@ -71,7 +72,7 @@ func (bs *BlobStore) Store(
 	}
 	uid := bs.uuidGen.GetUUID()
 
-	nodeuser, err := bs.nodeStore.GetUser(user.UserName)
+	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
 	if err != nil {
 		return nil, err //TODO ERROR look into error handling here
 	}
@@ -110,7 +111,7 @@ func uuidToFilePath(uid uuid.UUID) string {
 
 // Get gets details about a node.
 func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
-	nodeuser, err := bs.nodeStore.GetUser(user.UserName)
+	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
 	if err != nil {
 		return nil, err // TODO ERROR error handling
 	}
@@ -126,7 +127,7 @@ func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
 }
 
 func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool {
-	if user.IsAdmin {
+	if user.IsAdmin() {
 		return true
 	}
 	if node.GetOwner() == *nodeuser {

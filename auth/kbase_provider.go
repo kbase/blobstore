@@ -81,7 +81,7 @@ func (kb *KBaseProvider) GetUser(token string) (*User, error) {
 	roles := mejson["customroles"].([]interface{})
 	isadmin := kb.isAdmin(&roles)
 	//TODO CACHE return expiration time from token info
-	return &User{UserName: tokenjson["user"].(string), IsAdmin: isadmin}, nil
+	return &User{userName: tokenjson["user"].(string), isAdmin: isadmin}, nil
 }
 
 // expects roles to be strings
