@@ -244,3 +244,167 @@ func TestStoreFailStoreNode(t *testing.T) {
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("the loveliest of them all"), err, "incorrect error")
 }
+
+func TestGetAsOwner(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(
+		uid, *nuser, 12, "fakemd5", tme, nodestore.FileName("fn"), nodestore.Format("json"))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: uid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "fn",
+		Format: "json",
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+}
+
+func TestGetAsReader(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("reader", false)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "reader").Return(ruser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(
+		uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ouser), nodestore.Reader(*ruser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: uid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "",
+		Format: "",
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+}
+
+func TestGetAsAdmin(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("reader", true)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "reader").Return(ruser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ouser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: uid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "",
+		Format: "",
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+}
+
+func TestGetFailGetUser(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+}
+
+func TestGetFailGetNode(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+
+	nsmock.On("GetNode", uid).Return(
+		nil, errors.New("that node isn't the messiah, he's a very naughty boy"))
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("that node isn't the messiah, he's a very naughty boy"),
+		err, "incorrect error")
+}
+
+func TestGetFailUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("other", false)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "other").Return(ouser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("Unauthorized"), err, "incorrect error")
+}
