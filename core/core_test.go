@@ -1,6 +1,7 @@
 package core
 
 import (
+	"io/ioutil"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"time"
@@ -407,4 +408,171 @@ func TestGetFailUnauthorized(t *testing.T) {
 	bnode, err := bs.Get(*auser, uid)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("Unauthorized"), err, "incorrect error")
+}
+
+// GetFile calls GET under the hood, so we only test one error case (auth) from the Get code
+
+func TestGetFileAsOwner(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid, err := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	gfo := filestore.GetFileOutput{
+		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size: 9,
+		Format: "who cares",
+		Filename: "who cares",
+		MD5: "who cares",
+		Stored: time.Now(),
+		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+	}
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+
+	rd, size, err := bs.GetFile(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
+}
+
+func TestGetFileAsReader(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid, err := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("reader", false)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "reader").Return(ruser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme,
+		nodestore.Reader(*ouser), nodestore.Reader(*ruser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	gfo := filestore.GetFileOutput{
+		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size: 9,
+		Format: "who cares",
+		Filename: "who cares",
+		MD5: "who cares",
+		Stored: time.Now(),
+		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+	}
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+
+	rd, size, err := bs.GetFile(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
+}
+
+func TestGetFileAsAdmin(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid, err := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("other", true)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "other").Return(ouser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	gfo := filestore.GetFileOutput{
+		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size: 9,
+		Format: "who cares",
+		Filename: "who cares",
+		MD5: "who cares",
+		Stored: time.Now(),
+		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+	}
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+
+	rd, size, err := bs.GetFile(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
+}
+
+func TestGetFileUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("other", false)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "other").Return(ouser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	rd, size, err := bs.GetFile(*auser, uid)
+	assert.Equal(t, int64(0), size, "expected error")
+	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, errors.New("Unauthorized"), err, "incorrect error")
+}
+
+func TestGetFileFailGetFromStorage(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+		nil, errors.New("whoopsie"))
+
+	rd, size, err := bs.GetFile(*auser, uid)
+	assert.Equal(t, int64(0), size, "expected error")
+	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, errors.New("whoopsie"), err, "incorrect error")
 }
