@@ -16,7 +16,7 @@ in an `@id bytestream` annotation. See the workspace documentation for details; 
 in the context of KBase applications.
 
 The API is nominally compatible with a minimal subset of the
-[KBase fork of Shock](https://github.com/kbase/Shock) API. The vast majority of functions are
+[KBase fork of Shock's](https://github.com/kbase/Shock) API. The vast majority of functions are
 not supported; only those required for the KBase codebase are included.
 
 # Requirements:
@@ -34,6 +34,8 @@ BLOBSTORE_TEST_CFG=[absolute path to test.cfg] go test ./...
 
 Each package gets its own working directory during tests so the path to the `test.cfg` file
 cannot be relative.
+
+Mocks are generated with https://github.com/vektra/mockery v1.0.0.
 
 # TODO
 * HTTP2 support
