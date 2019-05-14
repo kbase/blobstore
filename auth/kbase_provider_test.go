@@ -120,6 +120,20 @@ func TestRunSuite(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
+func (t *TestSuite) TestConstruct() {
+	u, _ := url.Parse("http://foo.bar/baz/")
+	kb, err := NewKBaseProvider(*u)
+	t.Nil(err, "unexpected error")
+	expected, _ := url.Parse("http://foo.bar/baz/")
+	t.Equal(*expected, kb.GetURL(), "incorrect url")
+
+	u2, _ := url.Parse("http://foo.bar/baz")
+	kb2, err := NewKBaseProvider(*u2)
+	t.Nil(err, "unexpected error")
+	expected2, _ := url.Parse("http://foo.bar/baz/")
+	t.Equal(*expected2, kb2.GetURL(), "incorrect url")
+}
+
 func (t *TestSuite) TestConstructFailBadArgs() {
 	u, _ := url.Parse("foo.bar")
 	kb, err := NewKBaseProvider(*u)

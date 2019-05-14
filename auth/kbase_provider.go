@@ -41,28 +41,37 @@ func AdminRole(role string) func(*KBaseProvider) error {
 }
 
 // NewKBaseProvider creates a new auth provider targeting the KBase auth server.
-func NewKBaseProvider(url url.URL, options ...func(*KBaseProvider) error,
+func NewKBaseProvider(kbaseurl url.URL, options ...func(*KBaseProvider) error,
 ) (*KBaseProvider, error) {
-	if !url.IsAbs() {
+	if !kbaseurl.IsAbs() {
 		return nil, errors.New("url must be absolute")
 	}
+	if !strings.HasSuffix(kbaseurl.String(), "/") {
+		kburl, _ := url.Parse(kbaseurl.String() + "/")
+		kbaseurl = *kburl
+	}
 	r := []string(nil)
-	kb := &KBaseProvider{url: url, adminRoles: &r}
+	kb := &KBaseProvider{url: kbaseurl, adminRoles: &r}
 	for _, option := range options {
 		err := option(kb)
 		if err != nil {
 			return nil, err
 		}
 	}
-	token, _ := url.Parse("api/V2/token")
+	token, _ := kbaseurl.Parse("api/V2/token")
 	kb.endpointToken = *token
-	me, _ := url.Parse("api/V2/me")
+	me, _ := kbaseurl.Parse("api/V2/me")
 	kb.endpointMe = *me
-	u, _ := url.Parse("api/V2/users")
+	u, _ := kbaseurl.Parse("api/V2/users")
 	kb.endpointUser = u.String() + "?list="
 	// TODO LATER check url is valid when auth testmode root returns correct info
 	// could also check custom roles are valid & clock skew, probably not worth it
 	return kb, nil
+}
+
+// GetURL returns the url used to contact the auth server.
+func (kb *KBaseProvider) GetURL() url.URL {
+	return kb.url
 }
 
 // GetUser gets a user given a token.
