@@ -91,6 +91,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	if err != nil {
 		return nil, err // may want to wrap error here, not sure how to test
 	}
+	// could split the stream here to count the size and confirm content-length
 	req, _ := http.NewRequest("PUT", presignedurl, p.data)
 	req.ContentLength = p.size
 	req.Header.Set("x-amz-meta-Filename", p.filename)
@@ -107,10 +108,11 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		// TODO LOG body
 		return nil, fmt.Errorf("Unexpected status code uploading to S3: %v", resp.StatusCode)
 	}
-	stored, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
+	// tried parsing the date from the returned headers, but wasn't always the same as what's
+	// returned by head. Head should be cheap compared to a write
+	headObj, err := fs.s3client.HeadObject(&s3.HeadObjectInput{Bucket: &fs.bucket, Key: &p.id})
 	if err != nil {
-		// should delete file if this occurs, but it should never happen
-		return nil, err
+		return nil, err // not sure how to test this
 	}
 	return &StoreFileOutput{
 			ID:       p.id,
@@ -119,9 +121,9 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 			// theoretically, the Etag is opaque. In practice, it's the md5
 			// If that changes, MultiWrite the file to an md5 writer.
 			// That means that we can't return the md5 in get file though.
-			MD5:    strings.Trim(resp.Header.Get("Etag"), `"`),
+			MD5:    strings.Trim(*headObj.ETag, `"`),
 			Size:   p.size,
-			Stored: stored.UTC(),
+			Stored: headObj.LastModified.UTC(),
 		},
 		nil
 }
