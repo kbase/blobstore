@@ -11,14 +11,14 @@ mongodb-database = blobstore
 #mongodb-user = [username]
 #mongodb-pwd = [password]
 
-# S3 API parameters. All are required other than region and disable-ssl.
+# S3 API parameters. All are required other than disable-ssl.
 # disable-ssl treats any value other than 'true' as false.
 s3-host: localhost:9000
 s3-bucket: blobstore
 s3-access-key: [access key goes here]
 s3-access-secret: [access secret goes here]
+s3-region: us-west-1
 #s3-disable-ssl: false
-#s3-region: us-west-1
 
 # KBase auth server parameters.
 # The root url of the auth server.

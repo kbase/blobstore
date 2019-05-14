@@ -73,6 +73,7 @@ func (t *TestSuite) TestMinimalConfig() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	cfg, err := New(filePath)
@@ -86,6 +87,7 @@ func (t *TestSuite) TestMinimalConfig() {
 		S3Bucket: "mybucket",
 		S3AccessKey: "akey",
 		S3AccessSecret: "sooporsekrit",
+		S3Region: "us-west-1",
 		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
@@ -105,7 +107,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
 		"s3-disable-ssl =     \t   tru  ",
-		"s3-region =           \t   ",
+		"s3-region =       us-west-1    \t   ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ",
 	)
@@ -120,6 +122,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		S3Bucket: "mybucket",
 		S3AccessKey: "akey",
 		S3AccessSecret: "sooporsekrit",
+		S3Region: "us-west-1",
 		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
@@ -198,6 +201,7 @@ func (t *TestSuite) TestConfigFailNoHost() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -208,6 +212,7 @@ func (t *TestSuite) TestConfigFailNoHost() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "host")
@@ -221,6 +226,7 @@ func (t *TestSuite) TestConfigFailNoMongoHost() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -231,6 +237,7 @@ func (t *TestSuite) TestConfigFailNoMongoHost() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "mongodb-host")
@@ -244,6 +251,7 @@ func (t *TestSuite) TestConfigFailNoMongoDatabase() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -254,6 +262,7 @@ func (t *TestSuite) TestConfigFailNoMongoDatabase() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "mongodb-database")
@@ -269,6 +278,7 @@ func (t *TestSuite) TestConfigFailMongoUserPwd() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wsuser := t.writeFile(
@@ -281,6 +291,7 @@ func (t *TestSuite) TestConfigFailMongoUserPwd() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	nopwd := t.writeFile(
@@ -292,6 +303,7 @@ func (t *TestSuite) TestConfigFailMongoUserPwd() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wspwd := t.writeFile(
@@ -304,6 +316,7 @@ func (t *TestSuite) TestConfigFailMongoUserPwd() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	for _, f := range []string{nouser, wsuser, nopwd, wspwd} {
@@ -323,6 +336,7 @@ func (t *TestSuite) TestConfigFailNoS3Host() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -333,6 +347,7 @@ func (t *TestSuite) TestConfigFailNoS3Host() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "s3-host")
@@ -346,6 +361,7 @@ func (t *TestSuite) TestConfigFailNoS3Bucket() {
 		"s3-host = localhost:34567",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -356,6 +372,7 @@ func (t *TestSuite) TestConfigFailNoS3Bucket() {
 		"s3-bucket =        \t      ",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "s3-bucket")
@@ -369,6 +386,7 @@ func (t *TestSuite) TestConfigFailNoS3AccessKey() {
 		"s3-host = localhost:34567",
 		"s3-bucket =        \t      mybucket",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -379,6 +397,7 @@ func (t *TestSuite) TestConfigFailNoS3AccessKey() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key =    ",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "s3-access-key")
@@ -392,6 +411,7 @@ func (t *TestSuite) TestConfigFailNoS3AccessSecret() {
 		"s3-host = localhost:34567",
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	wskey := t.writeFile(
@@ -402,9 +422,35 @@ func (t *TestSuite) TestConfigFailNoS3AccessSecret() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = \t",
+		"s3-region = us-west-1",
 		"kbase-auth-url = https://kbase.us/authyauth",
 	)
 	t.checkFile(nokey, wskey, "s3-access-secret")
+}
+
+func (t *TestSuite) TestConfigFailNoS3Region() {
+	nokey := t.writeFile(
+		"host = localhost:12345",
+		"mongodb-host = localhost:67890 \t  ",
+		"mongodb-database = mydb",
+		"s3-host = localhost:34567",
+		"s3-bucket =        \t      mybucket",
+		"s3-access-key = akey",
+		"s3-access-secret = sooporsekrit",
+		"kbase-auth-url = https://kbase.us/authyauth",
+	)
+	wskey := t.writeFile(
+		"host = localhost:12345",
+		"mongodb-host = localhost:67890 \t  ",
+		"mongodb-database = mydb",
+		"s3-host = localhost:34567",
+		"s3-bucket =        \t      mybucket",
+		"s3-access-key = akey",
+		"s3-access-secret = sooporsekrit",
+		"s3-region =    \t     \n     ",
+		"kbase-auth-url = https://kbase.us/authyauth",
+	)
+	t.checkFile(nokey, wskey, "s3-region")
 }
 
 func (t *TestSuite) TestConfigFailNoAuthURL() {
@@ -416,6 +462,7 @@ func (t *TestSuite) TestConfigFailNoAuthURL() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 	)
 	wskey := t.writeFile(
 		"host = localhost:12345",
@@ -425,6 +472,7 @@ func (t *TestSuite) TestConfigFailNoAuthURL() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url =   \t    ",
 	)
 	t.checkFile(nokey, wskey, "kbase-auth-url")
@@ -439,6 +487,7 @@ func (t *TestSuite) TestConfigFailBadAuthURL() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-region = us-west-1",
 		"kbase-auth-url =   ://kbase.us/authyauth",
 	)
 

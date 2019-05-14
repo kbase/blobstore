@@ -96,7 +96,7 @@ func New(configFilePath string) (*Config, error) {
 	s3key, err := getString(err, configFilePath, sec, KeyS3AccessKey, true)
 	s3secret, err := getString(err, configFilePath, sec, KeyS3AccessSecret, true)
 	s3disableSSL, err := getString(err, configFilePath, sec, KeyS3DisableSSL, false)
-	s3region, err := getString(err, configFilePath, sec, KeyS3Region, false) //TODO NOW TEST manually starting the server with noregion
+	s3region, err := getString(err, configFilePath, sec, KeyS3Region, true)
 	authurl, err := getURL(err, configFilePath, sec, KeyAuthURL)
 	roles, err := getStringList(err, configFilePath, sec, KeyAuthAdminRoles)
 	if err != nil {
