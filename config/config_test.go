@@ -86,6 +86,7 @@ func (t *TestSuite) TestMinimalConfig() {
 		S3Bucket: "mybucket",
 		S3AccessKey: "akey",
 		S3AccessSecret: "sooporsekrit",
+		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
 	}
@@ -103,6 +104,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		"s3-bucket =        \t      mybucket",
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
+		"s3-disable-ssl =     \t   tru  ",
 		"s3-region =           \t   ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ",
@@ -118,6 +120,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		S3Bucket: "mybucket",
 		S3AccessKey: "akey",
 		S3AccessSecret: "sooporsekrit",
+		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
 	}
@@ -136,6 +139,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		"s3-access-key = akey",
 		"s3-access-secret = sooporsekrit",
 		"s3-region = us-west-1",
+		"s3-disable-ssl=     true    ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ,    foo   , \tbar\t , ,  baz ,,",
 	)
@@ -152,6 +156,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		S3Bucket: "mybucket",
 		S3AccessKey: "akey",
 		S3AccessSecret: "sooporsekrit",
+		S3DisableSSL: true,
 		S3Region: "us-west-1",
 		AuthURL: u,
 		AuthAdminRoles: &[]string{"foo", "bar", "baz"},

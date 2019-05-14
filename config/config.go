@@ -32,6 +32,9 @@ const (
 	KeyS3AccessKey = "s3-access-key"
 	// KeyS3AccessSecret is the configuration key where the value is the S3 access secret
 	KeyS3AccessSecret = "s3-access-secret"
+	// KeyS3DisableSSL is the configuration key that determines whether SSL is to be used.
+	// any value other than 'true' is treated as false.
+	KeyS3DisableSSL = "s3-disable-ssl"
 	// KeyS3Region is the configuration key where the value is the S3 region
 	KeyS3Region = "s3-region"
 	// KeyAuthURL is the configuration key where the value is the KBase auth server URL
@@ -61,6 +64,8 @@ type Config struct {
 	S3AccessKey string
 	// S3AccessSecret is the S3 access secret
 	S3AccessSecret string
+	// S3DisableSSL determines whether SSL should be used
+	S3DisableSSL bool
 	// S3Region is the S3 region
 	S3Region string
 	// AuthURL is the KBase auth server URL. It is never nil.
@@ -90,6 +95,7 @@ func New(configFilePath string) (*Config, error) {
 	s3bucket, err := getString(err, configFilePath, sec, KeyS3Bucket, true)
 	s3key, err := getString(err, configFilePath, sec, KeyS3AccessKey, true)
 	s3secret, err := getString(err, configFilePath, sec, KeyS3AccessSecret, true)
+	s3disableSSL, err := getString(err, configFilePath, sec, KeyS3DisableSSL, false)
 	s3region, err := getString(err, configFilePath, sec, KeyS3Region, false) //TODO NOW TEST manually starting the server with noregion
 	authurl, err := getURL(err, configFilePath, sec, KeyAuthURL)
 	roles, err := getStringList(err, configFilePath, sec, KeyAuthAdminRoles)
@@ -112,6 +118,7 @@ func New(configFilePath string) (*Config, error) {
 			S3Bucket:       s3bucket,
 			S3AccessKey:    s3key,
 			S3AccessSecret: s3secret,
+			S3DisableSSL:   "true" == s3disableSSL,
 			S3Region:       s3region,
 			AuthURL:        authurl,
 			AuthAdminRoles: roles,
