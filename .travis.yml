@@ -43,7 +43,8 @@ script:
 
   # run tests
   - export TCFG=`pwd`/test.cfg
-  - BLOBSTORE_TEST_CFG=$TCFG go test -race -coverpkg=all -coverprofile=coverage.txt -covermode=atomic ./...
+  - export CVRPKG=app,auth,build,config,core,errors,filestore,nodestore,service
+  - BLOBSTORE_TEST_CFG=$TCFG go test -race -coverpkg=$CVRPKG -coverprofile=coverage.txt -covermode=atomic ./...
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
