@@ -56,6 +56,8 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 		return nil, err // this is a pain to test
 	}
 	router := mux.NewRouter()
+	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
+	router.MethodNotAllowedHandler = http.HandlerFunc(notAllowedHandler)
 	// router.StrictSlash(true) // doesn't seem to have an effect
 	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
@@ -76,7 +78,13 @@ type servkey struct {
 	k string
 }
 
-//TODO NOW test everything below this line
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	writeErrorWithCode("Not Found", 404, w)
+}
+
+func notAllowedHandler(w http.ResponseWriter, r *http.Request) {
+	writeErrorWithCode("Method Not Allowed", 405, w)
+}
 
 func (s *Server) authMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,11 +106,15 @@ func (s *Server) authMiddleWare(next http.Handler) http.Handler {
 }
 
 func writeError(err error, w http.ResponseWriter) {
-	//TODO LOG log error
 	code := 500 //TODO ERROR correct code
+	writeErrorWithCode(err.Error(), code, w)
+}
+
+func writeErrorWithCode(err string, code int, w http.ResponseWriter) {
+	//TODO LOG log error
 	ret := map[string]interface{}{
 		"data":   nil,
-		"error":  [1]string{err.Error()},
+		"error":  [1]string{err},
 		"status": code,
 	}
 	w.WriteHeader(code)
