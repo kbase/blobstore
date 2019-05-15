@@ -53,7 +53,7 @@ func (t *TestSuite) TearDownSuite() {
 }
 
 func (t *TestSuite) SetupTest() {
-	t.minio.Clear()
+	t.minio.Clear(false)
 }
 
 func TestRunSuite(t *testing.T) {

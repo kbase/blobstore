@@ -40,14 +40,20 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	_ = cfg // TODO NOW pass into service.New
-	serv := service.New(service.ServerStaticConf{
-		ServerName:          name,
-		ServerVersion:       version,
-		ID:                  shockname,
-		ServerVersionCompat: shockver,
-		DeprecationWarning:  deprecation,
-	})
+	serv, err := service.New(
+		cfg,
+		service.ServerStaticConf{
+			ServerName:          name,
+			ServerVersion:       version,
+			ID:                  shockname,
+			ServerVersionCompat: shockver,
+			DeprecationWarning:  deprecation,
+		},
+	)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 	server := &http.Server{
 		Addr:    cfg.Host,
 		Handler: serv,

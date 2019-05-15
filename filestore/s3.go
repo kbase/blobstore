@@ -3,8 +3,10 @@ package filestore
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -103,9 +105,12 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
 		return nil, errors.New(err.(*url.Error).Err.Error())
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
 		// not sure how to test this either, other than shutting down Minio
 		// TODO LOG body
+		// TODO TEST by deleting bucket
+		io.Copy(os.Stdout, resp.Body)
 		return nil, fmt.Errorf("Unexpected status code uploading to S3: %v", resp.StatusCode)
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
