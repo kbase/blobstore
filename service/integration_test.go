@@ -438,4 +438,12 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	t.checkError(nodeb2, 500, "Unauthorized")
 }
 
-//TODO NOW 404 and 405 handlers
+func (t *TestSuite) TestNotFound() {
+	body := t.post(t.url + "/nde", strings.NewReader("foobarbaz"), t.tokenKBaseAdmin)
+	t.checkError(body, 404, "Not Found")
+}
+
+func (t *TestSuite) TestNotAllowed() {
+	body := t.getNode(t.url + "/node", "token")
+	t.checkError(body, 405, "Method Not Allowed")
+}
