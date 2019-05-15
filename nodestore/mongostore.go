@@ -240,7 +240,7 @@ func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 // go driver 1.1.0 will have a DateTime.Time() method, this is copied from the prerelease code
 // https://github.com/mongodb/mongo-go-driver/blob/229a9c94a4735eccfc431ea183e0942de7569f58/bson/primitive/primitive.go#L45
 func toTime(d primitive.DateTime) time.Time {
-	return time.Unix(int64(d)/1000, int64(d)%1000*1000000)
+	return time.Unix(int64(d)/1000, int64(d)%1000*1000000).UTC()
 }
 
 // DeleteNode deletes a node.

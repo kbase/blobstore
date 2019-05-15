@@ -129,7 +129,7 @@ func (c *Controller) CreateMinioClient() (*minio.Client, error) {
 
 // Clear removes all data from the Minio instance, but is limited to the first 1000 objects in
 // each of the buckets.
-func (c *Controller) Clear() error {
+func (c *Controller) Clear(keepBuckets bool) error {
 	client := c.CreateS3Client()
 	buckets, err := client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
@@ -152,9 +152,11 @@ func (c *Controller) Clear() error {
 				return err
 			}
 		}
-		_, err = client.DeleteBucket(&s3.DeleteBucketInput{Bucket: bucket.Name})
-		if err != nil {
-			return err
+		if !keepBuckets {
+			_, err = client.DeleteBucket(&s3.DeleteBucketInput{Bucket: bucket.Name})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
