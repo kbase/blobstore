@@ -53,7 +53,7 @@ type Server struct {
 func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	deps, err := constructDependencies(cfg)
 	if err != nil {
-		return nil, err
+		return nil, err // this is a pain to test
 	}
 	router := mux.NewRouter()
 	// router.StrictSlash(true) // doesn't seem to have an effect
@@ -106,7 +106,7 @@ func writeError(err error, w http.ResponseWriter) {
 		"status": code,
 	}
 	w.WriteHeader(code)
-	encodeToJSON(w, ret)
+	encodeToJSON(w, &ret)
 }
 
 func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -119,10 +119,10 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"servertime":         time.Now().UnixNano() / 1000000,
 		//TODO git commit hash
 	}
-	encodeToJSON(w, ret)
+	encodeToJSON(w, &ret)
 }
 
-func encodeToJSON(w http.ResponseWriter, data map[string]interface{}) {
+func encodeToJSON(w http.ResponseWriter, data *map[string]interface{}) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(data) // assume no errors here
@@ -143,15 +143,22 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	//TODO CREATE handle copy
 	node, err := s.store.Store(*user, r.Body, r.ContentLength, "", "")
 	if err != nil {
+		// can't figure out how to easily test this case.
+		// the only triggerable error in the blobstore code is a bad content length,
+		// but the server complains before we even get here for small data.
 		writeError(err, w)
 		return
 	}
+	writeNode(w, node)
+}
+
+func writeNode(w http.ResponseWriter, node *core.BlobNode) {
 	ret := map[string]interface{}{
 		"status": 200,
 		"error":  nil,
 		"data":   fromNode(node),
 	}
-	encodeToJSON(w, ret)
+	encodeToJSON(w, &ret)
 }
 
 func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
@@ -180,12 +187,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 			writeError(err, w) //TODO ERROR code
 			return
 		}
-		ret := map[string]interface{}{
-			"status": 200,
-			"error":  nil,
-			"data":   fromNode(node),
-		}
-		encodeToJSON(w, ret)
+		writeNode(w, node)
 	}
 }
 
