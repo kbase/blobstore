@@ -16,7 +16,6 @@ import (
 
 	"github.com/kbase/blobstore/auth"
 
-	"github.com/kbase/blobstore/build"
 	"github.com/kbase/blobstore/config"
 
 	"github.com/gorilla/mux"
@@ -52,7 +51,7 @@ type Server struct {
 
 // New create a new server.
 func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
-	deps, err := build.ConstructDependencies(cfg)
+	deps, err := constructDependencies(cfg)
 	if err != nil {
 		return nil, err
 	}

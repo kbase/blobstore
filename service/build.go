@@ -1,5 +1,4 @@
-// Package build builds the dependencies for the blobstore.
-package build
+package service
 
 import (
 	"context"
@@ -34,7 +33,7 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
-func ConstructDependencies(cfg *config.Config) (*Dependencies, error) {
+func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
 	if err != nil {
