@@ -183,7 +183,8 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 		t.Fail("returned object is not nil")
 	}
 	// might want a different error message here
-	t.Equal(errors.New("http: ContentLength=11 with Body length 12"), err, "incorrect error")
+	t.Equal(errors.New("s3 store request: http: ContentLength=11 with Body length 12"), err,
+		"incorrect error")
 }
 
 func (t *TestSuite) TestGetWithBlankID() {
@@ -219,7 +220,7 @@ func (t *TestSuite) assertNoFile(fstore FileStore, id string) {
 	if res != nil {
 		t.Fail("returned object is not null")
 	}
-	t.Equal(errors.New("No such id: "+strings.TrimSpace(id)), err, "incorrect err")
+	t.Equal(NewNoFileError("No such id: "+strings.TrimSpace(id)), err, "incorrect err")
 }
 
 func (t *TestSuite) TestGetWithoutMetaData() {
@@ -383,7 +384,7 @@ func (t *TestSuite) copyFail(fstore FileStore, src string, dst string, expected 
 	if err == nil {
 		t.Fail("expected error")
 	}
-	t.Equal(err, expected, "incorrect error")
+	t.Equal(expected, err, "incorrect error")
 }
 
 func (t *TestSuite) TestCopyNonExistentFile() {
@@ -399,7 +400,7 @@ func (t *TestSuite) TestCopyNonExistentFile() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	t.copyFail(fstore, "  myid2   ", "   myid3  ", errors.New("File ID myid2 does not exist"))
+	t.copyFail(fstore, "  myid2   ", "   myid3  ", NewNoFileError("No such ID: myid2"))
 }
 
 func (t* TestSuite) testCopyLargeObject() {

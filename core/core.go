@@ -14,6 +14,8 @@ import (
 	"github.com/kbase/blobstore/nodestore"
 )
 
+//TODO ERROR note errors returned from this code.
+
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID

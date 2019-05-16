@@ -18,7 +18,7 @@ type StoreFileParams struct {
 	filename string
 }
 
-// Format provide an arbitrary file format (e.g. json, txt) to the NewStoreFileParams() method.
+// Format provides an arbitrary file format (e.g. json, txt) to the NewStoreFileParams() method.
 func Format(format string) func(*StoreFileParams) error {
 	return func(s *StoreFileParams) error {
 		s.format = strings.TrimSpace(format)
@@ -26,7 +26,7 @@ func Format(format string) func(*StoreFileParams) error {
 	}
 }
 
-// FileName provide an arbitrary file name to the NewStoreFileParams() method.
+// FileName provides an arbitrary file name to the NewStoreFileParams() method.
 func FileName(filename string) func(*StoreFileParams) error {
 	return func(s *StoreFileParams) error {
 		s.filename = strings.TrimSpace(filename)
@@ -34,7 +34,7 @@ func FileName(filename string) func(*StoreFileParams) error {
 	}
 }
 
-// NewStoreFileParams create parameters for storing a file.
+// NewStoreFileParams creates parameters for storing a file.
 // The ID must be unique - providing the same ID twice will cause the file to be overwritten.
 // To set the file format and name (both optional and arbitrary) use the Format() and
 // FileName() functions in the options argument.
@@ -102,15 +102,30 @@ type GetFileOutput struct {
 	Data io.ReadCloser
 }
 
+// NoFileError is returned when a file that doesn't exist is requested.
+type NoFileError string
+
+// NewNoFileError creates a new NoFileError.
+func NewNoFileError(err string) *NoFileError {
+	e := NoFileError(err)
+	return &e
+}
+
+func (e *NoFileError) Error() string {
+	return string(*e)
+}
+
 // FileStore an interface to a file storage system that allows storing and retrieving files
 // by ID.
 type FileStore interface {
 	// Store a file.
 	StoreFile(p *StoreFileParams) (*StoreFileOutput, error)
 	// Get a file by the ID of the file.
+	// Returns NoFileError if there is no file by the given ID.
 	GetFile(id string) (*GetFileOutput, error)
 	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
 	DeleteFile(id string) error
 	// CopyFile copies a file from one ID to another.
+	// Returns NoFileError if there is no file by the source ID.
 	CopyFile(sourceID string, targetID string) error
 }

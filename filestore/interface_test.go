@@ -56,3 +56,8 @@ func TestStoreFileParamsBuildBadSize(t *testing.T) {
 
 	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect err")
 }
+
+func TestNoFileError(t *testing.T) {
+	e := NewNoFileError("err")
+	assert.Equal(t, "err", e.Error(), "incorrect error")
+}
