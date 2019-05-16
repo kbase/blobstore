@@ -111,3 +111,7 @@ func TestNodeBadInput(t *testing.T) {
 	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect error")
 }
 
+func TestNoNodeError(t *testing.T) {
+	e := NewNoNodeError("err")
+	assert.Equal(t, "err", e.Error(), "incorrect error")
+}

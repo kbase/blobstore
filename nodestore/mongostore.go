@@ -89,7 +89,8 @@ func (s *MongoNodeStore) GetUser(accountName string) (*User, error) {
 	col := s.db.Collection(colUsers)
 	res := col.FindOne(context.Background(), map[string]string{keyUsersUser: accountName})
 	if res.Err() != nil {
-		return nil, res.Err() // don't know how to test this
+		// don't know how to test this
+		return nil, errors.New("mongostore find user: " + res.Err().Error())
 	}
 	u, err := toUser(res)
 	if err != nil {
@@ -122,11 +123,12 @@ func (s *MongoNodeStore) createUser(accountName string) (*User, error) {
 		res := col.FindOne(nil, map[string]string{keyUsersUser: accountName})
 		if res.Err() != nil {
 			// ok, give up. Dunno how to test this either.
-			return nil, res.Err()
+			return nil, errors.New("mongostore find user attempt 2: " + res.Err().Error())
 		}
+		// assume we found a user here, so returning nil, nil is imposible.
 		return toUser(res)
 	}
-	return nil, err // dunno how to test
+	return nil, errors.New("mongostore create user: " + err.Error()) // dunno how to test
 }
 
 // returns true if the error has one WriteError, has no WriteConcernError, and the
@@ -148,6 +150,7 @@ func isMongoDuplicateKey(err error) bool {
 	return true
 }
 
+// returns nil, nil if no result was found
 func toUser(sr *mongo.SingleResult) (*User, error) {
 	var udoc map[string]interface{}
 	err := sr.Decode(&udoc)
@@ -155,7 +158,8 @@ func toUser(sr *mongo.SingleResult) (*User, error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		return nil, err // dunno how to test this either
+		// dunno how to test this either
+		return nil, errors.New("mongostore user decode: " + err.Error())
 	}
 	// err should always be nil unless db is corrupt
 	uid, _ := uuid.Parse(udoc[keyUsersUUID].(string))
@@ -192,7 +196,7 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 		if isMongoDuplicateKey(err) {
 			return fmt.Errorf("Node %v already exists", node.id.String())
 		}
-		return err // not sure how to test
+		return errors.New("mongostore store node: " + err.Error()) // not sure how to test
 	}
 	return nil
 }
@@ -201,16 +205,18 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 	res := s.db.Collection(colNodes).FindOne(nil, map[string]string{keyNodesID: id.String()})
 	if res.Err() != nil {
-		return nil, res.Err() // don't know how to test this
+		// don't know how to test this
+		return nil, errors.New("mongostore get node: " + res.Err().Error())
 	}
 	var ndoc map[string]interface{}
 	err := res.Decode(&ndoc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			// TODO ERROR match shock error and add error code
-			return nil, fmt.Errorf("No such node %v", id.String())
+			return nil, NewNoNodeError("No such node " + id.String())
 		}
-		return nil, err // dunno how to test this either
+		// dunno how to test this either
+		return nil, errors.New("mongostore decode node: " + err.Error())
 	}
 	opts := []func(*Node) error{}
 	opts = append(opts, Format(ndoc[keyNodesFormat].(string)))
@@ -248,11 +254,11 @@ func (s *MongoNodeStore) DeleteNode(id uuid.UUID) error {
 	res, err := s.db.Collection(colNodes).DeleteOne(
 		nil, map[string]string{keyNodesID: id.String()})
 	if err != nil {
-		return err // dunno how to test this
+		return errors.New("mongostore delete node: " + err.Error()) // dunno how to test this
 	}
 	if res.DeletedCount < 1 {
 		// TODO ERROR match shock error and add error code
-		return fmt.Errorf("No such node %v", id.String())
+		return NewNoNodeError("No such node " + id.String())
 	}
 	return nil
 }
