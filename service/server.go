@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -62,7 +61,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
 	router.Use(s.authMiddleWare)
-	// TODO API is there a way to return a custom body for a 405?
 	router.HandleFunc("/node", s.createNode).Methods(http.MethodPost, http.MethodPut)
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
@@ -179,7 +177,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(putativeid)
 	if err != nil {
 		// crappy error message, but compatible with Shock
-		writeError(errors.New("Node not found"), w) //TODO ERROR needs a 404
+		writeErrorWithCode("Node not found", 404, w)
 		return
 	}
 	user := r.Context().Value(servkey{"user"}).(*auth.User)

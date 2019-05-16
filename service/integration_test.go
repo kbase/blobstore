@@ -415,10 +415,10 @@ func (t *TestSuite) TestStoreNoUser() {
 
 func (t *TestSuite) TestGetBadID() {
 	body := t.getNode(t.url + "/node/badid", t.tokenNoRole)
-	t.checkError(body, 500, "Node not found")
+	t.checkError(body, 404, "Node not found")
 
 	body2 := t.getNode(t.url + "/node/badid?download", t.tokenNoRole)
-	t.checkError(body2, 500, "Node not found")
+	t.checkError(body2, 404, "Node not found")
 	
 	uid := uuid.New()
 	body3 := t.getNode(t.url + "/node/" + uid.String(), t.tokenNoRole)
