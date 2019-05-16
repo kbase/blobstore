@@ -3,10 +3,8 @@ package filestore
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -111,10 +109,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
-		// not sure how to test this either, other than shutting down Minio
 		// TODO LOG body
-		// TODO TEST by deleting bucket
-		io.Copy(os.Stdout, resp.Body)
 		return nil, fmt.Errorf("s3 store request unexpected status code: %v", resp.StatusCode)
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
@@ -186,7 +181,6 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 		Key:    &id,
 	})
 	if err != nil {
-		// no idea how to test this - could delete bucket? But that shouldn't happen
 		return errors.New("s3 store delete: " + err.Error())
 	}
 	return nil
