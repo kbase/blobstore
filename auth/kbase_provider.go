@@ -129,18 +129,18 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(io.LimitReader(resp.Body, 10000))
 	if err != nil {
-		return nil, err // dunno how to test this easily
+		return nil, errors.New("kbase auth read: " + err.Error()) // dunno how to test this easily
 	}
 	if _, err = resp.Body.Read(make([]byte, 1, 1)); err != io.EOF {
 		// TODO LOG b
-		return nil, errors.New("Unexpectedly long body from auth service")
+		return nil, errors.New("kbase auth: Unexpectedly long body from auth service")
 	}
 	var authresp map[string]interface{}
 	err = json.Unmarshal(b, &authresp)
 	if err != nil {
 		// TODO LOG b.
-		return nil, errors.New("Non-JSON response from KBase auth server, status code: " +
-			strconv.Itoa(resp.StatusCode))
+		return nil, errors.New("kbase auth: Non-JSON response from KBase auth server, " +
+			"status code: " + strconv.Itoa(resp.StatusCode))
 	}
 	if resp.StatusCode > 399 { // should never see 100s or 300s
 		// assume that we have a valid error response from the auth server at this point
@@ -150,7 +150,7 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 		}
 		// add more errors responses here
 		// not sure how to easily test this
-		return nil, errors.New("Error from KBase auth server: " + aerr["message"].(string))
+		return nil, errors.New("kbase auth server error: " + aerr["message"].(string))
 	}
 	return authresp, nil
 }
