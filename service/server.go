@@ -106,8 +106,8 @@ func (s *Server) authMiddleWare(next http.Handler) http.Handler {
 }
 
 func writeError(err error, w http.ResponseWriter) {
-	code := 500 //TODO ERROR correct code
-	writeErrorWithCode(err.Error(), code, w)
+	code, errstr := translateError(err)
+	writeErrorWithCode(errstr, code, w)
 }
 
 func writeErrorWithCode(err string, code int, w http.ResponseWriter) {
@@ -143,12 +143,13 @@ func encodeToJSON(w http.ResponseWriter, data *map[string]interface{}) {
 func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	if r.ContentLength < 0 {
-		writeError(errors.New("Missing content-length header"), w) //TODO ERROR 400 code
+		writeErrorWithCode("Length Required", http.StatusLengthRequired, w)
 		return
 	}
 	user := r.Context().Value(servkey{"user"}).(*auth.User)
 	if user == nil {
-		writeError(errors.New("Unauthorized"), w) // TODO ERROR correct error
+		// shock compatibility here
+		writeErrorWithCode("No Authorization", http.StatusUnauthorized, w)
 		return
 	}
 	// TODO CREATE handle filename and format

@@ -114,7 +114,7 @@ func get(u url.URL, token string) (map[string]interface{}, error) {
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err // dunno how to test this
+		return nil, errors.New("kbase auth get: " + err.Error()) // dunno how to test this
 	}
 	return toJSON(res)
 }
@@ -146,7 +146,7 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 		// assume that we have a valid error response from the auth server at this point
 		aerr := authresp["error"].(map[string]interface{})
 		if aerr["apperror"] == "Invalid token" {
-			return nil, errors.New("KBase auth server reported token was invalid")
+			return nil, NewInvalidTokenError("KBase auth server reported token was invalid")
 		}
 		// add more errors responses here
 		// not sure how to easily test this
@@ -186,7 +186,7 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (b
 		}
 	}
 	if len(invalid) > 0 {
-		return false, InvalidUserError{&invalid}
+		return false, &InvalidUserError{&invalid}
 	}
 	// TODO CACHE return expiration time
 	return true, nil
