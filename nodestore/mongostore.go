@@ -212,7 +212,6 @@ func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 	err := res.Decode(&ndoc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			// TODO ERROR match shock error and add error code
 			return nil, NewNoNodeError("No such node " + id.String())
 		}
 		// dunno how to test this either
@@ -257,7 +256,6 @@ func (s *MongoNodeStore) DeleteNode(id uuid.UUID) error {
 		return errors.New("mongostore delete node: " + err.Error()) // dunno how to test this
 	}
 	if res.DeletedCount < 1 {
-		// TODO ERROR match shock error and add error code
 		return NewNoNodeError("No such node " + id.String())
 	}
 	return nil

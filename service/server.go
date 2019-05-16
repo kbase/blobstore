@@ -186,7 +186,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	if download(r.URL) {
 		datareader, size, err := s.store.GetFile(*user, id)
 		if err != nil {
-			writeError(err, w) //TODO ERROR code
+			writeError(err, w)
 			return
 		}
 		defer datareader.Close()
@@ -195,7 +195,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	} else {
 		node, err := s.store.Get(*user, id)
 		if err != nil {
-			writeError(err, w) //TODO ERROR code
+			writeError(err, w)
 			return
 		}
 		writeNode(w, node)

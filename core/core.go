@@ -14,8 +14,6 @@ import (
 	"github.com/kbase/blobstore/nodestore"
 )
 
-//TODO ERROR note errors returned from this code.
-
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID
@@ -40,6 +38,32 @@ type UUIDGenDefault struct{}
 // GetUUID generates a random UUID.
 func (u *UUIDGenDefault) GetUUID() uuid.UUID {
 	return uuid.New()
+}
+
+// NoBlobError is returned when a requested blob does not exist.
+type NoBlobError string
+
+// NewNoBlobError creates a new NoBlobError.
+func NewNoBlobError(err string) *NoBlobError {
+	e := NoBlobError(err)
+	return &e
+}
+
+func (e *NoBlobError) Error() string {
+	return string(*e)
+}
+
+// UnauthorizedError is returned when a user may not read a blob.
+type UnauthorizedError string
+
+// NewUnauthorizedError creates a new UnauthorizedError.
+func NewUnauthorizedError(err string) *UnauthorizedError {
+	e := UnauthorizedError(err)
+	return &e
+}
+
+func (e *UnauthorizedError) Error() string {
+	return string(*e)
 }
 
 // BlobStore is the storage system for blobs.
@@ -76,19 +100,19 @@ func (bs *BlobStore) Store(
 
 	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
 	if err != nil {
-		return nil, err //TODO ERROR look into error handling here
+		return nil, err // errors should only occur for unusual situations here
 	}
 	p, _ := filestore.NewStoreFileParams(
 		uuidToFilePath(uid), size, data, filestore.FileName(filename), filestore.Format(format))
 	f, err := bs.fileStore.StoreFile(p)
 	if err != nil {
-		return nil, err //TODO ERROR look into error handling here
+		return nil, err // errors should only occur for unusual situations here
 	}
 	node, _ := nodestore.NewNode(uid, *nodeuser, size, f.MD5, f.Stored,
 		nodestore.FileName(filename), nodestore.Format(format))
 	err = bs.nodeStore.StoreNode(node)
 	if err != nil {
-		return nil, err
+		return nil, err // errors should only occur for unusual situations here
 		// consider deleting the file here, although errors should be extremely rare
 		// since we recently contacted mongo
 	}
@@ -111,18 +135,22 @@ func uuidToFilePath(uid uuid.UUID) string {
 	return "/" + uidstr[0:2] + "/" + uidstr[2:4] + "/" + uidstr[4:6] + "/" + uidstr
 }
 
-// Get gets details about a node.
+// Get gets details about a node. Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
 	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
 	if err != nil {
-		return nil, err // TODO ERROR error handling
+		return nil, err // errors should only occur for unusual situations here
 	}
 	node, err := bs.nodeStore.GetNode(id)
 	if err != nil {
-		return nil, err // TODO ERROR error handling
+		if _, ok := err.(*nodestore.NoNodeError); ok {
+			// seems weird to rewrap, but also seems weird to expose errors in lower api levels
+			return nil, NewNoBlobError(err.Error())
+		}
+		return nil, err // errors should only occur for unusual situations here
 	}
 	if !authok(user, nodeuser, node) {
-		return nil, errors.New("Unauthorized") // TODO ERROR error handling
+		return nil, NewUnauthorizedError("Unauthorized")
 	}
 	return toBlobNode(node), nil
 
@@ -143,7 +171,7 @@ func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool
 	return false
 }
 
-// GetFile gets the file from a node.
+// GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
 ) (data io.ReadCloser, size int64, err error) {
 	_, err = bs.Get(user, id) // checks auth
@@ -152,7 +180,8 @@ func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
 	}
 	f, err := bs.fileStore.GetFile(uuidToFilePath(id))
 	if err != nil {
-		return nil, 0, err //TODO ERROR handling
+		// errors should only occur for unusual situations here since we got the node
+		return nil, 0, err
 	}
 	return f.Data, f.Size, nil
 }

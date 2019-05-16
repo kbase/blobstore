@@ -1,6 +1,8 @@
 package service
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
 	"io"
 	"io/ioutil"
@@ -27,6 +29,7 @@ import (
 
 const (
 	testDB = "test_blobstore_integration"
+	testBucket = "mybukkit"
 	blobstoreRole = "BLOBSTORE_ADMIN"
 	adminRole = "KBASE_ADMIN"
 )
@@ -65,7 +68,7 @@ func (t *TestSuite) SetupSuite() {
 			MongoHost: "localhost:" + strconv.Itoa(t.mongo.GetPort()),
 			MongoDatabase: testDB,
 			S3Host: "localhost:" + strconv.Itoa(t.minio.GetPort()),
-			S3Bucket: "mybukkit",
+			S3Bucket: testBucket,
 			S3AccessKey: "ackey",
 			S3AccessSecret: "sooporsecret",
 			S3Region: "us-west-1",
@@ -422,10 +425,10 @@ func (t *TestSuite) TestGetBadID() {
 	
 	uid := uuid.New()
 	body3 := t.getNode(t.url + "/node/" + uid.String(), t.tokenNoRole)
-	t.checkError(body3, 500, "No such node " + uid.String())
+	t.checkError(body3, 404, "Node not found")
 	
 	body4 := t.getNode(t.url + "/node/" + uid.String() + "?download", t.tokenNoRole)
-	t.checkError(body4, 500, "No such node " + uid.String())
+	t.checkError(body4, 404, "Node not found")
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
@@ -433,9 +436,34 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	
 	nodeb := t.getNode(t.url + "/node/" + id, t.tokenNoRole)
-	t.checkError(nodeb, 500, "Unauthorized")
+	t.checkError(nodeb, 401, "User Unauthorized")
 	nodeb2 := t.getNode(t.url + "/node/" + id + "?download", t.tokenNoRole)
-	t.checkError(nodeb2, 500, "Unauthorized")
+	t.checkError(nodeb2, 401, "User Unauthorized")
+}
+
+func (t *TestSuite) TestUnexpectedError() {
+	defer t.createTestBucket()
+	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), t.tokenKBaseAdmin)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	t.minio.Clear(false) // delete the file data, but not the node data
+
+	node := t.getNode(t.url + "/node/" + id + "?download", t.tokenKBaseAdmin)
+	t.Equal(float64(500), node["status"].(float64), "incorrect code")
+	t.Nil(node["data"], "expected no data")
+	err := node["error"].([]interface{})
+	t.Equal(1, len(err), "incorrect error size")
+	t.True(strings.HasPrefix(err[0].(string), "s3 store get: NoSuchBucket: " +
+		"The specified bucket does not exist\n\tstatus code: 404, request id: "))
+}
+
+func (t *TestSuite) createTestBucket() {
+	cli := t.minio.CreateS3Client()
+	input := &s3.CreateBucketInput{Bucket: aws.String(testBucket)}
+	_, err := cli.CreateBucket(input)
+	if err != nil {
+		t.FailNow(err.Error())
+	}
 }
 
 func (t *TestSuite) TestNotFound() {

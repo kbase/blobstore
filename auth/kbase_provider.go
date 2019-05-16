@@ -14,7 +14,6 @@ import (
 )
 
 //TODO CACHE token -> user & name -> valid
-//TODO ERROR - go through errors and match to shock if necessary, and type so can be converted to http code
 
 // KBaseProvider provides authentication based on the KBase auth server
 // (https://github.com/kbase/auth2)
