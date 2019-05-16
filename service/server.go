@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -62,7 +61,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
 	router.Use(s.authMiddleWare)
-	// TODO API is there a way to return a custom body for a 405?
 	router.HandleFunc("/node", s.createNode).Methods(http.MethodPost, http.MethodPut)
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
@@ -106,8 +104,8 @@ func (s *Server) authMiddleWare(next http.Handler) http.Handler {
 }
 
 func writeError(err error, w http.ResponseWriter) {
-	code := 500 //TODO ERROR correct code
-	writeErrorWithCode(err.Error(), code, w)
+	code, errstr := translateError(err)
+	writeErrorWithCode(errstr, code, w)
 }
 
 func writeErrorWithCode(err string, code int, w http.ResponseWriter) {
@@ -143,12 +141,13 @@ func encodeToJSON(w http.ResponseWriter, data *map[string]interface{}) {
 func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	if r.ContentLength < 0 {
-		writeError(errors.New("Missing content-length header"), w) //TODO ERROR 400 code
+		writeErrorWithCode("Length Required", http.StatusLengthRequired, w)
 		return
 	}
 	user := r.Context().Value(servkey{"user"}).(*auth.User)
 	if user == nil {
-		writeError(errors.New("Unauthorized"), w) // TODO ERROR correct error
+		// shock compatibility here
+		writeErrorWithCode("No Authorization", http.StatusUnauthorized, w)
 		return
 	}
 	// TODO CREATE handle filename and format
@@ -178,7 +177,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(putativeid)
 	if err != nil {
 		// crappy error message, but compatible with Shock
-		writeError(errors.New("Node not found"), w) //TODO ERROR needs a 404
+		writeErrorWithCode("Node not found", 404, w)
 		return
 	}
 	user := r.Context().Value(servkey{"user"}).(*auth.User)

@@ -39,11 +39,24 @@ type InvalidUserError struct {
 	InvalidUsers *[]string
 }
 
-func (iue InvalidUserError) Error() string {
+func (iue *InvalidUserError) Error() string {
 	if iue.InvalidUsers == nil {
 		return fmt.Sprintf("Please do not initialize %T with a nil", iue)
 	}
 	return "Invalid users: " + strings.Join(*iue.InvalidUsers, ", ")
+}
+
+// InvalidTokenError occurs when the user's token is invalid.
+type InvalidTokenError string
+
+// NewInvalidTokenError creates a new invalid token error.
+func NewInvalidTokenError(err string) *InvalidTokenError {
+	e := InvalidTokenError(err)
+	return &e
+}
+
+func (e *InvalidTokenError) Error() string {
+	return string(*e)
 }
 
 // Provider provides authentication for a user given the user's token.

@@ -32,7 +32,7 @@ func TestInvalidUserError(t *testing.T) {
 	}
 
 	tc := []tiue{
-		tiue{nil, "Please do not initialize auth.InvalidUserError with a nil"},
+		tiue{nil, "Please do not initialize *auth.InvalidUserError with a nil"},
 		tiue{&[]string{}, "Invalid users: "},
 		tiue{&[]string{"foo", "bar"}, "Invalid users: foo, bar"},
 	}
@@ -41,4 +41,9 @@ func TestInvalidUserError(t *testing.T) {
 		e := InvalidUserError{tcase.users}
 		assert.Equal(t, tcase.errstr, e.Error(), "incorrect error")
 	}
+}
+
+func TestInvalidTokenError(t *testing.T) {
+	e := NewInvalidTokenError("some error")
+	assert.Equal(t, "some error", e.Error(), "incorrect error")
 }

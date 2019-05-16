@@ -395,7 +395,7 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 
 func (t *TestSuite) TestBadToken() {
 	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), "bad token")
-	t.checkError(body, 500, "KBase auth server reported token was invalid")
+	t.checkError(body, 400, "Invalid authorization header or content")
 }
 
 func (t *TestSuite) TestNoContentLength() {
@@ -405,20 +405,20 @@ func (t *TestSuite) TestNoContentLength() {
 	req.ContentLength = -1
 	body := t.requestToJSON(req)
 
-	t.checkError(body, 500, "Missing content-length header")
+	t.checkError(body, 411, "Length Required")
 }
 
 func (t *TestSuite) TestStoreNoUser() {
 	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), "")
-	t.checkError(body, 500, "Unauthorized")
+	t.checkError(body, 401, "No Authorization")
 }
 
 func (t *TestSuite) TestGetBadID() {
 	body := t.getNode(t.url + "/node/badid", t.tokenNoRole)
-	t.checkError(body, 500, "Node not found")
+	t.checkError(body, 404, "Node not found")
 
 	body2 := t.getNode(t.url + "/node/badid?download", t.tokenNoRole)
-	t.checkError(body2, 500, "Node not found")
+	t.checkError(body2, 404, "Node not found")
 	
 	uid := uuid.New()
 	body3 := t.getNode(t.url + "/node/" + uid.String(), t.tokenNoRole)

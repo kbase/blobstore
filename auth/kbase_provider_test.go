@@ -188,17 +188,17 @@ func (t *TestSuite) checkUser(tc *tgu) {
 }
 
 func (t *TestSuite) TestGetUserFailBadInput() {
-	tc := map[string]string{
-		"   \t    \n   ": "token cannot be empty or whitespace only",
-		"no such token":  "KBase auth server reported token was invalid",
+	tc := map[string]error{
+		"   \t    \n   ": errors.New("token cannot be empty or whitespace only"),
+		"no such token":  NewInvalidTokenError("KBase auth server reported token was invalid"),
 	}
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
 
-	for token, errstr := range tc {
+	for token, expectederr := range tc {
 		u, err := kb.GetUser(token)
 		t.Nil(u, "expected error")
-		t.Equal(errors.New(errstr), err, "incorrect error")
+		t.Equal(expectederr, err, "incorrect error")
 	}
 }
 
@@ -247,7 +247,7 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 		tvun{&[]string{"user", "  \t \n  "},
 			errors.New("names in userNames array cannot be empty or whitespace only")},
 		tvun{&[]string{"noroles", "   foo   ", "admin_std_role", "   bar   "},
-			InvalidUserError{&[]string{"foo", "bar"}}},
+			&InvalidUserError{&[]string{"foo", "bar"}}},
 	}
 
 	kb, err := NewKBaseProvider(*t.authURL)
@@ -261,18 +261,18 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 }
 
 func (t *TestSuite) TestValidateUserNameFailBadToken() {
-	tc := map[string]string{
-		"   \t    \n   ": "token cannot be empty or whitespace only",
-		"no such token":  "KBase auth server reported token was invalid",
+	tc := map[string]error{
+		"   \t    \n   ": errors.New("token cannot be empty or whitespace only"),
+		"no such token":  NewInvalidTokenError("KBase auth server reported token was invalid"),
 	}
 	
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
 	
-	for token, errstr := range tc {
+	for token, expectederr := range tc {
 		b, err := kb.ValidateUserNames(&[]string{"noroles"}, token)
 		t.Equal(false, b, "expected error")
-		t.Equal(errors.New(errstr), err, "incorrect error")
+		t.Equal(expectederr, err, "incorrect error")
 	}
 }
 
