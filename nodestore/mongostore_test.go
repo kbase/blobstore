@@ -306,7 +306,7 @@ func (t *TestSuite) TestGetNodeFailNoNode() {
 	nid2 := uuid.New()
 	n2, err := mns.GetNode(nid2)
 	t.Nil(n2, "expected nil node")
-	t.Equal(fmt.Errorf("No such node %v", nid2.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node: " + nid2.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestDeleteNode() {
@@ -323,7 +323,7 @@ func (t *TestSuite) TestDeleteNode() {
 
 	n2, err := mns.GetNode(nid)
 	t.Nil(n2, "expected nil node")
-	t.Equal(fmt.Errorf("No such node %v", nid.String()), err, "incorrect error") 
+	t.Equal(NewNoNodeError("No such node: " + nid.String()), err, "incorrect error") 
 }
 
 func (t *TestSuite) TestDeleteNodeFailNoNode() {
@@ -336,7 +336,7 @@ func (t *TestSuite) TestDeleteNodeFailNoNode() {
 
 	nid2 := uuid.New()
 	err = mns.DeleteNode(nid2)
-	t.Equal(fmt.Errorf("No such node %v", nid2.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node: " + nid2.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestCollections() {

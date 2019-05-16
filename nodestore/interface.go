@@ -156,14 +156,27 @@ func (n *Node) GetPublic() bool {
 	return n.public
 }
 
+// NoNodeError is returned when a node doesn't exist.
+type NoNodeError string
+
+// NewNoNodeError creates a new NoNodeError.
+func NewNoNodeError(err string) *NoNodeError {
+	e := NoNodeError(err)
+	return &e
+}
+
+func (e *NoNodeError) Error() string {
+	return string(*e)
+}
+
 // NodeStore stores node information.
 type NodeStore interface {
 	// StoreNode stores a node.
 	// Attempting to store Nodes with the same ID is an error.
 	StoreNode(node *Node) error
-	// GetNode gets a node.
+	// GetNode gets a node. Returns NoNodeError if the node does not exist.
 	GetNode(id uuid.UUID) (*Node, error)
-	// DeleteNode deletes a node.
+	// DeleteNode deletes a node. Returns NoNodeError if the node does not exist.
 	DeleteNode(id uuid.UUID) error
 	// GetUser gets a user. If the user does not exist in the system, a new ID will be assigned
 	// to the user.
