@@ -125,7 +125,10 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 	res, _ := fstore.StoreFile(p)
 
 	stored := res.Stored
-	testhelpers.AssertCloseToNow1S(t.T(), stored)
+	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
+	// down, and so if the time is very close to the next second, at the time the test occurs
+	// it's flipped over to the next second and the test fails.
+	testhelpers.AssertCloseToNow(t.T(), stored, 2 * time.Second)
 	expected := &StoreFileOutput{
 		ID:       "myid",
 		Size:     12,
@@ -265,7 +268,10 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 		t.Fail(err.Error())
 	}
 	defer obj.Data.Close()
-	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
+	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
+	// down, and so if the time is very close to the next second, at the time the test occurs
+	// it's flipped over to the next second and the test fails.
+	testhelpers.AssertCloseToNow(t.T(), obj.Stored, 2 * time.Second)
 	
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
@@ -379,7 +385,10 @@ func (t *TestSuite) copy(filename string, format string) {
 	}
 
 	obj, _ := fstore.GetFile("  myid3   ")
-	testhelpers.AssertCloseToNow1S(t.T(), obj.Stored)
+	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
+	// down, and so if the time is very close to the next second, at the time the test occurs
+	// it's flipped over to the next second and the test fails.
+	testhelpers.AssertCloseToNow(t.T(), obj.Stored, 2 * time.Second)
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
