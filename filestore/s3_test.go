@@ -187,6 +187,25 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 		"incorrect error")
 }
 
+func (t *TestSuite) TestStoreFailNoBucket() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+
+	t.minio.Clear(false)
+
+	p, _ := NewStoreFileParams(
+		"myid",
+		10,
+		strings.NewReader("0123456789"),
+		Format("json"),
+		FileName("fn"),
+	)
+	res, err := fstore.StoreFile(p)
+	t.Nil(res, "expected error")
+	t.Equal(errors.New("s3 store request unexpected status code: 404"), err, "incorrect error")
+}
+
 func (t *TestSuite) TestGetWithBlankID() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
@@ -318,6 +337,20 @@ func (t *TestSuite) TestDeleteWithBlankID() {
 
 	err := fstore.DeleteFile("")
 	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")
+}
+
+
+func (t *TestSuite) TestDeleteFailNoBucket() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+
+	t.minio.Clear(false)
+
+	err := fstore.DeleteFile("myid")
+	t.True(strings.HasPrefix(err.Error(), "s3 store delete: NoSuchBucket: " +
+		"The specified bucket does not exist\n\tstatus code: 404, request id:"),
+		"incorrect error: " + err.Error())
 }
 
 func (t *TestSuite) TestCopy() {
