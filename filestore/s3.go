@@ -16,6 +16,10 @@ import (
 	"github.com/minio/minio-go"
 )
 
+const (
+	minioNoSuchKey = "NoSuchKey"
+)
+
 // S3FileStore is a file store that stores files in an S3 API compatible storage system.
 // It impelements FileStore.
 type S3FileStore struct {
@@ -91,7 +95,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 
 	presignedurl, _, err := putObj.PresignRequest(15 * time.Minute) // headers is nil in this case
 	if err != nil {
-		return nil, err // may want to wrap error here, not sure how to test
+		return nil, errors.New("s3 store presign: " + err.Error()) //not sure how to test
 	}
 	// could split the stream here to count the size and confirm content-length
 	req, _ := http.NewRequest("PUT", presignedurl, p.data)
@@ -103,7 +107,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	if err != nil {
 		// don't expose the presigned url in the returned error
 		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
-		return nil, errors.New(err.(*url.Error).Err.Error())
+		return nil, errors.New("s3 store request: " + err.(*url.Error).Err.Error())
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
@@ -111,13 +115,13 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 		// TODO LOG body
 		// TODO TEST by deleting bucket
 		io.Copy(os.Stdout, resp.Body)
-		return nil, fmt.Errorf("Unexpected status code uploading to S3: %v", resp.StatusCode)
+		return nil, fmt.Errorf("s3 store request unexpected status code: %v", resp.StatusCode)
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
 	// returned by head. Head should be cheap compared to a write
 	headObj, err := fs.s3client.HeadObject(&s3.HeadObjectInput{Bucket: &fs.bucket, Key: &p.id})
 	if err != nil {
-		return nil, err // not sure how to test this
+		return nil, errors.New("s3 store head: " + err.Error()) // not sure how to test this
 	}
 	return &StoreFileOutput{
 			ID:       p.id,
@@ -144,12 +148,11 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:
-			// TODO ERRORS change to own error code system so can be converted to HTTP codes (404 here)
-			return nil, fmt.Errorf("No such id: " + id)
+			return nil, NewNoFileError("No such id: " + id)
 		default:
 			// do nothing - not sure how to test this
 		}
-		return nil, err
+		return nil, errors.New("s3 store get: " + err.Error())
 	}
 	return &GetFileOutput{
 			ID:       id,
@@ -183,7 +186,8 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 		Key:    &id,
 	})
 	if err != nil {
-		return err // no idea how to test this - could delete bucket? But that shouldn't happen
+		// no idea how to test this - could delete bucket? But that shouldn't happen
+		return errors.New("s3 store delete: " + err.Error())
 	}
 	return nil
 }
@@ -207,10 +211,12 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
 	err := fs.minioClient.CopyObject(dst, src)
 	if err != nil {
 		err2 := err.(minio.ErrorResponse)
-		if err2.Code == "NoSuchKey" { //TODO CONSTANT
-			// TODO ERRORS change to own error code system so can be converted to HTTP codes (404 here)
-			return fmt.Errorf("File ID %s does not exist", sourceID)
+		if err2.Code == minioNoSuchKey {
+			return NewNoFileError("No such ID: " + sourceID)
 		}
+		// not sure how to test this.
+		return errors.New("s3 store copy: " + err.Error())
+
 	}
-	return err // don't know how to test this easily if it's an error
+	return nil
 }
