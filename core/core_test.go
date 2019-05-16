@@ -16,6 +16,16 @@ import (
 	"testing"
 )
 
+func TestNoBlobError(t *testing.T) {
+	e := NewNoBlobError("some error")
+	assert.Equal(t, "some error", e.Error(), "incorrect error")
+}
+
+func TestUnauthorizedError(t *testing.T) {
+	e := NewUnauthorizedError("some error")
+	assert.Equal(t, "some error", e.Error(), "incorrect error")
+}
+
 func TestStoreBasic(t *testing.T) {
 	uidmock := new(cmocks.UUIDGen)
 	fsmock := new(fsmocks.FileStore)
@@ -363,26 +373,31 @@ func TestGetFailGetUser(t *testing.T) {
 }
 
 func TestGetFailGetNode(t *testing.T) {
-	fsmock := new(fsmocks.FileStore)
-	nsmock := new(nsmocks.NodeStore)
-
-	bs := New(fsmock, nsmock)
-
 	uid := uuid.New()
 	auser, _ := auth.NewUser("un", false)
 
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-	nsmock.On("GetUser", "un").Return(nuser, nil)
 
-	nsmock.On("GetNode", uid).Return(
-		nil, errors.New("that node isn't the messiah, he's a very naughty boy"))
+	inputs := map[error]error{
+		errors.New("that node isn't the messiah, he's a very naughty boy"):
+			errors.New("that node isn't the messiah, he's a very naughty boy"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
 
-	bnode, err := bs.Get(*auser, uid)
-	assert.Nil(t, bnode, "expected error")
-	assert.Equal(t, errors.New("that node isn't the messiah, he's a very naughty boy"),
-		err, "incorrect error")
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+
+		nsmock.On("GetNode", uid).Return(nil, causeerr)
+	
+		bnode, err := bs.Get(*auser, uid)
+		assert.Nil(t, bnode, "expected error")
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
 }
 
 func TestGetFailUnauthorized(t *testing.T) {
@@ -407,7 +422,7 @@ func TestGetFailUnauthorized(t *testing.T) {
 
 	bnode, err := bs.Get(*auser, uid)
 	assert.Nil(t, bnode, "expected error")
-	assert.Equal(t, errors.New("Unauthorized"), err, "incorrect error")
+	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
 }
 
 // GetFile calls GET under the hood, so we only test one error case (auth) from the Get code
@@ -546,7 +561,7 @@ func TestGetFileUnauthorized(t *testing.T) {
 	rd, size, err := bs.GetFile(*auser, uid)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
-	assert.Equal(t, errors.New("Unauthorized"), err, "incorrect error")
+	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
 }
 
 func TestGetFileFailGetFromStorage(t *testing.T) {

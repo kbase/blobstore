@@ -422,10 +422,10 @@ func (t *TestSuite) TestGetBadID() {
 	
 	uid := uuid.New()
 	body3 := t.getNode(t.url + "/node/" + uid.String(), t.tokenNoRole)
-	t.checkError(body3, 500, "No such node " + uid.String())
+	t.checkError(body3, 404, "Node not found")
 	
 	body4 := t.getNode(t.url + "/node/" + uid.String() + "?download", t.tokenNoRole)
-	t.checkError(body4, 500, "No such node " + uid.String())
+	t.checkError(body4, 404, "Node not found")
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
@@ -433,9 +433,9 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	
 	nodeb := t.getNode(t.url + "/node/" + id, t.tokenNoRole)
-	t.checkError(nodeb, 500, "Unauthorized")
+	t.checkError(nodeb, 401, "User Unauthorized")
 	nodeb2 := t.getNode(t.url + "/node/" + id + "?download", t.tokenNoRole)
-	t.checkError(nodeb2, 500, "Unauthorized")
+	t.checkError(nodeb2, 401, "User Unauthorized")
 }
 
 func (t *TestSuite) TestNotFound() {

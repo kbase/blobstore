@@ -3,6 +3,8 @@ package service
 import (
 	"net/http"
 
+	"github.com/kbase/blobstore/core"
+
 	"github.com/kbase/blobstore/auth"
 )
 
@@ -13,7 +15,11 @@ func translateError(err error) (code int, errstr string) {
 	case *auth.InvalidTokenError:
 		// Shock compatibility, should be 401
 		return http.StatusBadRequest, "Invalid authorization header or content"
-	// add more error types here
+	case *core.NoBlobError:
+		return http.StatusNotFound, "Node not found"
+	case *core.UnauthorizedError:
+		// Shock compatibility, really should be 403 forbidden
+		return http.StatusUnauthorized, "User Unauthorized"
 	default:
 		return 500, t.Error()
 	}
