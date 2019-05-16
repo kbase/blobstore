@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// AssertCloseToNow1S asserts that the given time is within one second of the present time.
-func AssertCloseToNow1S(t *testing.T, tme time.Time) {
+// AssertCloseToNow asserts that the given time is within the given duration of the present time.
+func AssertCloseToNow(t *testing.T, tme time.Time, dur time.Duration) {
 	et := time.Now()
 
 	// testify has comparisons in the works but not released as of this writng
-	assert.True(t, et.Add(time.Second*-1).Before(tme),
+	assert.True(t, et.Add(-1*dur).Before(tme),
 		fmt.Sprintf("time %v earlier than expected %v", tme, et))
-	assert.True(t, et.Add(time.Second*1).After(tme),
+	assert.True(t, et.Add(dur).After(tme),
 		fmt.Sprintf("time %v later than expected %v", tme, et))
 }
 
