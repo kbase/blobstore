@@ -205,9 +205,9 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 func (t *TestSuite) TestGetUserFailBadURL() {
 	tc := map[string]string{
 		"https://ci.kbase.us/services":
-			"Non-JSON response from KBase auth server, status code: 404",
+			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
 		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
-			"Unexpectedly long body from auth service",
+			"kbase auth: Unexpectedly long body from auth service",
 	}
 	
 	for ur, errstr := range tc {
@@ -279,9 +279,9 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 func (t *TestSuite) TestValidateUserNameFailBadURL() {
 	tc := map[string]string{
 		"https://ci.kbase.us/services":
-			"Non-JSON response from KBase auth server, status code: 404",
+			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
 		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
-			"Unexpectedly long body from auth service",
+			"kbase auth: Unexpectedly long body from auth service",
 	}
 	
 	for ur, errstr := range tc {
