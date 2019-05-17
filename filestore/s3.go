@@ -65,8 +65,6 @@ func createBucket(s3Client *s3.S3, bucket string) error {
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeBucketAlreadyOwnedByYou:
-			// TODO LOG here, need to pass in logger
-			// log.Println("Bucket already exists")
 			return nil // everything's groovy
 		default:
 			// do nothing
