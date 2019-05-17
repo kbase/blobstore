@@ -13,6 +13,7 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/minio/minio-go v0.0.0-20190430232750-10b3660b8f09
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
+	github.com/sirupsen/logrus v1.4.1
 	github.com/stretchr/testify v1.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect

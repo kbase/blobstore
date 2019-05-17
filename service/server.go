@@ -3,11 +3,16 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/google/uuid"
 
@@ -22,6 +27,10 @@ import (
 
 // TODO LOG log or ignore X-IP headers
 // TODO LOG insecure urls
+
+const (
+	service = "BlobStore"
+)
 
 // ServerStaticConf Static configuration items for the Server.
 type ServerStaticConf struct {
@@ -50,6 +59,8 @@ type Server struct {
 
 // New create a new server.
 func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetOutput(os.Stdout)
 	deps, err := constructDependencies(cfg)
 	if err != nil {
 		return nil, err // this is a pain to test
@@ -60,10 +71,16 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	// router.StrictSlash(true) // doesn't seem to have an effect
 	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
-	router.Use(s.authMiddleWare)
+	router.Use(s.authLogMiddleWare)
 	router.HandleFunc("/node", s.createNode).Methods(http.MethodPost, http.MethodPut)
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
+	//TODO DELETE handle node delete
+	//TODO ACLs handle node acls (verbosity)
+	// TODO ACLS chown node
+	// TODO ACLS public read
+	// TODO HANG figure out a way to stop minio hanging when contentlength > file
+	// TODO TEST content-type and content-length headers
 	return s, nil
 }
 
@@ -77,39 +94,81 @@ type servkey struct {
 }
 
 func notFoundHandler(w http.ResponseWriter, r *http.Request) {
-	writeErrorWithCode("Not Found", 404, w)
+	writeErrorWithCode(initLogger(r), "Not Found", 404, w)
 }
 
 func notAllowedHandler(w http.ResponseWriter, r *http.Request) {
-	writeErrorWithCode("Method Not Allowed", 405, w)
+	writeErrorWithCode(initLogger(r), "Method Not Allowed", 405, w)
 }
 
-func (s *Server) authMiddleWare(next http.Handler) http.Handler {
+func initLogger(r *http.Request) *logrus.Entry {
+	//TODO LOG get correct ip taking X-* headers into account
+	return logrus.WithFields(logrus.Fields{
+		"ip": r.RemoteAddr,
+		// at some point return rid to the user
+		"requestid": fmt.Sprintf("%016d", rand.Intn(10000000000000000)),
+		"service":   service,
+		"path":      r.URL.EscapedPath(),
+		"method":    r.Method,
+		"user":      nil,
+	})
+}
+
+func getUser(r *http.Request) *auth.User {
+	if user, ok := r.Context().Value(servkey{"user"}).(*auth.User); ok {
+		return user
+	}
+	return nil
+}
+func getLogger(r *http.Request) *logrus.Entry {
+	return r.Context().Value(servkey{"log"}).(*logrus.Entry)
+}
+
+func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// would like to split out the log middleware, but no way to pass the user up the stack
+		le := initLogger(r)
+
 		token := r.Header.Get("authorization")
 		var user *auth.User
 		if token != "" {
 			var err error
 			user, err = s.auth.GetUser(token)
 			if err != nil {
-				writeError(err, w)
+				writeError(le, err, w)
 				return
 			}
+			le = le.WithField("user", user.GetUserName())
 		}
 		//TODO ACLs GetNode and GetFile will need to handle nil/ public users
 		r = r.WithContext(context.WithValue(r.Context(), servkey{"user"}, user))
-		// TODO LOG user
-		next.ServeHTTP(w, r)
+		r = r.WithContext(context.WithValue(r.Context(), servkey{"log"}, le))
+		rec := statusRecorder{w, 200}
+		next.ServeHTTP(&rec, r)
+		if rec.status < 400 {
+			// if there was an error a log should've already occurred
+			le.WithField("status", rec.status).Info("request complete")
+		}
 	})
 }
 
-func writeError(err error, w http.ResponseWriter) {
-	code, errstr := translateError(err)
-	writeErrorWithCode(errstr, code, w)
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
 }
 
-func writeErrorWithCode(err string, code int, w http.ResponseWriter) {
-	//TODO LOG log error
+func (rec *statusRecorder) WriteHeader(code int) {
+	rec.status = code
+	rec.ResponseWriter.WriteHeader(code)
+}
+
+func writeError(logentry *logrus.Entry, err error, w http.ResponseWriter) {
+	code, errstr := translateError(err)
+	writeErrorWithCode(logentry, errstr, code, w)
+}
+
+func writeErrorWithCode(logentry *logrus.Entry, err string, code int, w http.ResponseWriter) {
+	logentry.WithField("status", code).Error(err)
 	ret := map[string]interface{}{
 		"data":   nil,
 		"error":  [1]string{err},
@@ -127,7 +186,7 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"version":            s.staticconf.ServerVersionCompat,
 		"deprecationwarning": s.staticconf.DeprecationWarning,
 		"servertime":         time.Now().UnixNano() / 1000000,
-		//TODO git commit hash
+		//TODO SERV git commit hash
 	}
 	encodeToJSON(w, &ret)
 }
@@ -140,14 +199,15 @@ func encodeToJSON(w http.ResponseWriter, data *map[string]interface{}) {
 
 func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	le := getLogger(r)
 	if r.ContentLength < 0 {
-		writeErrorWithCode("Length Required", http.StatusLengthRequired, w)
+		writeErrorWithCode(le, "Length Required", http.StatusLengthRequired, w)
 		return
 	}
-	user := r.Context().Value(servkey{"user"}).(*auth.User)
+	user := getUser(r)
 	if user == nil {
 		// shock compatibility here
-		writeErrorWithCode("No Authorization", http.StatusUnauthorized, w)
+		writeErrorWithCode(le, "No Authorization", http.StatusUnauthorized, w)
 		return
 	}
 	// TODO CREATE handle filename and format
@@ -157,7 +217,7 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 		// can't figure out how to easily test this case.
 		// the only triggerable error in the blobstore code is a bad content length,
 		// but the server complains before we even get here for small data.
-		writeError(err, w)
+		writeError(le, err, w)
 		return
 	}
 	writeNode(w, node)
@@ -173,20 +233,21 @@ func writeNode(w http.ResponseWriter, node *core.BlobNode) {
 }
 
 func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
 	putativeid := mux.Vars(r)["id"]
 	id, err := uuid.Parse(putativeid)
 	if err != nil {
 		// crappy error message, but compatible with Shock
-		writeErrorWithCode("Node not found", 404, w)
+		writeErrorWithCode(le, "Node not found", 404, w)
 		return
 	}
-	user := r.Context().Value(servkey{"user"}).(*auth.User)
+	user := getUser(r)
 	// TODO AUTH handle nil user
-	// TODO add special header for download
+	// TODO DOWNLOAD add special header for download
 	if download(r.URL) {
 		datareader, size, err := s.store.GetFile(*user, id)
 		if err != nil {
-			writeError(err, w)
+			writeError(le, err, w)
 			return
 		}
 		defer datareader.Close()
@@ -195,7 +256,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	} else {
 		node, err := s.store.Get(*user, id)
 		if err != nil {
-			writeError(err, w)
+			writeError(le, err, w)
 			return
 		}
 		writeNode(w, node)
