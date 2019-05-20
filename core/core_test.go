@@ -442,7 +442,7 @@ func TestGetFileAsOwner(t *testing.T) {
 	nsmock.On("GetUser", "un").Return(nuser, nil)
 
 	tme := time.Now()
-	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.FileName("a_file"))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
@@ -450,16 +450,17 @@ func TestGetFileAsOwner(t *testing.T) {
 		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
-		Filename: "who cares",
+		Filename: "my_lovely_file",
 		MD5: "who cares",
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
-	rd, size, err := bs.GetFile(*auser, uid)
+	rd, size, filename, err := bs.GetFile(*auser, uid)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, "a_file", filename, "incorrect filename")
 	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
 }
 
@@ -480,7 +481,7 @@ func TestGetFileAsReader(t *testing.T) {
 
 	tme := time.Now()
 	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme,
-		nodestore.Reader(*ouser), nodestore.Reader(*ruser))
+		nodestore.Reader(*ouser), nodestore.Reader(*ruser), nodestore.FileName(""))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
@@ -488,16 +489,17 @@ func TestGetFileAsReader(t *testing.T) {
 		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
-		Filename: "who cares",
+		Filename: "",
 		MD5: "who cares",
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
-	rd, size, err := bs.GetFile(*auser, uid)
+	rd, size, filename, err := bs.GetFile(*auser, uid)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, "", filename, "incorrect filename")
 	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
 }
 
@@ -517,7 +519,8 @@ func TestGetFileAsAdmin(t *testing.T) {
 	nsmock.On("GetUser", "other").Return(ouser, nil)
 
 	tme := time.Now()
-	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser))
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser),
+		nodestore.FileName("bfile"))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
@@ -525,16 +528,17 @@ func TestGetFileAsAdmin(t *testing.T) {
 		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
-		Filename: "who cares",
+		Filename: "afile",
 		MD5: "who cares",
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
-	rd, size, err := bs.GetFile(*auser, uid)
+	rd, size, filename, err := bs.GetFile(*auser, uid)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, "bfile", filename, "incorrect filename")
 	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
 }
 
@@ -554,13 +558,15 @@ func TestGetFileUnauthorized(t *testing.T) {
 	nsmock.On("GetUser", "other").Return(ouser, nil)
 
 	tme := time.Now()
-	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser))
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser),
+		nodestore.FileName("foo"))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
-	rd, size, err := bs.GetFile(*auser, uid)
+	rd, size, filename, err := bs.GetFile(*auser, uid)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, "", filename, "incorrect filename")
 	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
 }
 
@@ -579,15 +585,16 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 	nsmock.On("GetUser", "un").Return(nuser, nil)
 
 	tme := time.Now()
-	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme)
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
 	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
 		nil, errors.New("whoopsie"))
 
-	rd, size, err := bs.GetFile(*auser, uid)
+	rd, size, filename, err := bs.GetFile(*auser, uid)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, "", filename, "incorrect filename")
 	assert.Equal(t, errors.New("whoopsie"), err, "incorrect error")
 }
