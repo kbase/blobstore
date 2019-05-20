@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -210,9 +211,10 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 		writeErrorWithCode(le, "No Authorization", http.StatusUnauthorized, w)
 		return
 	}
-	// TODO CREATE handle filename and format
+	filename := getQuery(r.URL, "filename")
+	format := getQuery(r.URL, "format")
 	//TODO CREATE handle copy
-	node, err := s.store.Store(*user, r.Body, r.ContentLength, "", "")
+	node, err := s.store.Store(*user, r.Body, r.ContentLength, filename, format)
 	if err != nil {
 		// can't figure out how to easily test this case.
 		// the only triggerable error in the blobstore code is a bad content length,
@@ -221,6 +223,14 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeNode(w, node)
+}
+
+func getQuery(u *url.URL, param string) string {
+	s := u.Query()[param]
+	if len(s) > 0 {
+		return strings.TrimSpace(s[0])
+	}
+	return ""
 }
 
 func writeNode(w http.ResponseWriter, node *core.BlobNode) {
@@ -245,13 +255,19 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	// TODO AUTH handle nil user
 	download := download(r.URL)
 	if download != "" {
-		datareader, size, _, err := s.store.GetFile(*user, id)
+		datareader, size, filename, err := s.store.GetFile(*user, id)
 		if err != nil {
 			writeError(le, err, w)
 			return
 		}
-		// TODO DOWNLOAD add special header for download
 		defer datareader.Close()
+		if download == "yes" {
+			if filename == "" {
+				filename = id.String()
+			}
+			//TODO TEST in browser
+			w.Header().Set("content-disposition", "attachment; filename="+filename)
+		}
 		w.Header().Set("content-length", strconv.FormatInt(size, 10))
 		w.Header().Set("content-type", "application/octet-stream")
 		io.Copy(w, datareader)
