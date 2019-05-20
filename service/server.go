@@ -79,7 +79,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	//TODO ACLs handle node acls (verbosity)
 	// TODO ACLS chown node
 	// TODO ACLS public read
-	// TODO HANG figure out a way to stop minio hanging when contentlength > file
 	// TODO TEST content-type and content-length headers
 	return s, nil
 }
@@ -174,8 +173,15 @@ func writeErrorWithCode(logentry *logrus.Entry, err string, code int, w http.Res
 		"error":  [1]string{err},
 		"status": code,
 	}
+	encodeToJSON(w, code, &ret)
+}
+
+func encodeToJSON(w http.ResponseWriter, code int, data *map[string]interface{}) {
+	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(code)
-	encodeToJSON(w, &ret)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.Encode(data) // assume no errors here
 }
 
 func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -188,13 +194,7 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"servertime":         time.Now().UnixNano() / 1000000,
 		//TODO SERV git commit hash
 	}
-	encodeToJSON(w, &ret)
-}
-
-func encodeToJSON(w http.ResponseWriter, data *map[string]interface{}) {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	enc.Encode(data) // assume no errors here
+	encodeToJSON(w, 200, &ret)
 }
 
 func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +229,7 @@ func writeNode(w http.ResponseWriter, node *core.BlobNode) {
 		"error":  nil,
 		"data":   fromNode(node),
 	}
-	encodeToJSON(w, &ret)
+	encodeToJSON(w, 200, &ret)
 }
 
 func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
@@ -243,15 +243,17 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	}
 	user := getUser(r)
 	// TODO AUTH handle nil user
-	// TODO DOWNLOAD add special header for download
-	if download(r.URL) {
+	download := download(r.URL)
+	if download != "" {
 		datareader, size, _, err := s.store.GetFile(*user, id)
 		if err != nil {
 			writeError(le, err, w)
 			return
 		}
+		// TODO DOWNLOAD add special header for download
 		defer datareader.Close()
 		w.Header().Set("content-length", strconv.FormatInt(size, 10))
+		w.Header().Set("content-type", "application/octet-stream")
 		io.Copy(w, datareader)
 	} else {
 		node, err := s.store.Get(*user, id)
@@ -263,14 +265,14 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func download(u *url.URL) bool {
+func download(u *url.URL) string {
 	if _, ok := u.Query()["download"]; ok {
-		return true
+		return "yes"
 	}
 	if _, ok := u.Query()["download_raw"]; ok {
-		return true
+		return "raw"
 	}
-	return false
+	return ""
 }
 
 func fromNode(node *core.BlobNode) map[string]interface{} {

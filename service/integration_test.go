@@ -302,11 +302,19 @@ func ptr(s string) *string {
 	return &s
 }
 
+func (t *TestSuite) checkHeaders(r *http.Response, ctype string, lmin int64, lmax int64) {
+	t.Equal(ctype, r.Header.Get("content-type"), "incorrect content-type")
+	cl := r.ContentLength
+	t.True(lmin <= cl, fmt.Sprintf("content-length %v < %v", cl, lmin))
+	t.True(lmax >= cl, fmt.Sprintf("content-length %v > %v", cl, lmax))
+}
+
 func (t *TestSuite) TestRoot() {
 	ret, err := http.Get(t.url)
 	if err != nil {
 		t.Fail(err.Error())
 	}
+	t.checkHeaders(ret, "application/json", 209, 211) // allow space for timestamp expansion
 	dec := json.NewDecoder(ret.Body)
 	var root map[string]interface{}
 	dec.Decode(&root)
@@ -338,7 +346,7 @@ func (t *TestSuite) TestRoot() {
 
 // TODO DOCS for store, get, get file
 func (t *TestSuite) TestStoreAndGetNoParams() {
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token)
+	body := t.createFile(strings.NewReader("foobarbaz"), t.noRole.token, 374)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
@@ -384,7 +392,7 @@ func (t *TestSuite) TestStoreAndGetNoParams() {
 		"error": nil,
 		"status": float64(200),
 	}
-	t.checkNode(id, &t.noRole, expected2)
+	t.checkNode(id, &t.noRole, 374, expected2)
 
 	// TODO TEST check download header
 	path1 := "/node/" + id
@@ -396,7 +404,7 @@ func (t *TestSuite) TestStoreAndGetNoParams() {
 }
 
 func (t *TestSuite) TestGetAsAdmin() {
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token)
+	body := t.createFile(strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
@@ -422,35 +430,37 @@ func (t *TestSuite) TestGetAsAdmin() {
 		"status": float64(200),
 	}
 	path := "/node/" + id
-	t.checkNode(id, &t.stdRole, expected)
+	t.checkNode(id, &t.stdRole, 374, expected)
 	t.checkFile(t.url + path + "?download", path, &t.stdRole, 9, []byte("foobarbaz"))
-	t.checkNode(id, &t.kBaseAdmin, expected)
+	t.checkNode(id, &t.kBaseAdmin, 374, expected)
 	t.checkFile(t.url + path + "?download", path, &t.kBaseAdmin, 9, []byte("foobarbaz"))
 }
 
-func (t *TestSuite) post(u string, data io.Reader, token string) map[string]interface{} {
-	req, err := http.NewRequest(http.MethodPost, u, data)
+func (t *TestSuite) createFile(data io.Reader, token string, contentLength int64,
+) map[string]interface{} {
+	req, err := http.NewRequest(http.MethodPost, t.url + "/node", data)
 	t.Nil(err, "unexpected error")
 	if token != "" {
 		req.Header.Set("authorization", token)
 	}
-	return t.requestToJSON(req)
+	return t.requestToJSON(req, contentLength)
 }
 
 // TODO DOCS document effect of sending large file with incorrect content-length
 
-func (t *TestSuite) getNode(url string, user *User) map[string]interface{} {
+func (t *TestSuite) getNode(url string, user *User, contentLength int64) map[string]interface{} {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
 	if user != nil {
 		req.Header.Set("authorization", user.token)
 	}
-	return t.requestToJSON(req)
+	return t.requestToJSON(req, contentLength)
 }
 
-func (t *TestSuite) requestToJSON(req *http.Request) map[string]interface{} {
+func (t *TestSuite) requestToJSON(req *http.Request, contentLength int64) map[string]interface{} {
 	resp, err := http.DefaultClient.Do(req)
 	t.Nil(err, "unexpected error")
+	t.checkHeaders(resp, "application/json", contentLength, contentLength)
 	b, err := ioutil.ReadAll(resp.Body)
 	t.Nil(err, "unexpected error")
 	var body map[string]interface{}
@@ -465,10 +475,10 @@ func (t *TestSuite) checkFile(url string, path string, user *User, size int64, e
 		req.Header.Set("authorization", user.token)
 	}
 	resp, err := http.DefaultClient.Do(req)
+	t.checkHeaders(resp, "application/octet-stream", size, size)
 	t.Nil(err, "unexpected error")
 	b, err := ioutil.ReadAll(resp.Body)
 	t.Nil(err, "unexpected error")
-	t.Equal(size, resp.ContentLength, "incorrect content length")
 	t.Equal(expected, b, "incorrect file")
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "GET", path, 200, getUserName(user),
@@ -483,8 +493,9 @@ func getUserName(user *User) *string {
 	return nil
 }
 
-func (t *TestSuite) checkNode(id string, user *User, expected map[string]interface{}) {
-	body := t.getNode(t.url + "/node/" + id, user)
+func (t *TestSuite) checkNode(id string, user *User, contentLength int64,
+ expected map[string]interface{}) {
+	body := t.getNode(t.url + "/node/" + id, user, contentLength)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id, 200, getUserName(user),
 		"request complete", mtmap(), false},
@@ -502,7 +513,7 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 }
 
 func (t *TestSuite) TestBadToken() {
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), "bad token")
+	body := t.createFile(strings.NewReader("foobarbaz"), "bad_token", 100)
 	t.checkError(body, 400, "Invalid authorization header or content")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, nil,
 		"Invalid authorization header or content", mtmap(), false},
@@ -514,7 +525,7 @@ func (t *TestSuite) TestNoContentLength() {
 	t.Nil(err, "unexpected error")
 	req.Header.Set("authorization", t.noRole.token)
 	req.ContentLength = -1
-	body := t.requestToJSON(req)
+	body := t.requestToJSON(req, 76)
 
 	t.checkError(body, 411, "Length Required")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 411, &t.noRole.user,
@@ -523,7 +534,7 @@ func (t *TestSuite) TestNoContentLength() {
 }
 
 func (t *TestSuite) TestStoreNoUser() {
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), "")
+	body := t.createFile(strings.NewReader("foobarbaz"), "", 77)
 	t.checkError(body, 401, "No Authorization")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
 		"No Authorization", mtmap(), false},
@@ -531,26 +542,26 @@ func (t *TestSuite) TestStoreNoUser() {
 }
 
 func (t *TestSuite) TestGetBadID() {
-	body := t.getNode(t.url + "/node/badid", &t.noRole)
+	body := t.getNode(t.url + "/node/badid", &t.noRole, 75)
 	t.checkError(body, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/badid", 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 
-	body2 := t.getNode(t.url + "/node/badid?download", &t.noRole)
+	body2 := t.getNode(t.url + "/node/badid?download", &t.noRole, 75)
 	t.checkError(body2, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/badid", 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 	
 	uid := uuid.New()
-	body3 := t.getNode(t.url + "/node/" + uid.String(), &t.noRole)
+	body3 := t.getNode(t.url + "/node/" + uid.String(), &t.noRole, 75)
 	t.checkError(body3, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + uid.String(), 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 	
-	body4 := t.getNode(t.url + "/node/" + uid.String() + "?download", &t.noRole)
+	body4 := t.getNode(t.url + "/node/" + uid.String() + "?download", &t.noRole, 75)
 	t.checkError(body4, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + uid.String(), 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
@@ -558,18 +569,18 @@ func (t *TestSuite) TestGetBadID() {
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token)
+	body := t.createFile(strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
 	)
 	
-	nodeb := t.getNode(t.url + "/node/" + id, &t.noRole)
+	nodeb := t.getNode(t.url + "/node/" + id, &t.noRole, 78)
 	t.checkError(nodeb, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
 	)
-	nodeb2 := t.getNode(t.url + "/node/" + id + "?download", &t.noRole)
+	nodeb2 := t.getNode(t.url + "/node/" + id + "?download", &t.noRole, 78)
 	t.checkError(nodeb2, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
@@ -578,7 +589,7 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 
 func (t *TestSuite) TestUnexpectedError() {
 	defer t.createTestBucket()
-	body := t.post(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token)
+	body := t.createFile(strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -586,7 +597,7 @@ func (t *TestSuite) TestUnexpectedError() {
 
 	t.minio.Clear(false) // delete the file data, but not the node data
 
-	node := t.getNode(t.url + "/node/" + id + "?download", &t.kBaseAdmin)
+	node := t.getNode(t.url + "/node/" + id + "?download", &t.kBaseAdmin, 185)
 	t.Equal(float64(500), node["status"].(float64), "incorrect code")
 	t.Nil(node["data"], "expected no data")
 	err := node["error"].([]interface{})
@@ -609,13 +620,16 @@ func (t *TestSuite) createTestBucket() {
 }
 
 func (t *TestSuite) TestNotFound() {
-	body := t.post(t.url + "/nde", strings.NewReader("foobarbaz"), t.kBaseAdmin.token)
+	req, err := http.NewRequest(http.MethodPost, t.url + "/nde", strings.NewReader("foobarbaz"))
+	t.Nil(err, "unexpected error")
+	req.Header.Set("authorization", t.kBaseAdmin.token)
+	body := t.requestToJSON(req, 70)
 	t.checkError(body, 404, "Not Found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/nde", 404, nil, "Not Found", mtmap(), false})
 }
 
 func (t *TestSuite) TestNotAllowed() {
-	body := t.getNode(t.url + "/node", nil)
+	body := t.getNode(t.url + "/node", nil, 79)
 	t.checkError(body, 405, "Method Not Allowed")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node", 405, nil, "Method Not Allowed",
 		mtmap(), false},
