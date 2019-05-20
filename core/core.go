@@ -173,15 +173,15 @@ func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool
 
 // GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
-) (data io.ReadCloser, size int64, err error) {
-	_, err = bs.Get(user, id) // checks auth
+) (data io.ReadCloser, size int64, filename string, err error) {
+	node, err := bs.Get(user, id) // checks auth
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	f, err := bs.fileStore.GetFile(uuidToFilePath(id))
 	if err != nil {
 		// errors should only occur for unusual situations here since we got the node
-		return nil, 0, err
+		return nil, 0, "", err
 	}
-	return f.Data, f.Size, nil
+	return f.Data, f.Size, node.Filename, nil
 }
