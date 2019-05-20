@@ -245,7 +245,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	// TODO AUTH handle nil user
 	// TODO DOWNLOAD add special header for download
 	if download(r.URL) {
-		datareader, size, err := s.store.GetFile(*user, id)
+		datareader, size, _, err := s.store.GetFile(*user, id)
 		if err != nil {
 			writeError(le, err, w)
 			return
