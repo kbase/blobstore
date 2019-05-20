@@ -302,11 +302,13 @@ func ptr(s string) *string {
 	return &s
 }
 
-func (t *TestSuite) checkHeaders(r *http.Response, ctype string, lmin int64, lmax int64) {
-	t.Equal(ctype, r.Header.Get("content-type"), "incorrect content-type")
+func (t *TestSuite) checkHeaders(r *http.Response, ctype string, lmin int64, lmax int64,
+body map[string]interface{}) {
+	t.Equal(ctype, r.Header.Get("content-type"),
+		fmt.Sprintf("incorrect content-type for body\n%v\n", body))
 	cl := r.ContentLength
-	t.True(lmin <= cl, fmt.Sprintf("content-length %v < %v", cl, lmin))
-	t.True(lmax >= cl, fmt.Sprintf("content-length %v > %v", cl, lmax))
+	t.True(lmin <= cl, fmt.Sprintf("content-length %v < %v for body\n%v\n", cl, lmin, body))
+	t.True(lmax >= cl, fmt.Sprintf("content-length %v > %v for body\n%v\n", cl, lmax, body))
 }
 
 func (t *TestSuite) TestRoot() {
@@ -314,10 +316,10 @@ func (t *TestSuite) TestRoot() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	t.checkHeaders(ret, "application/json", 209, 211) // allow space for timestamp expansion
 	dec := json.NewDecoder(ret.Body)
 	var root map[string]interface{}
 	dec.Decode(&root)
+	t.checkHeaders(ret, "application/json", 209, 211, root) // allow space for timestamp expansion
 
 	// ugh. go isn't smart enough to use an int where possible
 	servertime := root["servertime"].(float64)
@@ -345,8 +347,10 @@ func (t *TestSuite) TestRoot() {
 }
 
 // TODO DOCS for store, get, get file
-func (t *TestSuite) TestStoreAndGetNoParams() {
-	body := t.createFile(strings.NewReader("foobarbaz"), t.noRole.token, 374)
+func (t *TestSuite) TestStoreAndGetWithFilename() {
+	// check whitespace
+	body := t.createFile(t.url + "/node?filename=%20%20myfile%20%20", strings.NewReader("foobarbaz"),
+		t.noRole.token, 380)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
@@ -367,7 +371,7 @@ func (t *TestSuite) TestStoreAndGetNoParams() {
 			"format": "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name": "",
+				"name": "myfile",
 				"size": float64(9),
 			},
 		},
@@ -385,26 +389,27 @@ func (t *TestSuite) TestStoreAndGetNoParams() {
 			"format": "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name": "",
+				"name": "myfile",
 				"size": float64(9),
 			},
 		},
 		"error": nil,
 		"status": float64(200),
 	}
-	t.checkNode(id, &t.noRole, 374, expected2)
+	t.checkNode(id, &t.noRole, 380, expected2)
 
 	// TODO TEST check download header
 	path1 := "/node/" + id
 	path2 := path1 + "/"
-	t.checkFile(t.url + path1 + "?download", path1, &t.noRole, 9, []byte("foobarbaz"))
-	t.checkFile(t.url + path2 + "?download", path2, &t.noRole, 9, []byte("foobarbaz"))
-	t.checkFile(t.url + path1 + "?download_raw", path1, &t.noRole, 9, []byte("foobarbaz"))
-	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, []byte("foobarbaz"))
+	t.checkFile(t.url + path1 + "?download", path1, &t.noRole, 9, "myfile", []byte("foobarbaz"))
+	t.checkFile(t.url + path2 + "?download", path2, &t.noRole, 9, "myfile", []byte("foobarbaz"))
+	t.checkFile(t.url + path1 + "?download_raw", path1, &t.noRole, 9, "", []byte("foobarbaz"))
+	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetAsAdmin() {
-	body := t.createFile(strings.NewReader("foobarbaz"), t.noRole.token, 374)
+func (t *TestSuite) TestGetAsAdminWithFormat() {
+	body := t.createFile(t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
+		t.noRole.token, 378)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
@@ -419,7 +424,7 @@ func (t *TestSuite) TestGetAsAdmin() {
 			"created_on": time,
 			"last_modified": time,
 			"id": id,
-			"format": "",
+			"format": "JSON",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
 				"name": "",
@@ -430,15 +435,17 @@ func (t *TestSuite) TestGetAsAdmin() {
 		"status": float64(200),
 	}
 	path := "/node/" + id
-	t.checkNode(id, &t.stdRole, 374, expected)
-	t.checkFile(t.url + path + "?download", path, &t.stdRole, 9, []byte("foobarbaz"))
-	t.checkNode(id, &t.kBaseAdmin, 374, expected)
-	t.checkFile(t.url + path + "?download", path, &t.kBaseAdmin, 9, []byte("foobarbaz"))
+	t.checkNode(id, &t.stdRole, 378, expected)
+	t.checkFile(t.url + path + "?download", path, &t.stdRole, 9, id, []byte("foobarbaz"))
+	t.checkFile(t.url + path + "?download_raw", path, &t.stdRole, 9, "", []byte("foobarbaz"))
+	t.checkNode(id, &t.kBaseAdmin, 378, expected)
+	t.checkFile(t.url + path + "?download", path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
+	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) createFile(data io.Reader, token string, contentLength int64,
+func (t *TestSuite) createFile(urell string, data io.Reader, token string, contentLength int64,
 ) map[string]interface{} {
-	req, err := http.NewRequest(http.MethodPost, t.url + "/node", data)
+	req, err := http.NewRequest(http.MethodPost, urell, data)
 	t.Nil(err, "unexpected error")
 	if token != "" {
 		req.Header.Set("authorization", token)
@@ -460,22 +467,31 @@ func (t *TestSuite) getNode(url string, user *User, contentLength int64) map[str
 func (t *TestSuite) requestToJSON(req *http.Request, contentLength int64) map[string]interface{} {
 	resp, err := http.DefaultClient.Do(req)
 	t.Nil(err, "unexpected error")
-	t.checkHeaders(resp, "application/json", contentLength, contentLength)
 	b, err := ioutil.ReadAll(resp.Body)
+	// fmt.Println(string(b))
 	t.Nil(err, "unexpected error")
 	var body map[string]interface{}
 	json.Unmarshal(b, &body)
+	t.checkHeaders(resp, "application/json", contentLength, contentLength, body)
 	return body
 }
 
-func (t *TestSuite) checkFile(url string, path string, user *User, size int64, expected []byte) {
+func (t *TestSuite) checkFile(url string, path string, user *User, size int64, filename string,
+expected []byte) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
 	if user != nil {
 		req.Header.Set("authorization", user.token)
 	}
 	resp, err := http.DefaultClient.Do(req)
-	t.checkHeaders(resp, "application/octet-stream", size, size)
+	t.checkHeaders(resp, "application/octet-stream", size, size,
+		map[string]interface{}{"body": "was file"})
+	if filename == "" {
+		t.Equal("", resp.Header.Get("content-disposition"), "incorrect content-disposition")
+	} else {
+		t.Equal("attachment; filename=" + filename, resp.Header.Get("content-disposition"),
+			"incorrect content-disposition")
+	}
 	t.Nil(err, "unexpected error")
 	b, err := ioutil.ReadAll(resp.Body)
 	t.Nil(err, "unexpected error")
@@ -494,7 +510,7 @@ func getUserName(user *User) *string {
 }
 
 func (t *TestSuite) checkNode(id string, user *User, contentLength int64,
- expected map[string]interface{}) {
+expected map[string]interface{}) {
 	body := t.getNode(t.url + "/node/" + id, user, contentLength)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id, 200, getUserName(user),
@@ -513,7 +529,7 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 }
 
 func (t *TestSuite) TestBadToken() {
-	body := t.createFile(strings.NewReader("foobarbaz"), "bad_token", 100)
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), "bad_token", 100)
 	t.checkError(body, 400, "Invalid authorization header or content")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, nil,
 		"Invalid authorization header or content", mtmap(), false},
@@ -534,7 +550,7 @@ func (t *TestSuite) TestNoContentLength() {
 }
 
 func (t *TestSuite) TestStoreNoUser() {
-	body := t.createFile(strings.NewReader("foobarbaz"), "", 77)
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), "", 77)
 	t.checkError(body, 401, "No Authorization")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
 		"No Authorization", mtmap(), false},
@@ -569,7 +585,7 @@ func (t *TestSuite) TestGetBadID() {
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
-	body := t.createFile(strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -589,7 +605,7 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 
 func (t *TestSuite) TestUnexpectedError() {
 	defer t.createTestBucket()
-	body := t.createFile(strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -620,10 +636,7 @@ func (t *TestSuite) createTestBucket() {
 }
 
 func (t *TestSuite) TestNotFound() {
-	req, err := http.NewRequest(http.MethodPost, t.url + "/nde", strings.NewReader("foobarbaz"))
-	t.Nil(err, "unexpected error")
-	req.Header.Set("authorization", t.kBaseAdmin.token)
-	body := t.requestToJSON(req, 70)
+	body := t.createFile(t.url + "/nde", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 70)
 	t.checkError(body, 404, "Not Found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/nde", 404, nil, "Not Found", mtmap(), false})
 }
