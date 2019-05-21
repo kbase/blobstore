@@ -339,6 +339,61 @@ func (t *TestSuite) TestDeleteNodeFailNoNode() {
 	t.Equal(NewNoNodeError("No such node " + nid2.String()), err, "incorrect error")
 }
 
+func (t *TestSuite) TestSetNodePublic() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	nid := uuid.New()
+	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	err = mns.SetNodePublic(nid, true)
+	t.Nil(err, "expected no error")
+	
+	ngot, err := mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+	
+	nexpected, _ := NewNode(
+		nid,
+		*own,
+		78,
+		"1b9554867d35f0d59e4705f6b2712cd1",
+		ngot.GetStoredTime(),
+		Public(true),
+		)
+	t.Equal(nexpected, ngot, "incorrect node")
+
+	err = mns.SetNodePublic(nid, false)
+	t.Nil(err, "expected no error")
+	
+	ngot, err = mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+	
+	nexpected, _ = NewNode(
+		nid,
+		*own,
+		78,
+		"1b9554867d35f0d59e4705f6b2712cd1",
+		ngot.GetStoredTime(),
+		Public(false),
+		)
+	t.Equal(nexpected, ngot, "incorrect node")
+}
+
+func (t *TestSuite) TestSetNodePublicFailNoNode() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	nid := uuid.New()
+	err = mns.SetNodePublic(nid, true)
+	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+}
+
 func (t *TestSuite) TestCollections() {
 	// for some reason that's beyond me the mongo go client returns the collection names and
 	// the index names in the same list for mongo 2.X...

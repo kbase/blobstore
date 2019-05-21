@@ -171,6 +171,9 @@ func (e *NoNodeError) Error() string {
 
 // NodeStore stores node information.
 type NodeStore interface {
+	// GetUser gets a user. If the user does not exist in the system, a new ID will be assigned
+	// to the user.
+	GetUser(accountName string) (*User, error)
 	// StoreNode stores a node.
 	// Attempting to store Nodes with the same ID is an error.
 	StoreNode(node *Node) error
@@ -178,9 +181,9 @@ type NodeStore interface {
 	GetNode(id uuid.UUID) (*Node, error)
 	// DeleteNode deletes a node. Returns NoNodeError if the node does not exist.
 	DeleteNode(id uuid.UUID) error
-	// GetUser gets a user. If the user does not exist in the system, a new ID will be assigned
-	// to the user.
-	GetUser(accountName string) (*User, error)
-	//TODO NODE AddReader, RemoveReader, SetPublic
+	// SetNodePublic sets whether a node can be read by anyone, including anonymous users.
+	// Returns NoNodeError if the node does not exist.
+	SetNodePublic(id uuid.UUID, public bool) error
+	//TODO NODE AddReader, RemoveReader
 
 }

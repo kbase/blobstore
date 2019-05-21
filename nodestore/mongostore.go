@@ -203,7 +203,7 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 
 // GetNode gets a node.
 func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
-	res := s.db.Collection(colNodes).FindOne(nil, map[string]string{keyNodesID: id.String()})
+	res := s.db.Collection(colNodes).FindOne(nil, nodeFilter(id))
 	if res.Err() != nil {
 		// don't know how to test this
 		return nil, errors.New("mongostore get node: " + res.Err().Error())
@@ -248,14 +248,34 @@ func toTime(d primitive.DateTime) time.Time {
 	return time.Unix(int64(d)/1000, int64(d)%1000*1000000).UTC()
 }
 
+func nodeFilter(id uuid.UUID) map[string]string {
+	return map[string]string{keyNodesID: id.String()}
+}
+
 // DeleteNode deletes a node.
 func (s *MongoNodeStore) DeleteNode(id uuid.UUID) error {
-	res, err := s.db.Collection(colNodes).DeleteOne(
-		nil, map[string]string{keyNodesID: id.String()})
+	res, err := s.db.Collection(colNodes).DeleteOne(nil, nodeFilter(id))
 	if err != nil {
 		return errors.New("mongostore delete node: " + err.Error()) // dunno how to test this
 	}
 	if res.DeletedCount < 1 {
+		return NewNoNodeError("No such node " + id.String())
+	}
+	return nil
+}
+
+// SetNodePublic sets whether a node can be read by anyone, including anonymous users.
+// Returns NoNodeError if the node does not exist.
+func (s *MongoNodeStore) SetNodePublic(id uuid.UUID, public bool) error {
+	res, err := s.db.Collection(colNodes).UpdateOne(
+		nil,
+		nodeFilter(id),
+		map[string]interface{}{
+			"$set": map[string]interface{}{keyNodesPublic: public}})
+	if err != nil {
+		return errors.New("mongostore set node public: " + err.Error()) // dunno how to test this
+	}
+	if res.MatchedCount < 1 {
 		return NewNoNodeError("No such node " + id.String())
 	}
 	return nil
