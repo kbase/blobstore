@@ -14,6 +14,14 @@ import (
 	"github.com/kbase/blobstore/nodestore"
 )
 
+// User is a user that may own or read Nodes.
+type User struct {
+	// ID is the internal blobstore ID for the user.
+	ID uuid.UUID
+	// AccountName is the ID of the user in external systems.
+	AccountName string
+}
+
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID
@@ -22,6 +30,9 @@ type BlobNode struct {
 	Stored   time.Time
 	Filename string
 	Format   string
+	Owner    User
+	Readers  *[]User
+	Public   bool
 }
 
 // might want to move this somewhere else
@@ -120,6 +131,10 @@ func (bs *BlobStore) Store(
 }
 
 func toBlobNode(node *nodestore.Node) *BlobNode {
+	readers := &[]User{}
+	for _, u := range *node.GetReaders() {
+		*readers = append(*readers, toUser(u))
+	}
 	return &BlobNode{
 		ID:       node.GetID(),
 		Size:     node.GetSize(),
@@ -127,6 +142,16 @@ func toBlobNode(node *nodestore.Node) *BlobNode {
 		Stored:   node.GetStoredTime(),
 		Filename: node.GetFileName(),
 		Format:   node.GetFormat(),
+		Owner:    toUser(node.GetOwner()),
+		Readers:  readers,
+		Public:   node.GetPublic(),
+	}
+}
+
+func toUser(u nodestore.User) User {
+	return User{
+		ID:          u.GetID(),
+		AccountName: u.GetAccountName(),
 	}
 }
 
@@ -157,6 +182,9 @@ func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
 }
 
 func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool {
+	if node.GetPublic() {
+		return true
+	}
 	if user.IsAdmin() {
 		return true
 	}
