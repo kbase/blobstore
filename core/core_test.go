@@ -26,6 +26,11 @@ func TestUnauthorizedError(t *testing.T) {
 	assert.Equal(t, "some error", e.Error(), "incorrect error")
 }
 
+func TestUnauthorizedACLError(t *testing.T) {
+	e := NewUnauthorizedACLError("some error")
+	assert.Equal(t, "some error", e.Error(), "incorrect error")
+}
+
 func TestStoreBasic(t *testing.T) {
 	uidmock := new(cmocks.UUIDGen)
 	fsmock := new(fsmocks.FileStore)
@@ -673,25 +678,171 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 
 	bs := New(fsmock, nsmock)
 
-	uid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+		nil, errors.New("whoopsie"))
+
+	rd, size, filename, err := bs.GetFile(*auser, nid)
+	assert.Equal(t, int64(0), size, "expected error")
+	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, "", filename, "incorrect filename")
+	assert.Equal(t, errors.New("whoopsie"), err, "incorrect error")
+}
+
+func TestSetNodePublicTrueAsOwner(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("SetNodePublic", nid, true).Return(nil)
+
+	err := bs.SetNodePublic(*auser, nid, true)
+	assert.Nil(t, err, "unexpected error")
+}
+
+func TestSetNodePublicFalseAsAdmin(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", true)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("SetNodePublic", nid, false).Return(nil)
+
+	err := bs.SetNodePublic(*auser, nid, false)
+	assert.Nil(t, err, "unexpected error")
+}
+
+func TestSetNodePublicFailGetUser(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
+
+	err := bs.SetNodePublic(*auser, uid, true)
+	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+}
+
+func TestSetNodePublicFailGetNode(t *testing.T) {
+	uid := uuid.New()
 	auser, _ := auth.NewUser("un", false)
 
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
+
+	inputs := map[error]error{
+		errors.New("You are all individuals"): errors.New("You are all individuals"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+
+		nsmock.On("GetNode", uid).Return(nil, causeerr)
+	
+		err := bs.SetNodePublic(*auser, uid, false)
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
+
+func TestSetNodePublicFailUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
-	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
 
-	nsmock.On("GetNode", uid).Return(node, nil)
+	nsmock.On("GetNode", nid).Return(node, nil)
 
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
-		nil, errors.New("whoopsie"))
+	err := bs.SetNodePublic(*auser, nid, false)
+	assert.Equal(t, NewUnauthorizedACLError("Only the node owner can set the public node flag"),
+		err, "incorrect error")
+}
 
-	rd, size, filename, err := bs.GetFile(*auser, uid)
-	assert.Equal(t, int64(0), size, "expected error")
-	assert.Equal(t, rd, nil, "expected error")
-	assert.Equal(t, "", filename, "incorrect filename")
-	assert.Equal(t, errors.New("whoopsie"), err, "incorrect error")
+func TestSetNodePublicFailSetPublic(t *testing.T) {
+	
+	auser, _ := auth.NewUser("un", true)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	
+	inputs := map[error]error{
+		errors.New("You are all individuals"): errors.New("You are all individuals"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+	
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+		
+		nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+		tme := time.Now()
+		node, _ := nodestore.NewNode(nid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+		nsmock.On("GetNode", nid).Return(node, nil)
+
+		nsmock.On("SetNodePublic", nid, false).Return(causeerr)
+
+		err := bs.SetNodePublic(*auser, nid, false)
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
 }
