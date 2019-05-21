@@ -454,7 +454,7 @@ func (t *TestSuite) createFile(urell string, data io.Reader, token string, conte
 
 // TODO DOCS document effect of sending large file with incorrect content-length
 
-func (t *TestSuite) getNode(url string, user *User, contentLength int64) map[string]interface{} {
+func (t *TestSuite) get(url string, user *User, contentLength int64) map[string]interface{} {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
 	if user != nil {
@@ -510,7 +510,7 @@ func getUserName(user *User) *string {
 
 func (t *TestSuite) checkNode(id string, user *User, contentLength int64,
 expected map[string]interface{}) {
-	body := t.getNode(t.url + "/node/" + id, user, contentLength)
+	body := t.get(t.url + "/node/" + id, user, contentLength)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id, 200, getUserName(user),
 		"request complete", mtmap(), false},
@@ -556,27 +556,27 @@ func (t *TestSuite) TestStoreNoUser() {
 	)
 }
 
-func (t *TestSuite) TestGetBadID() {
-	body := t.getNode(t.url + "/node/badid", &t.noRole, 75)
+func (t *TestSuite) TestGetNodeBadID() {
+	body := t.get(t.url + "/node/badid", &t.noRole, 75)
 	t.checkError(body, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/badid", 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 
-	body2 := t.getNode(t.url + "/node/badid?download", &t.noRole, 75)
+	body2 := t.get(t.url + "/node/badid?download", &t.noRole, 75)
 	t.checkError(body2, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/badid", 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 	
 	uid := uuid.New()
-	body3 := t.getNode(t.url + "/node/" + uid.String(), &t.noRole, 75)
+	body3 := t.get(t.url + "/node/" + uid.String(), &t.noRole, 75)
 	t.checkError(body3, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + uid.String(), 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
 	)
 	
-	body4 := t.getNode(t.url + "/node/" + uid.String() + "?download", &t.noRole, 75)
+	body4 := t.get(t.url + "/node/" + uid.String() + "?download", &t.noRole, 75)
 	t.checkError(body4, 404, "Node not found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + uid.String(), 404, &t.noRole.user,
 		"Node not found", mtmap(), false},
@@ -590,12 +590,12 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 		"request complete", mtmap(), false},
 	)
 	
-	nodeb := t.getNode(t.url + "/node/" + id, &t.noRole, 78)
+	nodeb := t.get(t.url + "/node/" + id, &t.noRole, 78)
 	t.checkError(nodeb, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
 	)
-	nodeb2 := t.getNode(t.url + "/node/" + id + "?download", &t.noRole, 78)
+	nodeb2 := t.get(t.url + "/node/" + id + "?download", &t.noRole, 78)
 	t.checkError(nodeb2, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
@@ -612,7 +612,7 @@ func (t *TestSuite) TestUnexpectedError() {
 
 	t.minio.Clear(false) // delete the file data, but not the node data
 
-	node := t.getNode(t.url + "/node/" + id + "?download", &t.kBaseAdmin, 185)
+	node := t.get(t.url + "/node/" + id + "?download", &t.kBaseAdmin, 185)
 	t.Equal(float64(500), node["status"].(float64), "incorrect code")
 	t.Nil(node["data"], "expected no data")
 	err := node["error"].([]interface{})
@@ -641,9 +641,132 @@ func (t *TestSuite) TestNotFound() {
 }
 
 func (t *TestSuite) TestNotAllowed() {
-	body := t.getNode(t.url + "/node", nil, 79)
+	body := t.get(t.url + "/node", nil, 79)
 	t.checkError(body, 405, "Method Not Allowed")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node", 405, nil, "Method Not Allowed",
 		mtmap(), false},
+	)
+}
+
+// TODO ACL TEST multiple readers
+// TODO ACL TEST public
+func (t *TestSuite) TestGetACLs() {
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	t.loggerhook.Reset() // tested this enough already
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	// ID gen is random, so we'll just fetch the generated ID from the DB.
+	// Cheating kinda
+	uid := t.getUserFromMongo()
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"owner": uid,
+			"write": []interface{}{uid},
+			"delete": []interface{}{uid},
+			"read": []interface{}{uid},
+			"public": map[string]interface{}{
+				"read": false,
+				"write": false,
+				"delete": false,
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	for _, urlsuffix := range []string{"", "/read", "/write", "/delete",
+		"/public_read", "/public_write", "/public_delete"} {
+
+		t.checkACL(id, urlsuffix, "", &t.noRole, 395, expected)
+		t.checkACL(id, urlsuffix + "/", "", &t.noRole, 395, expected)
+	}
+}
+
+// assumes only 1 user in mongo
+func (t *TestSuite) getUserFromMongo() string {
+	muser := t.mongoclient.Database(testDB).Collection("users").FindOne(nil, map[string]string{})
+	t.Nil(muser.Err(), "error getting mongo user")
+	var udoc map[string]interface{}
+	err := muser.Decode(&udoc)
+	t.Nil(err, "unexpected error")
+	uid, _ := udoc["id"].(string)
+	return uid
+}
+
+func (t *TestSuite) TestGetACLAsAdminVerbose() {
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	t.loggerhook.Reset() // tested this enough already
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	// ID gen is random, so we'll just fetch the generated ID from the DB.
+	// Cheating kinda
+	uid := t.getUserFromMongo()
+
+	vuser := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+	expectedverbose := map[string]interface{}{
+		"data": map[string]interface{}{
+			"owner": vuser,
+			"write": []interface{}{vuser},
+			"delete": []interface{}{vuser},
+			"read": []interface{}{vuser},
+			"public": map[string]interface{}{
+				"read": false,
+				"write": false,
+				"delete": false,
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	for _, urlsuffix := range []string{"", "/read", "/write", "/delete",
+		"/public_read", "/public_write", "/public_delete"} {
+
+		t.checkACL(id, urlsuffix, "?verbosity=full", &t.kBaseAdmin, 617, expectedverbose)
+		t.checkACL(id, urlsuffix + "/", "?verbosity=full", &t.kBaseAdmin, 617, expectedverbose)
+	}
+}
+
+func (t *TestSuite) checkACL(id string, urlsuffix string, params string, user *User,
+contentLength int64, expected map[string]interface{}) {
+	body := t.get(t.url + "/node/" + id + "/acl" + urlsuffix + params, user, contentLength)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id + "/acl" + urlsuffix, 200,
+		getUserName(user), "request complete", mtmap(), false},
+	)
+	t.Equal(expected, body, "incorrect return")
+}
+
+func (t *TestSuite) TestGetACLsBadType() {
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	t.loggerhook.Reset() // tested this enough already
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	body2 := t.get(t.url + "/node/" + id + "/acl/pubwic_wead", &t.noRole, 77)
+	t.checkError(body2, 400, "Invalid acl type")
+}
+
+func (t *TestSuite) TestGetACLsBadID() {
+	body := t.get(t.url + "/node/badid/acl", &t.noRole, 75)
+	t.checkError(body, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/badid/acl", 404, &t.noRole.user,
+		"Node not found", mtmap(), false},
+	)
+
+	uid := uuid.New()
+	body2 := t.get(t.url + "/node/" + uid.String() + "/acl", &t.noRole, 75)
+	t.checkError(body2, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + uid.String() + "/acl", 404,
+		&t.noRole.user, "Node not found", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestGetACLsFailPerms() {
+	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+	
+	nodeb := t.get(t.url + "/node/" + id + "/acl", &t.noRole, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id + "/acl", 401, &t.noRole.user,
+		"User Unauthorized", mtmap(), false},
 	)
 }

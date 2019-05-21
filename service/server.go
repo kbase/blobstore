@@ -69,13 +69,21 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	router.MethodNotAllowedHandler = http.HandlerFunc(notAllowedHandler)
-	// router.StrictSlash(true) // doesn't seem to have an effect
+	// router.StrictSlash(true) // doesn't seem to have an effect...?
 	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
-	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
 	router.Use(s.authLogMiddleWare)
+
+	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
+
 	router.HandleFunc("/node", s.createNode).Methods(http.MethodPost, http.MethodPut)
+
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
+
+	router.HandleFunc("/node/{id}/acl", s.getACL).Methods(http.MethodGet)
+	router.HandleFunc("/node/{id}/acl/", s.getACL).Methods(http.MethodGet)
+	router.HandleFunc("/node/{id}/acl/{acltype}", s.getACL).Methods(http.MethodGet)
+	router.HandleFunc("/node/{id}/acl/{acltype}/", s.getACL).Methods(http.MethodGet)
 	//TODO DELETE handle node delete
 	//TODO ACLs handle node acls (verbosity)
 	// TODO ACLS chown node
@@ -237,25 +245,33 @@ func writeNode(w http.ResponseWriter, node *core.BlobNode) {
 	ret := map[string]interface{}{
 		"status": 200,
 		"error":  nil,
-		"data":   fromNode(node),
+		"data":   fromNodeToNode(node),
 	}
 	encodeToJSON(w, 200, &ret)
 }
 
-func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
-	le := getLogger(r)
+func getNodeID(le *logrus.Entry, w http.ResponseWriter, r *http.Request) (*uuid.UUID, error) {
 	putativeid := mux.Vars(r)["id"]
 	id, err := uuid.Parse(putativeid)
 	if err != nil {
 		// crappy error message, but compatible with Shock
 		writeErrorWithCode(le, "Node not found", 404, w)
+		return nil, err
+	}
+	return &id, nil
+}
+
+func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
+	id, err := getNodeID(le, w, r)
+	if err != nil {
 		return
 	}
 	user := getUser(r)
 	// TODO AUTH handle nil user
 	download := download(r.URL)
 	if download != "" {
-		datareader, size, filename, err := s.store.GetFile(*user, id)
+		datareader, size, filename, err := s.store.GetFile(*user, *id)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -272,7 +288,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/octet-stream")
 		io.Copy(w, datareader)
 	} else {
-		node, err := s.store.Get(*user, id)
+		node, err := s.store.Get(*user, *id)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -291,7 +307,7 @@ func download(u *url.URL) string {
 	return ""
 }
 
-func fromNode(node *core.BlobNode) map[string]interface{} {
+func fromNodeToNode(node *core.BlobNode) map[string]interface{} {
 	return map[string]interface{}{
 		"id":            node.ID.String(),
 		"format":        node.Format,
@@ -310,4 +326,79 @@ const timeFormat = "2006-01-02T15:04:05.000Z"
 
 func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
+}
+
+var aclTypes = map[string]struct{}{
+	"":              struct{}{},
+	"read":          struct{}{},
+	"write":         struct{}{},
+	"delete":        struct{}{},
+	"public_read":   struct{}{},
+	"public_write":  struct{}{},
+	"public_delete": struct{}{},
+}
+
+func (s *Server) getACL(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
+	atype := mux.Vars(r)["acltype"]
+	if _, ok := aclTypes[atype]; !ok {
+		// compatible with shock
+		writeErrorWithCode(le, "Invalid acl type", 400, w)
+		return
+	}
+	id, err := getNodeID(le, w, r)
+	if err != nil {
+		return
+	}
+	user := getUser(r)
+	// TODO AUTH handle nil user
+	node, err := s.store.Get(*user, *id)
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	writeACL(w, node, r)
+}
+
+func writeACL(w http.ResponseWriter, node *core.BlobNode, r *http.Request) {
+	verbose := getQuery(r.URL, "verbosity") == "full"
+	ret := map[string]interface{}{
+		"status": 200,
+		"error":  nil,
+		"data":   fromNodeToACL(node, verbose),
+	}
+	encodeToJSON(w, 200, &ret)
+}
+
+func fromNodeToACL(node *core.BlobNode, verbose bool) map[string]interface{} {
+	o := toUser(node.Owner, verbose)
+	return map[string]interface{}{
+		"owner":  o,
+		"delete": []interface{}{o},
+		"write":  []interface{}{o},
+		"read":   toUsers(o, node.Readers, verbose),
+		"public": map[string]bool{
+			"write":  false,
+			"delete": false,
+			"read":   node.Public,
+		},
+	}
+}
+
+func toUsers(owner interface{}, users *[]core.User, verbose bool) []interface{} {
+	ulist := &[]interface{}{owner}
+	for _, u := range *users {
+		*ulist = append(*ulist, u)
+	}
+	return *ulist
+}
+
+func toUser(user core.User, verbose bool) interface{} {
+	if verbose {
+		return map[string]string{
+			"uuid":     user.ID.String(),
+			"username": user.AccountName,
+		}
+	}
+	return user.ID.String()
 }
