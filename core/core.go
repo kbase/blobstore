@@ -77,6 +77,20 @@ func (e *UnauthorizedError) Error() string {
 	return string(*e)
 }
 
+// UnauthorizedACLError is returned when a user may not alter a blob's ACLs in the manner
+// requested.
+type UnauthorizedACLError string
+
+// NewUnauthorizedACLError creates a new UnauthorizedACLError.
+func NewUnauthorizedACLError(err string) *UnauthorizedACLError {
+	e := UnauthorizedACLError(err)
+	return &e
+}
+
+func (e *UnauthorizedACLError) Error() string {
+	return string(*e)
+}
+
 // BlobStore is the storage system for blobs.
 type BlobStore struct {
 	fileStore filestore.FileStore
@@ -162,23 +176,36 @@ func uuidToFilePath(uid uuid.UUID) string {
 
 // Get gets details about a node. Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
-	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
+	node, nodeuser, err := bs.getNode(user, id)
 	if err != nil {
-		return nil, err // errors should only occur for unusual situations here
-	}
-	node, err := bs.nodeStore.GetNode(id)
-	if err != nil {
-		if _, ok := err.(*nodestore.NoNodeError); ok {
-			// seems weird to rewrap, but also seems weird to expose errors in lower api levels
-			return nil, NewNoBlobError(err.Error())
-		}
-		return nil, err // errors should only occur for unusual situations here
+		return nil, err
 	}
 	if !authok(user, nodeuser, node) {
 		return nil, NewUnauthorizedError("Unauthorized")
 	}
 	return toBlobNode(node), nil
+}
 
+func (bs *BlobStore) getNode(user auth.User, id uuid.UUID,
+) (*nodestore.Node, *nodestore.User, error) {
+	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
+	if err != nil {
+		return nil, nil, err // errors should only occur for unusual situations here
+	}
+	node, err := bs.nodeStore.GetNode(id)
+	if err != nil {
+		return nil, nil, translateError(err)
+	}
+	return node, nodeuser, nil
+}
+
+func translateError(err error) error {
+	if _, ok := err.(*nodestore.NoNodeError); ok {
+		// seems weird to rewrap, but also seems weird to expose errors in lower api levels
+		return NewNoBlobError(err.Error())
+	}
+	// errors should only occur for unusual situations here
+	return err
 }
 
 func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool {
@@ -212,4 +239,21 @@ func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
 		return nil, 0, "", err
 	}
 	return f.Data, f.Size, node.Filename, nil
+}
+
+// SetNodePublic sets whether a node can be read by anyone, including anonymous users.
+// Returns NoBlobError and UnauthorizedACLError.
+func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool) error {
+	node, nodeuser, err := bs.getNode(user, id)
+	if err != nil {
+		return err
+	}
+	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
+		return NewUnauthorizedACLError("Only the node owner can set the public node flag")
+	}
+	err = bs.nodeStore.SetNodePublic(id, public)
+	if err != nil {
+		return translateError(err)
+	}
+	return nil
 }
