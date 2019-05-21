@@ -270,8 +270,7 @@ func (s *MongoNodeStore) SetNodePublic(id uuid.UUID, public bool) error {
 	res, err := s.db.Collection(colNodes).UpdateOne(
 		nil,
 		nodeFilter(id),
-		map[string]interface{}{
-			"$set": map[string]interface{}{keyNodesPublic: public}})
+		map[string]interface{}{"$set": map[string]interface{}{keyNodesPublic: public}})
 	if err != nil {
 		return errors.New("mongostore set node public: " + err.Error()) // dunno how to test this
 	}

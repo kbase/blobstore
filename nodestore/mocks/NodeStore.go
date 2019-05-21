@@ -71,6 +71,20 @@ func (_m *NodeStore) GetUser(accountName string) (*nodestore.User, error) {
 	return r0, r1
 }
 
+// SetNodePublic provides a mock function with given fields: id, public
+func (_m *NodeStore) SetNodePublic(id uuid.UUID, public bool) error {
+	ret := _m.Called(id, public)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uuid.UUID, bool) error); ok {
+		r0 = rf(id, public)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // StoreNode provides a mock function with given fields: node
 func (_m *NodeStore) StoreNode(node *nodestore.Node) error {
 	ret := _m.Called(node)
