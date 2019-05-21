@@ -80,7 +80,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	//TODO ACLs handle node acls (verbosity)
 	// TODO ACLS chown node
 	// TODO ACLS public read
-	// TODO TEST content-type and content-length headers
+	// TODO DOCKER and docker-compose-up
 	return s, nil
 }
 

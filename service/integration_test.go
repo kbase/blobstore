@@ -398,7 +398,6 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	}
 	t.checkNode(id, &t.noRole, 380, expected2)
 
-	// TODO TEST check download header
 	path1 := "/node/" + id
 	path2 := path1 + "/"
 	t.checkFile(t.url + path1 + "?download", path1, &t.noRole, 9, "myfile", []byte("foobarbaz"))

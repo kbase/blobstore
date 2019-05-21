@@ -74,6 +74,9 @@ func TestStoreBasic(t *testing.T) {
 		Stored: tme,
 		Filename: "",
 		Format: "",
+		Owner: User{userid, "username"},
+		Readers: &[]User{},
+		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -130,6 +133,9 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		Stored: tme,
 		Filename: "myfile",
 		Format: "excel",
+		Owner: User{userid, "username"},
+		Readers: &[]User{},
+		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -285,6 +291,9 @@ func TestGetAsOwner(t *testing.T) {
 		Stored: tme,
 		Filename: "fn",
 		Format: "json",
+		Owner: User{userid, "username"},
+		Readers: &[]User{},
+		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -298,9 +307,12 @@ func TestGetAsReader(t *testing.T) {
 	uid := uuid.New()
 	auser, _ := auth.NewUser("reader", false)
 
-	nuser, _ := nodestore.NewUser(uuid.New(), "username")
-	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
-	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+	nid := uuid.New()
+	nuser, _ := nodestore.NewUser(nid, "username")
+	rid := uuid.New()
+	ruser, _ := nodestore.NewUser(rid, "reader")
+	oid := uuid.New()
+	ouser, _ := nodestore.NewUser(oid, "other")
 
 	nsmock.On("GetUser", "reader").Return(ruser, nil)
 
@@ -319,6 +331,9 @@ func TestGetAsReader(t *testing.T) {
 		Stored: tme,
 		Filename: "",
 		Format: "",
+		Owner: User{nid, "username"},
+		Readers: &[]User{User{oid, "other"}, User{rid, "reader"}},
+		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -332,9 +347,11 @@ func TestGetAsAdmin(t *testing.T) {
 	uid := uuid.New()
 	auser, _ := auth.NewUser("reader", true)
 
-	nuser, _ := nodestore.NewUser(uuid.New(), "username")
+	nid := uuid.New()
+	nuser, _ := nodestore.NewUser(nid, "username")
 	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
-	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+	oid := uuid.New()
+	ouser, _ := nodestore.NewUser(oid, "other")
 
 	nsmock.On("GetUser", "reader").Return(ruser, nil)
 
@@ -352,6 +369,45 @@ func TestGetAsAdmin(t *testing.T) {
 		Stored: tme,
 		Filename: "",
 		Format: "",
+		Owner: User{nid, "username"},
+		Readers: &[]User{User{oid, "other"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+}
+
+func TestGetPublic(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("reader", false)
+
+	nid := uuid.New()
+	nuser, _ := nodestore.NewUser(nid, "username")
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+
+	nsmock.On("GetUser", "reader").Return(ruser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Public(true))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	bnode, err := bs.Get(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: uid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "",
+		Format: "",
+		Owner: User{nid, "username"},
+		Readers: &[]User{},
+		Public: true,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -521,6 +577,47 @@ func TestGetFileAsAdmin(t *testing.T) {
 	tme := time.Now()
 	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser),
 		nodestore.FileName("bfile"))
+
+	nsmock.On("GetNode", uid).Return(node, nil)
+
+	gfo := filestore.GetFileOutput{
+		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size: 9,
+		Format: "who cares",
+		Filename: "afile",
+		MD5: "who cares",
+		Stored: time.Now(),
+		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+	}
+	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+
+	rd, size, filename, err := bs.GetFile(*auser, uid)
+	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, int64(9), size, "incorrect size")
+	assert.Equal(t, "bfile", filename, "incorrect filename")
+	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
+}
+
+func TestGetFilePublic(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid, err := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	auser, _ := auth.NewUser("other", false)
+
+	nid := uuid.New()
+	nuser, _ := nodestore.NewUser(nid, "username")
+	rid := uuid.New()
+	ruser, _ := nodestore.NewUser(rid, "reader")
+	ouser, _ := nodestore.NewUser(uuid.New(), "other")
+
+	nsmock.On("GetUser", "other").Return(ouser, nil)
+
+	tme := time.Now()
+	node, _ := nodestore.NewNode(uid, *nuser, 12, "fakemd5", tme, nodestore.Reader(*ruser),
+		nodestore.FileName("bfile"), nodestore.Public(true))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
