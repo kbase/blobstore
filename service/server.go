@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -84,6 +85,10 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.getACL).Methods(http.MethodGet)
+	router.HandleFunc("/node/{id}/acl/{acltype}", s.addNodeACL).Methods(http.MethodPut)
+	router.HandleFunc("/node/{id}/acl/{acltype}/", s.addNodeACL).Methods(http.MethodPut)
+	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
+	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
 	//TODO DELETE handle node delete
 	//TODO ACLs handle node acls (verbosity)
 	// TODO ACLS chown node
@@ -213,10 +218,8 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 		writeErrorWithCode(le, "Length Required", http.StatusLengthRequired, w)
 		return
 	}
-	user := getUser(r)
-	if user == nil {
-		// shock compatibility here
-		writeErrorWithCode(le, "No Authorization", http.StatusUnauthorized, w)
+	user, err := getUserRequired(le, w, r)
+	if err != nil {
 		return
 	}
 	filename := getQuery(r.URL, "filename")
@@ -338,29 +341,91 @@ var aclTypes = map[string]struct{}{
 	"public_delete": struct{}{},
 }
 
-func (s *Server) getACL(w http.ResponseWriter, r *http.Request) {
-	le := getLogger(r)
-	atype := mux.Vars(r)["acltype"]
-	if _, ok := aclTypes[atype]; !ok {
+func getACLType(le *logrus.Entry, w http.ResponseWriter, r *http.Request) (string, error) {
+	acltype := mux.Vars(r)["acltype"]
+	if _, ok := aclTypes[acltype]; !ok {
 		// compatible with shock
 		writeErrorWithCode(le, "Invalid acl type", 400, w)
-		return
+		return "", errors.New("Invalid acl type")
+	}
+	return acltype, nil
+}
+
+func getACLParams(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
+) (*uuid.UUID, string, error) {
+	aclType, err := getACLType(le, w, r)
+	if err != nil {
+		return nil, "", err
 	}
 	id, err := getNodeID(le, w, r)
+	if err != nil {
+		return nil, "", err
+	}
+	return id, aclType, nil
+}
+
+func (s *Server) getACL(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
+	id, _, err := getACLParams(le, w, r)
 	if err != nil {
 		return
 	}
 	user := getUser(r)
+	s.getAndWriteACL(le, w, r, user, *id)
+}
+
+func (s *Server) addNodeACL(w http.ResponseWriter, r *http.Request) {
+	s.setNodeACL(w, r, true)
+}
+
+func (s *Server) removeNodeACL(w http.ResponseWriter, r *http.Request) {
+	s.setNodeACL(w, r, false)
+}
+
+func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
+	le := getLogger(r)
+	id, acltype, err := getACLParams(le, w, r)
+	if err != nil {
+		return
+	}
+	user, err := getUserRequired(le, w, r)
+	if err != nil {
+		return
+	}
+	if acltype == "public_read" {
+		err := s.store.SetNodePublic(*user, *id, add)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+	}
+	s.getAndWriteACL(le, w, r, user, *id)
+}
+
+func getUserRequired(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
+) (*auth.User, error) {
+	user := getUser(r)
+	if user == nil {
+		// shock compatibility here
+		writeErrorWithCode(le, "No Authorization", http.StatusUnauthorized, w)
+		return nil, errors.New("No authorization")
+	}
+	return user, nil
+}
+
+func (s *Server) getAndWriteACL(
+	le *logrus.Entry,
+	w http.ResponseWriter,
+	r *http.Request,
+	user *auth.User,
+	id uuid.UUID,
+) {
 	// TODO AUTH handle nil user
-	node, err := s.store.Get(*user, *id)
+	node, err := s.store.Get(*user, id)
 	if err != nil {
 		writeError(le, err, w)
 		return
 	}
-	writeACL(w, node, r)
-}
-
-func writeACL(w http.ResponseWriter, node *core.BlobNode, r *http.Request) {
 	verbose := getQuery(r.URL, "verbosity") == "full"
 	ret := map[string]interface{}{
 		"status": 200,

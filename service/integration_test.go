@@ -349,8 +349,8 @@ func (t *TestSuite) TestRoot() {
 // TODO DOCS for store, get, get file
 func (t *TestSuite) TestStoreAndGetWithFilename() {
 	// check whitespace
-	body := t.createFile(t.url + "/node?filename=%20%20myfile%20%20", strings.NewReader("foobarbaz"),
-		t.noRole.token, 380)
+	body := t.req("POST", t.url + "/node?filename=%20%20myfile%20%20",
+		strings.NewReader("foobarbaz"), t.noRole.token, 380)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
@@ -406,8 +406,8 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetAsAdminWithFormat() {
-	body := t.createFile(t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
+func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
+	body := t.req("POST", t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
 		t.noRole.token, 378)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
@@ -442,9 +442,75 @@ func (t *TestSuite) TestGetAsAdminWithFormat() {
 	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) createFile(urell string, data io.Reader, token string, contentLength int64,
+func (t *TestSuite) TestGetNodePublic() {
+	// not testing logging here, tested elsewhere
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	uid := t.getUserFromMongo()
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	id := data["id"].(string)
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	expectedacl := map[string]interface{}{
+		"data": map[string]interface{}{
+			"owner": uid,
+			"write": []interface{}{uid},
+			"delete": []interface{}{uid},
+			"read": []interface{}{uid},
+			"public": map[string]interface{}{
+				"read": true,
+				"write": false,
+				"delete": false,
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	nodeb := t.get(t.url + "/node/" + id, &t.noRole, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	aclb := t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
+	t.checkError(aclb, 401, "User Unauthorized")
+
+	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 394)
+	t.loggerhook.Reset()
+
+	t.checkNode(id, &t.noRole, 374, expected)
+	t.checkACL(id, "", "", &t.noRole, 394, expectedacl)
+
+	t.req("DELETE", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 395)
+	
+	nodeb = t.get(t.url + "/node/" + id, &t.noRole, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	aclb = t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
+	t.checkError(aclb, 401, "User Unauthorized")
+}
+
+func (t *TestSuite) req(
+	method string,
+	urell string,
+	data io.Reader,
+	token string,
+	contentLength int64,
 ) map[string]interface{} {
-	req, err := http.NewRequest(http.MethodPost, urell, data)
+	req, err := http.NewRequest(method, urell, data)
 	t.Nil(err, "unexpected error")
 	if token != "" {
 		req.Header.Set("authorization", token)
@@ -528,7 +594,7 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 }
 
 func (t *TestSuite) TestBadToken() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), "bad_token", 100)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), "bad_token", 100)
 	t.checkError(body, 400, "Invalid authorization header or content")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, nil,
 		"Invalid authorization header or content", mtmap(), false},
@@ -549,7 +615,7 @@ func (t *TestSuite) TestNoContentLength() {
 }
 
 func (t *TestSuite) TestStoreNoUser() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), "", 77)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), "", 77)
 	t.checkError(body, 401, "No Authorization")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
 		"No Authorization", mtmap(), false},
@@ -584,7 +650,7 @@ func (t *TestSuite) TestGetNodeBadID() {
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -604,7 +670,7 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 
 func (t *TestSuite) TestUnexpectedError() {
 	defer t.createTestBucket()
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -635,7 +701,7 @@ func (t *TestSuite) createTestBucket() {
 }
 
 func (t *TestSuite) TestNotFound() {
-	body := t.createFile(t.url + "/nde", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 70)
+	body := t.req("POST", t.url + "/nde", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 70)
 	t.checkError(body, 404, "Not Found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/nde", 404, nil, "Not Found", mtmap(), false})
 }
@@ -651,7 +717,7 @@ func (t *TestSuite) TestNotAllowed() {
 // TODO ACL TEST multiple readers
 // TODO ACL TEST public
 func (t *TestSuite) TestGetACLs() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
@@ -694,7 +760,7 @@ func (t *TestSuite) getUserFromMongo() string {
 }
 
 func (t *TestSuite) TestGetACLAsAdminVerbose() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
@@ -737,7 +803,7 @@ contentLength int64, expected map[string]interface{}) {
 }
 
 func (t *TestSuite) TestGetACLsBadType() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	body2 := t.get(t.url + "/node/" + id + "/acl/pubwic_wead", &t.noRole, 77)
@@ -760,7 +826,7 @@ func (t *TestSuite) TestGetACLsBadID() {
 }
 
 func (t *TestSuite) TestGetACLsFailPerms() {
-	body := t.createFile(t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.loggerhook.Reset()
 	
@@ -769,4 +835,109 @@ func (t *TestSuite) TestGetACLsFailPerms() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id + "/acl", 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
 	)
+}
+
+func (t *TestSuite) TestSetGlobalACLs() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+	uid := t.getUserFromMongo()
+
+	type testcase struct {
+		method string
+		urlsuffix string
+		publicread bool
+		user User
+		verbose bool
+		conlen int64
+	}
+
+	testcases := []testcase{
+		testcase{"PUT", "public_read", true, t.noRole, false, 394},
+		testcase{"DELETE", "public_read", false, t.noRole, true, 617},
+		testcase{"PUT", "public_read", true, t.kBaseAdmin, true, 616}, // as admin
+		testcase{"DELETE", "public_read", false, t.kBaseAdmin, false, 395}, // as admin
+		testcase{"PUT", "public_write", false, t.noRole, false, 395}, // silently do nothing
+		testcase{"PUT", "public_delete", false, t.noRole, false, 395}, // silently do nothing
+		testcase{"DELETE", "public_write", false, t.noRole, false, 395}, // silently do nothing
+		testcase{"DELETE", "public_delete", false, t.noRole, false, 395}, // silently do nothing
+	}
+
+	for _, tc := range testcases {
+		path := "/node/" + id + "/acl/" + tc.urlsuffix
+		var owner interface{} = uid
+
+		params := ""
+		if tc.verbose {
+			params = "?verbosity=full"
+			owner = map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+		}
+		
+		expected := map[string]interface{}{
+			"data": map[string]interface{}{
+				"owner": owner,
+				"write": []interface{}{owner},
+				"delete": []interface{}{owner},
+				"read": []interface{}{owner},
+				"public": map[string]interface{}{
+					"read": tc.publicread,
+					"write": false,
+					"delete": false,
+				},
+			},
+			"error": nil,
+			"status": float64(200),
+		}
+
+		body := t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
+			getUserName(&tc.user), "request complete", mtmap(), false},
+		)
+		t.Equal(expected, body, fmt.Sprintf("incorrect return for case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
+
+		path = path + "/"
+		body = t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
+			getUserName(&tc.user), "request complete", mtmap(), false},
+		)
+		t.Equal(expected, body, fmt.Sprintf("incorrect return for trailing slash w/ case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
+	}
+}
+func (t *TestSuite) TestSetGlobalACLsFail() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	type testcase struct {
+		method string
+		urlsuffix string
+		token string
+		status int
+		errstring string
+		conlen int64
+	}
+
+	longun := "Users that are not node owners can only delete themselves from ACLs."
+	invauth := "Invalid authorization header or content"
+	badid := uuid.New().String()
+	testcases := []testcase{
+		testcase{"PUT", id + "/acl/pubwic_wead", "", 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/pubwic_dewete", "", 400, "Invalid acl type", 77},
+		testcase{"PUT", "/badid/acl/public_read", "", 404, "Node not found", 75},
+		testcase{"DELETE", "/worseid/acl/public_write", "", 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/public_read", "", 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/public_write", "", 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/public_read", "badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/public_read", "badtoken", 400, invauth, 100},
+		testcase{"PUT", badid + "/acl/public_read", t.noRole.token, 404, "Node not found", 75},
+		testcase{"DELETE", badid + "/acl/public_read", t.noRole.token, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
+		testcase{"DELETE", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
+	}
+
+	for _, tc := range testcases {
+		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		t.checkError(body, tc.status, tc.errstring)
+	}
 }
