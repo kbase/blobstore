@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/google/uuid"
@@ -19,13 +21,11 @@ import (
 
 const (
 	colUsers              = "users"
-	keyUsersUser          = "user"
-	keyUsersUUID          = "id"
+	keyUserUser           = "user"
+	keyUserUUID           = "id"
 	colNodes              = "nodes"
 	keyNodesID            = "id"
 	keyNodesOwner         = "own"
-	keyNodesUserID        = "id"
-	keyNodesUserName      = "user"
 	keyNodesReaders       = "read"
 	keyNodesFileName      = "fname"
 	keyNodesFormat        = "fmt"
@@ -54,11 +54,11 @@ func NewMongoNodeStore(db *mongo.Database) (*MongoNodeStore, error) {
 }
 
 func createIndexes(db *mongo.Database) error {
-	err := addIndex(db.Collection(colUsers), keyUsersUser, 1, true)
+	err := addIndex(db.Collection(colUsers), keyUserUser, 1, true)
 	if err != nil {
 		return err
 	}
-	err = addIndex(db.Collection(colUsers), keyUsersUUID, 1, true)
+	err = addIndex(db.Collection(colUsers), keyUserUUID, 1, true)
 	if err != nil {
 		return err // hard to test
 	}
@@ -87,7 +87,7 @@ func (s *MongoNodeStore) GetUser(accountName string) (*User, error) {
 	}
 	// try reading first, since users are only written once and reading is a lot faster
 	col := s.db.Collection(colUsers)
-	res := col.FindOne(context.Background(), map[string]string{keyUsersUser: accountName})
+	res := col.FindOne(context.Background(), map[string]string{keyUserUser: accountName})
 	if res.Err() != nil {
 		// don't know how to test this
 		return nil, errors.New("mongostore find user: " + res.Err().Error())
@@ -109,9 +109,7 @@ func (s *MongoNodeStore) createUser(accountName string) (*User, error) {
 	// try creating a new user
 	col := s.db.Collection(colUsers)
 	uid := uuid.New()
-	_, err := col.InsertOne(context.Background(), map[string]string{
-		keyUsersUser: accountName,
-		keyUsersUUID: uid.String()})
+	_, err := col.InsertOne(context.Background(), toUserDocCreate(uid, accountName))
 	if err == nil {
 		return &User{accountName: accountName, id: uid}, nil
 	}
@@ -120,7 +118,7 @@ func (s *MongoNodeStore) createUser(accountName string) (*User, error) {
 		// we just created a new uuid. If that's the case we're all good and
 		// can just pull the user.
 		// Assumes users are never deleted, which they shouldn't be.
-		res := col.FindOne(nil, map[string]string{keyUsersUser: accountName})
+		res := col.FindOne(nil, map[string]string{keyUserUser: accountName})
 		if res.Err() != nil {
 			// ok, give up. Dunno how to test this either.
 			return nil, errors.New("mongostore find user attempt 2: " + res.Err().Error())
@@ -162,8 +160,23 @@ func toUser(sr *mongo.SingleResult) (*User, error) {
 		return nil, errors.New("mongostore user decode: " + err.Error())
 	}
 	// err should always be nil unless db is corrupt
-	uid, _ := uuid.Parse(udoc[keyUsersUUID].(string))
-	return &User{accountName: udoc[keyUsersUser].(string), id: uid}, nil
+	uid, _ := uuid.Parse(udoc[keyUserUUID].(string))
+	return &User{accountName: udoc[keyUserUser].(string), id: uid}, nil
+}
+
+// MUST use these functions to make users, since bson.D is ordered and
+// maps are not
+// unordered maps make document matching unreliable, since MongoDB take key order into account
+// structures would be nicer, but all their fields have to be exported to work
+func toUserDoc(user User) bson.D {
+	return toUserDocCreate(user.GetID(), user.GetAccountName())
+}
+
+func toUserDocCreate(id uuid.UUID, accountName string) bson.D {
+	return bson.D{
+		{Key: keyUserUUID, Value: id.String()},
+		{Key: keyUserUser, Value: accountName},
+	}
 }
 
 // StoreNode stores a node.
@@ -172,12 +185,10 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 	if node == nil {
 		return errors.New("Node cannot be nil")
 	}
-	readers := []map[string]string{}
+	readers := []bson.D{}
 	nodemap := map[string]interface{}{
-		keyNodesID: node.id.String(),
-		keyNodesOwner: map[string]interface{}{
-			keyNodesUserID:   node.owner.id.String(),
-			keyNodesUserName: node.owner.accountName},
+		keyNodesID:       node.id.String(),
+		keyNodesOwner:    toUserDoc(node.owner),
 		keyNodesFileName: node.filename,
 		keyNodesFormat:   node.format,
 		keyNodesMD5:      node.md5,
@@ -186,9 +197,7 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 		keyNodesStored:   node.stored,
 	}
 	for _, u := range *node.readers {
-		readers = append(readers, map[string]string{
-			keyNodesUserID:   u.id.String(),
-			keyNodesUserName: u.accountName})
+		readers = append(readers, toUserDoc(u))
 	}
 	nodemap[keyNodesReaders] = readers
 	_, err := s.db.Collection(colNodes).InsertOne(nil, nodemap)
@@ -224,14 +233,14 @@ func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 	// I feel like I'm doing something wrong here, this seems nuts
 	for _, uinter := range []interface{}(ndoc[keyNodesReaders].(primitive.A)) {
 		u := uinter.(map[string]interface{})
-		uid, _ := uuid.Parse(u[keyNodesUserID].(string))    // err must be nil unless db is corrupt
-		nu, _ := NewUser(uid, u[keyNodesUserName].(string)) // same
+		uid, _ := uuid.Parse(u[keyUserUUID].(string))  // err must be nil unless db is corrupt
+		nu, _ := NewUser(uid, u[keyUserUser].(string)) // same
 		opts = append(opts, Reader(*nu))
 	}
 	nid, _ := uuid.Parse(ndoc[keyNodesID].(string)) // err should always be nil unles db is corrupt
 	odoc := ndoc[keyNodesOwner].(map[string]interface{})
-	oid, _ := uuid.Parse(odoc[keyNodesUserID].(string)) // err must be nil unles db is corrupt
-	owner, _ := NewUser(oid, odoc[keyNodesUserName].(string))
+	oid, _ := uuid.Parse(odoc[keyUserUUID].(string)) // err must be nil unles db is corrupt
+	owner, _ := NewUser(oid, odoc[keyUserUser].(string))
 	return NewNode(
 		nid,
 		*owner,
@@ -273,6 +282,59 @@ func (s *MongoNodeStore) SetNodePublic(id uuid.UUID, public bool) error {
 		map[string]interface{}{"$set": map[string]interface{}{keyNodesPublic: public}})
 	if err != nil {
 		return errors.New("mongostore set node public: " + err.Error()) // dunno how to test this
+	}
+	if res.MatchedCount < 1 {
+		return NewNoNodeError("No such node " + id.String())
+	}
+	return nil
+}
+
+// AddReader adds a user to a node's read ACL.
+// The caller is responsible for ensuring the user is valid - retrieving the user via
+// GetUser() is the proper way to do so.
+// Has no effect if the user is the node's owner or the user is already in the read ACL.
+// Returns NoNodeError if the node does not exist.
+func (s *MongoNodeStore) AddReader(id uuid.UUID, user User) error {
+	userdoc := toUserDoc(user)
+	updatedoc := map[string]interface{}{
+		"$addToSet": map[string]interface{}{keyNodesReaders: userdoc},
+	}
+	filterdoc := map[string]interface{}{
+		keyNodesID:    id.String(),
+		keyNodesOwner: map[string]interface{}{"$ne": userdoc},
+	}
+
+	res, err := s.db.Collection(colNodes).UpdateOne(nil, filterdoc, updatedoc)
+	if err != nil {
+		return errors.New("mongostore add reader: " + err.Error()) // dunno how to test this
+	}
+	if res.MatchedCount < 1 {
+		c, err := s.db.Collection(colNodes).CountDocuments(nil, nodeFilter(id))
+		if err != nil {
+			// dunno how to test this
+			return errors.New("mongostore set node public count: " + err.Error())
+		}
+		if c < 1 {
+			return NewNoNodeError("No such node " + id.String())
+		}
+		// otherwise we didn't match becauser the reader is the owner, so shit's cool
+	}
+	return nil
+}
+
+// RemoveReader removes a user from the node's read ACL.
+// Has no effect if the user is not in the read ACL.
+// Returns NoNodeError if the node does not exist.
+func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
+	userdoc := toUserDoc(user)
+	updatedoc := map[string]interface{}{
+		"$pull": map[string]interface{}{keyNodesReaders: userdoc},
+	}
+	filterdoc := map[string]interface{}{keyNodesID: id.String()}
+
+	res, err := s.db.Collection(colNodes).UpdateOne(nil, filterdoc, updatedoc)
+	if err != nil {
+		return errors.New("mongostore add reader: " + err.Error()) // dunno how to test this
 	}
 	if res.MatchedCount < 1 {
 		return NewNoNodeError("No such node " + id.String())

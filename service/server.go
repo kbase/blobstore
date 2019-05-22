@@ -328,6 +328,7 @@ func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
 }
 
+// TODO ACL add owner
 var aclTypes = map[string]struct{}{
 	"":              struct{}{},
 	"read":          struct{}{},
