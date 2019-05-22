@@ -20,6 +20,10 @@ func translateError(err error) (code int, errstr string) {
 	case *core.UnauthorizedError:
 		// Shock compatibility, really should be 403 forbidden
 		return http.StatusUnauthorized, "User Unauthorized"
+	case *core.UnauthorizedACLError:
+		// Shock compatibility, really should be 403 forbidden
+		return http.StatusBadRequest, "Users that are not node owners can only delete " +
+			"themselves from ACLs."
 	default:
 		return 500, t.Error()
 	}
