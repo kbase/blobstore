@@ -442,7 +442,7 @@ func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
 	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetNodePublic() {
+func (t *TestSuite) TestGetNodeFileACLPublic() {
 	// not testing logging here, tested elsewhere
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	uid := t.getUserFromMongo()
@@ -484,23 +484,32 @@ func (t *TestSuite) TestGetNodePublic() {
 		"status": float64(200),
 	}
 
-	nodeb := t.get(t.url + "/node/" + id, &t.noRole, 78)
-	t.checkError(nodeb, 401, "User Unauthorized")
-	aclb := t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
-	t.checkError(aclb, 401, "User Unauthorized")
+	t.getNodeFailUnauth(id, &t.noRole)
 
 	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 394)
 	t.loggerhook.Reset()
 
-	t.checkNode(id, &t.noRole, 374, expected)
-	t.checkACL(id, "", "", &t.noRole, 394, expectedacl)
+	for _, u := range []*User{&t.noRole, nil} {
+		t.checkNode(id, u, 374, expected)
+		t.checkACL(id, "", "", u, 394, expectedacl)
+		t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, u, 9, id,
+			[]byte("foobarbaz"))
+	}
 
 	t.req("DELETE", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 395)
 	
-	nodeb = t.get(t.url + "/node/" + id, &t.noRole, 78)
-	t.checkError(nodeb, 401, "User Unauthorized")
-	aclb = t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
-	t.checkError(aclb, 401, "User Unauthorized")
+	t.getNodeFailUnauth(id, &t.noRole)
+}
+
+func (t *TestSuite) getNodeFailUnauth(id string, user *User) {
+	for _, u := range []*User{user, nil} {
+		nodeb := t.get(t.url + "/node/" + id, u, 78)
+		t.checkError(nodeb, 401, "User Unauthorized")
+		nodeb = t.get(t.url + "/node/" + id + "?download", u, 78)
+		t.checkError(nodeb, 401, "User Unauthorized")
+		aclb := t.get(t.url + "/node/" + id + "/acl/", u, 78)
+		t.checkError(aclb, 401, "User Unauthorized")
+	}
 }
 
 func (t *TestSuite) req(
@@ -661,9 +670,19 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
 		"User Unauthorized", mtmap(), false},
 	)
-	nodeb2 := t.get(t.url + "/node/" + id + "?download", &t.noRole, 78)
+	nodeb2 := t.get(t.url + "/node/" + id, nil, 78)
 	t.checkError(nodeb2, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
+		"User Unauthorized", mtmap(), false},
+	)
+	nodeb3 := t.get(t.url + "/node/" + id + "?download", &t.noRole, 78)
+	t.checkError(nodeb3, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole.user,
+		"User Unauthorized", mtmap(), false},
+	)
+	nodeb4 := t.get(t.url + "/node/" + id + "?download", nil, 78)
+	t.checkError(nodeb4, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
 		"User Unauthorized", mtmap(), false},
 	)
 }
@@ -715,7 +734,6 @@ func (t *TestSuite) TestNotAllowed() {
 }
 
 // TODO ACL TEST multiple readers
-// TODO ACL TEST public
 func (t *TestSuite) TestGetACLs() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
@@ -833,6 +851,12 @@ func (t *TestSuite) TestGetACLsFailPerms() {
 	nodeb := t.get(t.url + "/node/" + id + "/acl", &t.noRole, 78)
 	t.checkError(nodeb, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id + "/acl", 401, &t.noRole.user,
+		"User Unauthorized", mtmap(), false},
+	)
+
+	nodeb = t.get(t.url + "/node/" + id + "/acl", nil, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id + "/acl", 401, nil,
 		"User Unauthorized", mtmap(), false},
 	)
 }
