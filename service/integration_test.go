@@ -804,13 +804,20 @@ func (t *TestSuite) TestSetGlobalACLs() {
 
 	for _, tc := range testcases {
 		path := "/node/" + id + "/acl/" + tc.urlsuffix
+		var owner interface{} = uid
+
+		params := ""
+		if tc.verbose {
+			params = "?verbosity=full"
+			owner = map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+		}
 		
 		expected := map[string]interface{}{
 			"data": map[string]interface{}{
-				"owner": uid,
-				"write": []interface{}{uid},
-				"delete": []interface{}{uid},
-				"read": []interface{}{uid},
+				"owner": owner,
+				"write": []interface{}{owner},
+				"delete": []interface{}{owner},
+				"read": []interface{}{owner},
 				"public": map[string]interface{}{
 					"read": tc.publicread,
 					"write": false,
@@ -819,27 +826,6 @@ func (t *TestSuite) TestSetGlobalACLs() {
 			},
 			"error": nil,
 			"status": float64(200),
-		}
-
-		params := ""
-		if tc.verbose {
-			params = "?verbosity=full"
-			vuser := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
-			expected = map[string]interface{}{
-				"data": map[string]interface{}{
-					"owner": vuser,
-					"write": []interface{}{vuser},
-					"delete": []interface{}{vuser},
-					"read": []interface{}{vuser},
-					"public": map[string]interface{}{
-						"read": tc.publicread,
-						"write": false,
-						"delete": false,
-					},
-				},
-				"error": nil,
-				"status": float64(200),
-			}
 		}
 
 		body := t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
