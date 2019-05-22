@@ -175,7 +175,7 @@ func uuidToFilePath(uid uuid.UUID) string {
 }
 
 // Get gets details about a node. Returns NoBlobError and UnauthorizedError.
-func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
+func (bs *BlobStore) Get(user *auth.User, id uuid.UUID) (*BlobNode, error) {
 	node, nodeuser, err := bs.getNode(user, id)
 	if err != nil {
 		return nil, err
@@ -186,11 +186,15 @@ func (bs *BlobStore) Get(user auth.User, id uuid.UUID) (*BlobNode, error) {
 	return toBlobNode(node), nil
 }
 
-func (bs *BlobStore) getNode(user auth.User, id uuid.UUID,
+func (bs *BlobStore) getNode(user *auth.User, id uuid.UUID,
 ) (*nodestore.Node, *nodestore.User, error) {
-	nodeuser, err := bs.nodeStore.GetUser(user.GetUserName())
-	if err != nil {
-		return nil, nil, err // errors should only occur for unusual situations here
+	var nodeuser *nodestore.User
+	if user != nil {
+		var err error
+		nodeuser, err = bs.nodeStore.GetUser(user.GetUserName())
+		if err != nil {
+			return nil, nil, err // errors should only occur for unusual situations here
+		}
 	}
 	node, err := bs.nodeStore.GetNode(id)
 	if err != nil {
@@ -208,9 +212,12 @@ func translateError(err error) error {
 	return err
 }
 
-func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool {
+func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool {
 	if node.GetPublic() {
 		return true
+	}
+	if user == nil {
+		return false
 	}
 	if user.IsAdmin() {
 		return true
@@ -227,7 +234,7 @@ func authok(user auth.User, nodeuser *nodestore.User, node *nodestore.Node) bool
 }
 
 // GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
-func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
+func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
 ) (data io.ReadCloser, size int64, filename string, err error) {
 	node, err := bs.Get(user, id) // checks auth
 	if err != nil {
@@ -244,7 +251,7 @@ func (bs *BlobStore) GetFile(user auth.User, id uuid.UUID,
 // SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool) error {
-	node, nodeuser, err := bs.getNode(user, id)
+	node, nodeuser, err := bs.getNode(&user, id)
 	if err != nil {
 		return err
 	}

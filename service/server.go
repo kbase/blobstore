@@ -90,9 +90,8 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
 	//TODO DELETE handle node delete
-	//TODO ACLs handle node acls (verbosity)
+	//TODO ACLs handle node acls
 	// TODO ACLS chown node
-	// TODO ACLS public read
 	// TODO DOCKER and docker-compose-up
 	return s, nil
 }
@@ -153,7 +152,6 @@ func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 			}
 			le = le.WithField("user", user.GetUserName())
 		}
-		//TODO ACLs GetNode and GetFile will need to handle nil/ public users
 		r = r.WithContext(context.WithValue(r.Context(), servkey{"user"}, user))
 		r = r.WithContext(context.WithValue(r.Context(), servkey{"log"}, le))
 		rec := statusRecorder{w, 200}
@@ -271,10 +269,9 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := getUser(r)
-	// TODO AUTH handle nil user
 	download := download(r.URL)
 	if download != "" {
-		datareader, size, filename, err := s.store.GetFile(*user, *id)
+		datareader, size, filename, err := s.store.GetFile(user, *id)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -291,7 +288,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/octet-stream")
 		io.Copy(w, datareader)
 	} else {
-		node, err := s.store.Get(*user, *id)
+		node, err := s.store.Get(user, *id)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -420,8 +417,7 @@ func (s *Server) getAndWriteACL(
 	user *auth.User,
 	id uuid.UUID,
 ) {
-	// TODO AUTH handle nil user
-	node, err := s.store.Get(*user, id)
+	node, err := s.store.Get(user, id)
 	if err != nil {
 		writeError(le, err, w)
 		return
