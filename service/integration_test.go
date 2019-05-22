@@ -406,7 +406,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetAsAdminWithFormat() {
+func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
 	body := t.req("POST", t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
 		t.noRole.token, 378)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
@@ -440,6 +440,67 @@ func (t *TestSuite) TestGetAsAdminWithFormat() {
 	t.checkNode(id, &t.kBaseAdmin, 378, expected)
 	t.checkFile(t.url + path + "?download", path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
 	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
+}
+
+func (t *TestSuite) TestGetNodePublic() {
+	// not testing logging here, tested elsewhere
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	uid := t.getUserFromMongo()
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	id := data["id"].(string)
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	expectedacl := map[string]interface{}{
+		"data": map[string]interface{}{
+			"owner": uid,
+			"write": []interface{}{uid},
+			"delete": []interface{}{uid},
+			"read": []interface{}{uid},
+			"public": map[string]interface{}{
+				"read": true,
+				"write": false,
+				"delete": false,
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	nodeb := t.get(t.url + "/node/" + id, &t.noRole, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	aclb := t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
+	t.checkError(aclb, 401, "User Unauthorized")
+
+	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 394)
+	t.loggerhook.Reset()
+
+	t.checkNode(id, &t.noRole, 374, expected)
+	t.checkACL(id, "", "", &t.noRole, 394, expectedacl)
+
+	t.req("DELETE", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 395)
+	
+	nodeb = t.get(t.url + "/node/" + id, &t.noRole, 78)
+	t.checkError(nodeb, 401, "User Unauthorized")
+	aclb = t.get(t.url + "/node/" + id + "/acl/", &t.noRole, 78)
+	t.checkError(aclb, 401, "User Unauthorized")
 }
 
 func (t *TestSuite) req(
