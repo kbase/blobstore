@@ -894,6 +894,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
 		t.Equal(expected, body, fmt.Sprintf("incorrect return for case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
 
 		path = path + "/"
 		body = t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
@@ -901,6 +902,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
 		t.Equal(expected, body, fmt.Sprintf("incorrect return for trailing slash w/ case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
 	}
 }
 func (t *TestSuite) TestSetGlobalACLsFail() {
