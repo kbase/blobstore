@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"fmt"
 	"errors"
 	"net/url"
 	"strconv"
@@ -229,9 +228,8 @@ func (t *TestSuite) TestValidateUserName() {
 	t.Nil(err, "unexpected error")
 
 	for _, names := range tc {
-		gotvalid, err := kb.ValidateUserNames(&names, t.tokenNoRole)
+		err := kb.ValidateUserNames(&names, t.tokenNoRole)
 		t.Nil(err, "unexpected error")
-		t.Equal(true, gotvalid, fmt.Sprintf("incorrect validation for users: %v", names))
 	}
 }
 
@@ -254,8 +252,7 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 	t.Nil(err, "unexpected error")
 
 	for _, tcase := range tc {
-		b, err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
-		t.Equal(false, b, "expected error")
+		err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
 		t.Equal(tcase.err, err, "incorrect error")
 	}
 }
@@ -270,8 +267,7 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 	t.Nil(err, "unexpected error")
 	
 	for token, expectederr := range tc {
-		b, err := kb.ValidateUserNames(&[]string{"noroles"}, token)
-		t.Equal(false, b, "expected error")
+		err := kb.ValidateUserNames(&[]string{"noroles"}, token)
 		t.Equal(expectederr, err, "incorrect error")
 	}
 }
@@ -288,8 +284,7 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 		urp, _ := url.Parse(ur)
 		kb, err := NewKBaseProvider(*urp)
 		t.Nil(err, "unexpected error")
-		b, err := kb.ValidateUserNames(&[]string{"noroles"}, "fake")
-		t.Equal(false, b, "expected error")
+		err = kb.ValidateUserNames(&[]string{"noroles"}, "fake")
 		t.Equal(errors.New(errstr), err, "incorrect error")
 	}
 }

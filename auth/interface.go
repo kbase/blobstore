@@ -67,5 +67,5 @@ type Provider interface {
 	// ValidateUserName validates that user names exist in the auth system.
 	// token can be any valid token - it's used only to look up the userName.
 	// Returns InvalidToken error and InvalidUserError.
-	ValidateUserNames(userNames *[]string, token string) (bool, error)
+	ValidateUserNames(userNames *[]string, token string) error
 }
