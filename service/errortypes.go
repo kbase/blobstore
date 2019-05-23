@@ -24,6 +24,9 @@ func translateError(err error) (code int, errstr string) {
 		// Shock compatibility, really should be 403 forbidden
 		return http.StatusBadRequest, "Users that are not node owners can only delete " +
 			"themselves from ACLs."
+	case *auth.InvalidUserError:
+		// no equivalent shock error, it accepts any string as a username
+		return http.StatusBadRequest, t.Error()
 	default:
 		return 500, t.Error()
 	}

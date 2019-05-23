@@ -52,6 +52,8 @@ type TestSuite struct {
 	auth *kbaseauthcontroller.Controller
 	loggerhook *logrust.Hook
 	noRole User
+	noRole2 User
+	noRole3 User
 	stdRole User
 	kBaseAdmin User
 }
@@ -121,10 +123,14 @@ func (t *TestSuite) SetupSuite() {
 
 func (t *TestSuite) setUpUsersAndRoles() {
 	t.createTestUser("noroles")
+	t.createTestUser("noroles2")
+	t.createTestUser("noroles3")
 	t.createTestUser("admin_std_role")
 	t.createTestUser("admin_kbase")
 
 	t.noRole = User{"noroles", t.createTestToken("noroles")}
+	t.noRole2 = User{"noroles2", t.createTestToken("noroles2")}
+	t.noRole3 = User{"noroles3", t.createTestToken("noroles3")}
 	t.stdRole = User{"admin_std_role", t.createTestToken("admin_std_role")}
 	t.kBaseAdmin = User{"admin_kbase", t.createTestToken("admin_kbase")}
 
@@ -445,7 +451,7 @@ func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
 func (t *TestSuite) TestGetNodeFileACLPublic() {
 	// not testing logging here, tested elsewhere
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
-	uid := t.getUserFromMongo()
+	uid := t.getUserIDFromMongo(t.kBaseAdmin.user)
 
 	data := body["data"].(map[string]interface{})
 	time := data["created_on"].(string)
@@ -509,6 +515,7 @@ func (t *TestSuite) getNodeFailUnauth(id string, user *User) {
 		t.checkError(nodeb, 401, "User Unauthorized")
 		aclb := t.get(t.url + "/node/" + id + "/acl/", u, 78)
 		t.checkError(aclb, 401, "User Unauthorized")
+		t.loggerhook.Reset()
 	}
 }
 
@@ -529,6 +536,7 @@ func (t *TestSuite) req(
 
 // TODO DOCS document effect of sending large file with incorrect content-length
 
+//TODO TEST check status code
 func (t *TestSuite) get(url string, user *User, contentLength int64) map[string]interface{} {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
@@ -740,7 +748,7 @@ func (t *TestSuite) TestGetACLs() {
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
 	// Cheating kinda
-	uid := t.getUserFromMongo()
+	uid := t.getUserIDFromMongo(t.noRole.user)
 
 	expected := map[string]interface{}{
 		"data": map[string]interface{}{
@@ -767,8 +775,10 @@ func (t *TestSuite) TestGetACLs() {
 }
 
 // assumes only 1 user in mongo
-func (t *TestSuite) getUserFromMongo() string {
-	muser := t.mongoclient.Database(testDB).Collection("users").FindOne(nil, map[string]string{})
+func (t *TestSuite) getUserIDFromMongo(name string) string {
+	muser := t.mongoclient.Database(testDB).Collection("users").FindOne(nil, map[string]string{
+		"user": name,
+	})
 	t.Nil(muser.Err(), "error getting mongo user")
 	var udoc map[string]interface{}
 	err := muser.Decode(&udoc)
@@ -783,7 +793,7 @@ func (t *TestSuite) TestGetACLAsAdminVerbose() {
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
 	// Cheating kinda
-	uid := t.getUserFromMongo()
+	uid := t.getUserIDFromMongo(t.noRole.user)
 
 	vuser := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
 	expectedverbose := map[string]interface{}{
@@ -865,7 +875,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.loggerhook.Reset()
-	uid := t.getUserFromMongo()
+	uid := t.getUserIDFromMongo(t.noRole.user)
 
 	type testcase struct {
 		method string
@@ -929,6 +939,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
 	}
 }
+
 func (t *TestSuite) TestSetGlobalACLsFail() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -958,6 +969,266 @@ func (t *TestSuite) TestSetGlobalACLsFail() {
 		testcase{"DELETE", badid + "/acl/public_read", t.noRole.token, 404, "Node not found", 75},
 		testcase{"PUT", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
 		testcase{"DELETE", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
+	}
+
+	for _, tc := range testcases {
+		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		t.checkError(body, tc.status, tc.errstring)
+	}
+}
+
+func (t *TestSuite) TestSetIgnoredACLs() {
+	// write and delete acl change requests are silently ignored, since we don't support
+	// those acls
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+	uid := t.getUserIDFromMongo(t.noRole.user)
+	type testcase struct {
+		method string
+		urlsuffix string
+		user User
+		verbose bool
+		conlen int64
+	}
+
+	testcases := []testcase{
+		testcase{"PUT", "write", t.noRole, false, 395},
+		testcase{"DELETE", "write", t.noRole, true, 617},
+		testcase{"PUT", "write", t.kBaseAdmin, true, 617}, // as admin
+		testcase{"DELETE", "write", t.kBaseAdmin, false, 395}, // as admin
+		testcase{"PUT", "delete", t.noRole, false, 395},
+		testcase{"DELETE", "delete", t.noRole, false, 395},
+	}
+
+	for _, tc := range testcases {
+		path := "/node/" + id + "/acl/" + tc.urlsuffix
+		var owner interface{} = uid
+
+		params := "?users=" + t.stdRole.user
+		if tc.verbose {
+			params += ";verbosity=full"
+			owner = map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+		}
+		
+		expected := map[string]interface{}{
+			"data": map[string]interface{}{
+				"owner": owner,
+				"write": []interface{}{owner},
+				"delete": []interface{}{owner},
+				"read": []interface{}{owner},
+				"public": map[string]interface{}{
+					"read": false,
+					"write": false,
+					"delete": false,
+				},
+			},
+			"error": nil,
+			"status": float64(200),
+		}
+
+		body := t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
+			getUserName(&tc.user), "request complete", mtmap(), false},
+		)
+		t.Equal(expected, body, fmt.Sprintf("incorrect return for case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
+
+		path = path + "/"
+		body = t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
+			getUserName(&tc.user), "request complete", mtmap(), false},
+		)
+		t.Equal(expected, body, fmt.Sprintf("incorrect return for trailing slash w/ case %v", tc))
+		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
+	}
+}
+
+func (t *TestSuite) TestSetReadACL() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	uid := t.getUserIDFromMongo(t.noRole.user)
+	t.loggerhook.Reset()
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	id := data["id"].(string)
+	
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	owner := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+
+	// check no readers and non-admins can't read
+	t.checkACL(id, "", "", &t.noRole, 395, getExpectedACL(owner, []map[string]interface{}{},false))
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.getNodeFailUnauth(id, &t.noRole3)
+	t.loggerhook.Reset()
+
+	// add readers as owner. Also check whitespace is ignored.
+	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?users=%20%20,%20%20%20,%20%20" +
+		t.noRole2.user + "%20%20,%20%20" + t.noRole3.user, nil, t.noRole.token, 487)
+	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
+		&t.noRole.user, "request complete", mtmap(), false},
+	)
+	
+	u2 := map[string]interface{}{
+		"uuid": t.getUserIDFromMongo(t.noRole2.user),
+		"username": t.noRole2.user,
+	}
+	u3 := map[string]interface{}{
+		"uuid": t.getUserIDFromMongo(t.noRole3.user),
+		"username": t.noRole3.user,
+	}
+	expectedACL := getExpectedACL(owner, []map[string]interface{}{u2, u3}, false)
+	t.Equal(expectedACL, body, "incorrect acls")
+
+	for _, u := range []*User{&t.noRole2, &t.noRole3} {
+		t.checkNode(id, u, 374, expected)
+		t.checkACL(id, "", "", u, 487, expectedACL)
+		t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, u, 9, id,
+			[]byte("foobarbaz"))
+	}
+	t.loggerhook.Reset()
+
+	// remove readers as owner with verbose response and trailing slash
+	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?verbosity=full;users=" +
+		t.noRole2.user, nil, t.noRole.token, 721)
+	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
+		&t.noRole.user, "request complete", mtmap(), false},
+	)
+	expectedACL = getExpectedACL(owner, []map[string]interface{}{u3}, true)
+	t.Equal(expectedACL, body, "incorrect acls")
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.checkNode(id, &t.noRole3, 374, expected)
+	t.checkACL(id, "", "?verbosity=full", &t.noRole3, 721, expectedACL)
+	t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, &t.noRole3, 9, id,
+		[]byte("foobarbaz"))
+
+	// add readers as admin with verbose response
+	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?verbosity=full;users=" +
+		t.noRole2.user + "," + t.noRole3.user, nil, t.stdRole.token, 825)
+	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
+		&t.stdRole.user, "request complete", mtmap(), false},
+	)
+
+	expectedACL = getExpectedACL(owner, []map[string]interface{}{u3, u2}, true)
+	t.Equal(expectedACL, body, "incorrect acls")
+
+	for _, u := range []*User{&t.noRole2, &t.noRole3} {
+		t.checkNode(id, u, 374, expected)
+		t.checkACL(id, "", "?verbosity=full", u, 825, expectedACL)
+		t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, u, 9, id,
+			[]byte("foobarbaz"))
+	}
+	t.loggerhook.Reset()
+
+	// remove readers as admin with trailing slash, check whitespace is ignored
+	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?users=%20%20,%20%20,%20" +
+		t.noRole2.user + ",%20%20" +  t.noRole3.user, nil, t.stdRole.token, 395)
+	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
+		&t.stdRole.user, "request complete", mtmap(), false},
+	)
+	expectedACL = getExpectedACL(owner, []map[string]interface{}{}, false)
+	t.Equal(expectedACL, body, "incorrect acls")
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.getNodeFailUnauth(id, &t.noRole3)
+}
+
+func getExpectedACL(owner map[string]interface{}, readers []map[string]interface{}, verbose bool,
+) map[string]interface{} {
+	var ownerdoc interface{}
+	var readerdocs []interface{}
+	if verbose {
+		ownerdoc = owner
+		readerdocs = append(readerdocs, owner)
+	} else {
+		ownerdoc = owner["uuid"]
+		readerdocs = append(readerdocs, owner["uuid"])
+	}
+	for _, r := range readers {
+		if verbose {
+			readerdocs = append(readerdocs, r)
+		} else {
+			readerdocs = append(readerdocs, r["uuid"])
+		}
+	}
+
+	return map[string]interface{}{
+		"data": map[string]interface{}{
+			"owner": ownerdoc,
+			"write": []interface{}{ownerdoc},
+			"delete": []interface{}{ownerdoc},
+			"read": readerdocs,
+			"public": map[string]interface{}{
+				"read": false,
+				"write": false,
+				"delete": false,
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+}
+
+
+func (t *TestSuite) TestSetReadACLsFail() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	type testcase struct {
+		method string
+		urlsuffix string
+		token string
+		status int
+		errstring string
+		conlen int64
+	}
+
+	notown := "Users that are not node owners can only delete themselves from ACLs."
+	nousers := "Action requires list of comma separated usernames in 'users' parameter"
+	invauth := "Invalid authorization header or content"
+	badid := uuid.New().String()
+	testcases := []testcase{
+		testcase{"PUT", id + "/acl/wead", "", 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/wead/", "", 400, "Invalid acl type", 77},
+		testcase{"PUT", "/badid/acl/read/", "", 404, "Node not found", 75},
+		testcase{"DELETE", "/worseid/acl/read", "", 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/read", "", 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/read/", "", 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/read/", "badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/read", "badtoken", 400, invauth, 100},
+		testcase{"PUT", id + "/acl/read?users=%20%20,%20%09%20%20,%20", t.noRole.token, 400,
+			nousers, 131},
+		testcase{"DELETE", id + "/acl/read?users=%20%20,%20%20%20,%09%20", t.noRole.token, 400,
+			nousers, 131},
+		testcase{"PUT", id + "/acl/read?users=fakename,fakename2", t.noRole.token, 400,
+			"Invalid users: fakename, fakename2", 95},
+		testcase{"DELETE", id + "/acl/read?users=fakename,fakename2", t.noRole.token, 400,
+			"Invalid users: fakename, fakename2", 95},
+
+		testcase{"PUT", badid + "/acl/read?users=" + t.noRole2.user, t.noRole.token, 404,
+			"Node not found", 75},
+		testcase{"DELETE", badid + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 404,
+			"Node not found", 75},
+		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
+			notown, 129},
+		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
+			notown, 129},
 	}
 
 	for _, tc := range testcases {

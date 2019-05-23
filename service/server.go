@@ -132,6 +132,11 @@ func getUser(r *http.Request) *auth.User {
 	}
 	return nil
 }
+
+func getToken(r *http.Request) string {
+	return r.Context().Value(servkey{"token"}).(string)
+}
+
 func getLogger(r *http.Request) *logrus.Entry {
 	return r.Context().Value(servkey{"log"}).(*logrus.Entry)
 }
@@ -154,6 +159,7 @@ func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 		}
 		r = r.WithContext(context.WithValue(r.Context(), servkey{"user"}, user))
 		r = r.WithContext(context.WithValue(r.Context(), servkey{"log"}, le))
+		r = r.WithContext(context.WithValue(r.Context(), servkey{"token"}, token))
 		rec := statusRecorder{w, 200}
 		next.ServeHTTP(&rec, r)
 		if rec.status < 400 {
@@ -396,6 +402,20 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 			writeError(le, err, w)
 			return
 		}
+	} else if acltype == "read" {
+		users, err := s.getUserList(le, w, r)
+		if err != nil {
+			return
+		}
+		if add {
+			err = s.store.AddReaders(*user, *id, *users)
+		} else {
+			err = s.store.RemoveReaders(*user, *id, *users)
+		}
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
 	}
 	s.getAndWriteACL(le, w, r, user, *id)
 }
@@ -409,6 +429,31 @@ func getUserRequired(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
 		return nil, errors.New("No authorization")
 	}
 	return user, nil
+}
+
+const noUsersError = "Action requires list of comma separated usernames in 'users' parameter"
+
+func (s *Server) getUserList(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
+) (*[]string, error) {
+	ul := getQuery(r.URL, "users")
+	uls := strings.Split(ul, ",")
+	ulst := []string{}
+	for _, s := range uls {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			ulst = append(ulst, s)
+		}
+	}
+	if len(ulst) < 1 {
+		writeErrorWithCode(le, noUsersError, 400, w)
+		return nil, errors.New(noUsersError)
+	}
+	err := s.auth.ValidateUserNames(&ulst, getToken(r))
+	if err != nil {
+		writeError(le, err, w)
+		return nil, err
+	}
+	return &ulst, nil
 }
 
 func (s *Server) getAndWriteACL(
@@ -450,7 +495,7 @@ func fromNodeToACL(node *core.BlobNode, verbose bool) map[string]interface{} {
 func toUsers(owner interface{}, users *[]core.User, verbose bool) []interface{} {
 	ulist := &[]interface{}{owner}
 	for _, u := range *users {
-		*ulist = append(*ulist, u)
+		*ulist = append(*ulist, toUser(u, verbose))
 	}
 	return *ulist
 }
