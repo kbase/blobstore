@@ -938,10 +938,10 @@ func TestAddAndRemoveReadersFailGetUser(t *testing.T) {
 
 	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
 
-	err := bs.AddReaders(*auser, uid, []string{"r}"})
+	err := bs.AddReaders(*auser, uid, []string{"r"})
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
 
-	err = bs.RemoveReaders(*auser, uid, []string{"r}"})
+	err = bs.RemoveReaders(*auser, uid, []string{"r"})
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
 }
 
@@ -1027,7 +1027,7 @@ func TestAddAndRemoveReadersFailGetReader(t *testing.T) {
 	assert.Equal(t, errors.New("Yeah? Sausages and?"), err, "incorrect error")
 }
 
-func TestAddAdnRemoveReadersFailAddRemoveReader(t *testing.T) {
+func TestAddAndRemoveReadersFailAddRemoveReader(t *testing.T) {
 	
 	auser, _ := auth.NewUser("un", true)
 	
@@ -1066,3 +1066,174 @@ func TestAddAdnRemoveReadersFailAddRemoveReader(t *testing.T) {
 	}
 }
 
+func TestChangeOwner(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("owner", false)
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	nsmock.On("GetUser", "owner").Return(o, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	newowner, _ := nodestore.NewUser(uuid.New(), "new")
+	nsmock.On("GetUser", "new").Return(newowner, nil)
+	nsmock.On("ChangeOwner", nid, *newowner).Return(nil)
+
+	err := bs.ChangeOwner(*auser, nid, "new")
+	assert.Nil(t, err, "unexpected error")
+}
+
+func TestChangeOwnerAsAdmin(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("notowner", true)
+	no, _ := nodestore.NewUser(uuid.New(), "notowner")
+	nsmock.On("GetUser", "notowner").Return(no, nil)
+	o, _  := nodestore.NewUser(uuid.New(), "owner")
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	newowner, _ := nodestore.NewUser(uuid.New(), "new")
+	nsmock.On("GetUser", "new").Return(newowner, nil)
+	nsmock.On("ChangeOwner", nid, *newowner).Return(nil)
+
+	err := bs.ChangeOwner(*auser, nid, "new")
+	assert.Nil(t, err, "unexpected error")
+}
+
+func TestChangeOwnerFailGetUser(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
+
+	err := bs.ChangeOwner(*auser, uid, "foo")
+	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+}
+
+func TestChangeOwnerFailGetNode(t *testing.T) {
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+
+	inputs := map[error]error{
+		errors.New("You are all individuals"): errors.New("You are all individuals"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+
+		nsmock.On("GetNode", uid).Return(nil, causeerr)
+	
+		err := bs.ChangeOwner(*auser, uid, "foo")
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
+
+
+func TestChangeOwnerFailUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	err := bs.ChangeOwner(*auser, nid, "foo")
+	expectederr := NewUnauthorizedACLError("Only the node owner can alter ACLs")
+	assert.Equal(t, expectederr, err, "incorrect error")
+}
+
+
+func TestAddAndRemoveReadersFailGetNewOwner(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("notowner", true)
+	no, _ := nodestore.NewUser(uuid.New(), "notowner")
+	nsmock.On("GetUser", "notowner").Return(no, nil)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("GetUser", "newown").Return(nil, errors.New("I've discharged my responsibilities"))
+
+	err := bs.ChangeOwner(*auser, nid, "newown")
+	assert.Equal(t, errors.New("I've discharged my responsibilities"), err, "incorrect error")
+}
+
+func TestChangeOwnerFailChangeOwner(t *testing.T) {
+	
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	newowner, _ := nodestore.NewUser(uuid.New(), "new")
+	
+	inputs := map[error]error{
+		errors.New("Now you discharge yours"):
+			errors.New("Now you discharge yours"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+	
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+		
+		nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+		tme := time.Now()
+		node, _ := nodestore.NewNode(nid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+		nsmock.On("GetNode", nid).Return(node, nil)
+
+		nsmock.On("GetUser", "new").Return(newowner, nil)
+		
+		nsmock.On("ChangeOwner", nid, *newowner).Return(causeerr)
+
+		err := bs.ChangeOwner(*auser, nid, "new")
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
