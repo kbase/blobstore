@@ -251,16 +251,67 @@ func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
 // SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool) error {
+	err := bs.writeok(user, id)
+	if err != nil {
+		return err
+	}
+	err = bs.nodeStore.SetNodePublic(id, public)
+	if err != nil {
+		return translateError(err)
+	}
+	return nil
+}
+
+func (bs *BlobStore) writeok(user auth.User, id uuid.UUID) error {
 	node, nodeuser, err := bs.getNode(&user, id)
 	if err != nil {
 		return err
 	}
 	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
-		return NewUnauthorizedACLError("Only the node owner can set the public node flag")
+		return NewUnauthorizedACLError("Only the node owner can alter ACLs")
 	}
-	err = bs.nodeStore.SetNodePublic(id, public)
+	return nil
+}
+
+// AddReaders adds readers to a node.
+// Has no effect if the user is the node's owner or the user is already in the read ACL.
+// Returns NoBlobError and UnauthorizedACLError.
+func (bs *BlobStore) AddReaders(user auth.User, id uuid.UUID, readerAccountNames []string) error {
+	return bs.alterReaders(user, id, readerAccountNames, true)
+}
+
+// RemoveReaders removes readers from a node.
+// Has no effect if the user is not already in the read ACL.
+// Returns NoBlobError and UnauthorizedACLError.
+func (bs *BlobStore) RemoveReaders(user auth.User, id uuid.UUID, readerAccountNames []string,
+) error {
+	return bs.alterReaders(user, id, readerAccountNames, false)
+}
+
+func (bs *BlobStore) alterReaders(
+	user auth.User,
+	id uuid.UUID,
+	readerAccountNames []string,
+	add bool,
+) error {
+	err := bs.writeok(user, id)
 	if err != nil {
-		return translateError(err)
+		return err
+	}
+	// errors at this point should be unusual since we've already fetched the node
+	for _, ran := range readerAccountNames {
+		u, err := bs.nodeStore.GetUser(ran)
+		if err != nil {
+			return err // errors should only occur for unusual situations here
+		}
+		if add {
+			err = bs.nodeStore.AddReader(id, *u)
+		} else {
+			err = bs.nodeStore.RemoveReader(id, *u)
+		}
+		if err != nil {
+			return translateError(err)
+		}
 	}
 	return nil
 }
