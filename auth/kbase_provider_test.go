@@ -67,6 +67,7 @@ func (t *TestSuite) setUpUsersAndRoles() {
 	t.createTestUser("noroles")
 	t.createTestUser("admin_std_role")
 	t.createTestUser("admin_kbase")
+	t.createTestUser("abc_123")
 
 	t.tokenNoRole = t.createTestToken("noroles")
 	t.tokenStdRole = t.createTestToken("admin_std_role")
@@ -222,7 +223,7 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 func (t *TestSuite) TestValidateUserName() {
 	tc := [][]string{
 		[]string{"   noroles  "},
-		[]string{"   noroles  ", "  \t   admin_std_role  \n"},
+		[]string{"   noroles  ", "  \t   admin_std_role  \n", "  abc_123   \n"},
 	}
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
@@ -246,6 +247,8 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 			errors.New("names in userNames array cannot be empty or whitespace only")},
 		tvun{&[]string{"noroles", "   foo   ", "admin_std_role", "   bar   "},
 			&InvalidUserError{&[]string{"foo", "bar"}}},
+		tvun{&[]string{"noroles", "   bad*user   ", "admin_std_role", "   bar   ", "0bad"},
+			&InvalidUserError{&[]string{"bad*user", "0bad"}}},
 	}
 
 	kb, err := NewKBaseProvider(*t.authURL)

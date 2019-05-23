@@ -7,13 +7,23 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	bserr "github.com/kbase/blobstore/errors"
 )
 
 //TODO CACHE token -> user & name -> valid
+
+const (
+	//https://github.com/kbase/auth2/blob/01a4d2c6e9bf8aff7d7f6eda78af47522ca158d8/src/us/kbase/auth2/lib/UserName.java#L39
+	nameInvalidChars = "[^a-z\\d_]+"
+)
+
+var nameRegex = regexp.MustCompile(nameInvalidChars)
 
 // KBaseProvider provides authentication based on the KBase auth server
 // (https://github.com/kbase/auth2)
@@ -156,29 +166,36 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 
 // ValidateUserNames validates that user names exist in the auth system.
 // If one or more users are invalid, InvalidUsersError is returned.
-// token can be any valid token - it's used only to look up the userName.
+// token can be any valid token - it's used only to look up the userNames.
 func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) error {
+	if strings.TrimSpace(token) == "" {
+		return bserr.WhiteSpaceError("token")
+	}
 	if userNames == nil || len(*userNames) < 1 {
 		return errors.New("userNames cannot be nil or empty")
 	}
 	names := []string{}
+	invalid := []string{}
 	for _, n := range *userNames {
 		n = strings.TrimSpace(n)
 		if n == "" {
 			return bserr.WhiteSpaceError("names in userNames array")
 		}
-		names = append(names, n) // don't modify input
-
+		if nameRegex.Match([]byte(n)) || !startsWithLetter(n) {
+			invalid = append(invalid, n)
+		} else {
+			names = append(names, n) // don't modify input
+		}
 	}
-	if strings.TrimSpace(token) == "" {
-		return bserr.WhiteSpaceError("token")
+	if len(invalid) > 0 {
+		// maybe a different error type here? Not actually checking all the names
+		return &InvalidUserError{&invalid}
 	}
 	u, _ := url.Parse(kb.endpointUser + strings.Join(names, ","))
 	userjson, err := get(*u, token)
 	if err != nil {
 		return err
 	}
-	invalid := []string{}
 	for _, n := range names {
 		if _, ok := userjson[n]; !ok {
 			invalid = append(invalid, n)
@@ -189,4 +206,9 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) er
 	}
 	// TODO CACHE return expiration time
 	return nil
+}
+
+func startsWithLetter(s string) bool {
+	r, _ := utf8.DecodeRuneInString(s)
+	return unicode.IsLetter(r)
 }
