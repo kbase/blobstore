@@ -524,7 +524,7 @@ func (t *TestSuite) TestRemoveNonReader() {
 	}
 }
 
-func (t *TestSuite) TestFailAddReaderNoNode() {
+func (t *TestSuite) TestAddReaderFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
@@ -538,7 +538,7 @@ func (t *TestSuite) TestFailAddReaderNoNode() {
 	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
 }
 
-func (t *TestSuite) TestFailRemoveReaderNoNode() {
+func (t *TestSuite) TestRemoveReaderFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
@@ -549,6 +549,59 @@ func (t *TestSuite) TestFailRemoveReaderNoNode() {
 
 	nid := uuid.New()
 	err = mns.RemoveReader(nid, *own)
+	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+}
+
+func (t *TestSuite) TestChangeOwner() {
+	// tests that user is removed from the read acl if made owner
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	newown, _ := NewUser(uuid.New(), "newowner")
+	nid := uuid.New()
+	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	err = mns.AddReader(nid, *newown)
+	t.Nil(err, "expected no error")
+	node, err := mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+
+	tme := node.GetStoredTime()
+	
+	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*newown))
+	t.Equal(expected, node, "incorrect node")
+
+	// test that changing to the current owner has no effect
+	err = mns.ChangeOwner(nid, *own)
+	node, err = mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+	t.Equal(expected, node, "incorrect node")
+	
+	// actually change the owner
+	err = mns.ChangeOwner(nid, *newown)
+	t.Nil(err, "expected no error")
+	node, err = mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+	
+	expected, _= NewNode(nid, *newown, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	t.Equal(expected, node, "incorrect node")
+}
+
+func (t *TestSuite) TestChangeOwnerFailNoNode() {
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	nid := uuid.New()
+	newown, _ := NewUser(uuid.New(), "newowner")
+	err = mns.ChangeOwner(nid, *newown)
 	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
 }
 

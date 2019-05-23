@@ -276,12 +276,14 @@ func (s *MongoNodeStore) DeleteNode(id uuid.UUID) error {
 // SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 // Returns NoNodeError if the node does not exist.
 func (s *MongoNodeStore) SetNodePublic(id uuid.UUID, public bool) error {
-	res, err := s.db.Collection(colNodes).UpdateOne(
-		nil,
-		nodeFilter(id),
-		map[string]interface{}{"$set": map[string]interface{}{keyNodesPublic: public}})
+	update := map[string]interface{}{"$set": map[string]interface{}{keyNodesPublic: public}}
+	return s.updateNode(id, update, "set node public")
+}
+
+func (s *MongoNodeStore) updateNode(id uuid.UUID, update map[string]interface{}, op string) error {
+	res, err := s.db.Collection(colNodes).UpdateOne(nil, nodeFilter(id), update)
 	if err != nil {
-		return errors.New("mongostore set node public: " + err.Error()) // dunno how to test this
+		return errors.New("mongostore " + op + ": " + err.Error()) // dunno how to test this
 	}
 	if res.MatchedCount < 1 {
 		return NewNoNodeError("No such node " + id.String())
@@ -326,16 +328,24 @@ func (s *MongoNodeStore) AddReader(id uuid.UUID, user User) error {
 // Has no effect if the user is not in the read ACL.
 // Returns NoNodeError if the node does not exist.
 func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
+	updatedoc := map[string]interface{}{
+		"$pull": map[string]interface{}{keyNodesReaders: toUserDoc(user)},
+	}
+	return s.updateNode(id, updatedoc, "remove reader")
+}
+
+// ChangeOwner changes the owner of a node.
+// The caller is responsible for ensuring the user is valid - retrieving the user via
+// GetUser() is the proper way to do so.
+// If the new owner is in the read ACL, the new owner will be removed.
+// Setting the new owner to the current owner has no effect.
+// Returns NoNodeError if the node does not exist.
+func (s *MongoNodeStore) ChangeOwner(id uuid.UUID, user User) error {
 	userdoc := toUserDoc(user)
 	updatedoc := map[string]interface{}{
+		"$set":  map[string]interface{}{keyNodesOwner: userdoc},
 		"$pull": map[string]interface{}{keyNodesReaders: userdoc},
 	}
-	res, err := s.db.Collection(colNodes).UpdateOne(nil, nodeFilter(id), updatedoc)
-	if err != nil {
-		return errors.New("mongostore add reader: " + err.Error()) // dunno how to test this
-	}
-	if res.MatchedCount < 1 {
-		return NewNoNodeError("No such node " + id.String())
-	}
-	return nil
+	return s.updateNode(id, updatedoc, "change owner")
+
 }
