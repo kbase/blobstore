@@ -25,6 +25,20 @@ func (_m *NodeStore) AddReader(id uuid.UUID, user nodestore.User) error {
 	return r0
 }
 
+// ChangeOwner provides a mock function with given fields: id, user
+func (_m *NodeStore) ChangeOwner(id uuid.UUID, user nodestore.User) error {
+	ret := _m.Called(id, user)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uuid.UUID, nodestore.User) error); ok {
+		r0 = rf(id, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteNode provides a mock function with given fields: id
 func (_m *NodeStore) DeleteNode(id uuid.UUID) error {
 	ret := _m.Called(id)

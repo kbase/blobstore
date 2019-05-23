@@ -171,21 +171,27 @@ func (e *NoNodeError) Error() string {
 
 // NodeStore stores node information.
 type NodeStore interface {
+
 	// GetUser gets a user. If the user does not exist in the system, a new ID will be assigned
 	// to the user.
 	GetUser(accountName string) (*User, error)
+
 	// StoreNode stores a node.
 	// The caller is responsible for ensuring any users are valid - retrieving users via
 	// GetUser() is the proper way to do so.
 	// Attempting to store Nodes with the same ID is an error.
 	StoreNode(node *Node) error
+
 	// GetNode gets a node. Returns NoNodeError if the node does not exist.
 	GetNode(id uuid.UUID) (*Node, error)
+
 	// DeleteNode deletes a node. Returns NoNodeError if the node does not exist.
 	DeleteNode(id uuid.UUID) error
+
 	// SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 	// Returns NoNodeError if the node does not exist.
 	SetNodePublic(id uuid.UUID, public bool) error
+
 	// adding and removing readers one at a time isn't efficient, but that's by far the most
 	// common use case so that's all we support for now. Optimize later.
 
@@ -195,9 +201,17 @@ type NodeStore interface {
 	// Has no effect if the user is the node's owner or the user is already in the read ACL.
 	// Returns NoNodeError if the node does not exist.
 	AddReader(id uuid.UUID, user User) error
+
 	// RemoveReader removes a user from the node's read ACL.
 	// Has no effect if the user is not in the read ACL.
 	// Returns NoNodeError if the node does not exist.
 	RemoveReader(id uuid.UUID, user User) error
-	//TODO NODE ChangeOwner
+
+	// ChangeOwner changes the owner of a node.
+	// The caller is responsible for ensuring the user is valid - retrieving the user via
+	// GetUser() is the proper way to do so.
+	// If the new owner is in the read ACL, the new owner will be removed.
+	// Setting the new owner to the current owner has no effect.
+	// Returns NoNodeError if the node does not exist.
+	ChangeOwner(id uuid.UUID, user User) error
 }
