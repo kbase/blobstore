@@ -280,7 +280,7 @@ func (bs *BlobStore) AddReaders(user auth.User, id uuid.UUID, readerAccountNames
 	return bs.alterReaders(user, id, readerAccountNames, true)
 }
 
-// RemoveReaders removes readers to a node.
+// RemoveReaders removes readers from a node.
 // Has no effect if the user is already in the read ACL.
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) RemoveReaders(user auth.User, id uuid.UUID, readerAccountNames []string,
