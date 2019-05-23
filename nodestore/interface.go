@@ -175,6 +175,8 @@ type NodeStore interface {
 	// to the user.
 	GetUser(accountName string) (*User, error)
 	// StoreNode stores a node.
+	// The caller is responsible for ensuring any users are valid - retrieving users via
+	// GetUser() is the proper way to do so.
 	// Attempting to store Nodes with the same ID is an error.
 	StoreNode(node *Node) error
 	// GetNode gets a node. Returns NoNodeError if the node does not exist.
@@ -184,6 +186,18 @@ type NodeStore interface {
 	// SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 	// Returns NoNodeError if the node does not exist.
 	SetNodePublic(id uuid.UUID, public bool) error
-	//TODO NODE AddReader, RemoveReader
+	// adding and removing readers one at a time isn't efficient, but that's by far the most
+	// common use case so that's all we support for now. Optimize later.
 
+	// AddReader adds a user to a node's read ACL.
+	// The caller is responsible for ensuring the user is valid - retrieving the user via
+	// GetUser() is the proper way to do so.
+	// Has no effect if the user is the node's owner or the user is already in the read ACL.
+	// Returns NoNodeError if the node does not exist.
+	AddReader(id uuid.UUID, user User) error
+	// RemoveReader removes a user from the node's read ACL.
+	// Has no effect if the user is not in the read ACL.
+	// Returns NoNodeError if the node does not exist.
+	RemoveReader(id uuid.UUID, user User) error
+	//TODO NODE ChangeOwner
 }
