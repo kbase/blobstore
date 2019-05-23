@@ -315,3 +315,22 @@ func (bs *BlobStore) alterReaders(
 	}
 	return nil
 }
+
+// ChangeOwner changes the owner of a node.
+// If the new owner is in the read ACL, the new owner will be removed.
+// Setting the new owner to the current owner has no effect.
+// Returns NoBlobError and UnauthorizedACLError.
+func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string) error {
+	err := bs.writeok(user, id)
+	if err != nil {
+		return err
+	}
+	u, err := bs.nodeStore.GetUser(newowner)
+	if err != nil {
+		return err // errors should only occur for unusual situations here
+	}
+	if err = bs.nodeStore.ChangeOwner(id, *u); err != nil {
+		return translateError(err)
+	}
+	return nil
+}
