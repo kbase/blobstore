@@ -157,26 +157,26 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 // ValidateUserNames validates that user names exist in the auth system.
 // If one or more users are invalid, InvalidUsersError is returned.
 // token can be any valid token - it's used only to look up the userName.
-func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (bool, error) {
+func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) error {
 	if userNames == nil || len(*userNames) < 1 {
-		return false, errors.New("userNames cannot be nil or empty")
+		return errors.New("userNames cannot be nil or empty")
 	}
 	names := []string{}
 	for _, n := range *userNames {
 		n = strings.TrimSpace(n)
 		if n == "" {
-			return false, bserr.WhiteSpaceError("names in userNames array")
+			return bserr.WhiteSpaceError("names in userNames array")
 		}
 		names = append(names, n) // don't modify input
 
 	}
 	if strings.TrimSpace(token) == "" {
-		return false, bserr.WhiteSpaceError("token")
+		return bserr.WhiteSpaceError("token")
 	}
 	u, _ := url.Parse(kb.endpointUser + strings.Join(names, ","))
 	userjson, err := get(*u, token)
 	if err != nil {
-		return false, err
+		return err
 	}
 	invalid := []string{}
 	for _, n := range names {
@@ -185,8 +185,8 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (b
 		}
 	}
 	if len(invalid) > 0 {
-		return false, &InvalidUserError{&invalid}
+		return &InvalidUserError{&invalid}
 	}
 	// TODO CACHE return expiration time
-	return true, nil
+	return nil
 }
