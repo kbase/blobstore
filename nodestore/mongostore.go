@@ -330,9 +330,7 @@ func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
 	updatedoc := map[string]interface{}{
 		"$pull": map[string]interface{}{keyNodesReaders: userdoc},
 	}
-	filterdoc := map[string]interface{}{keyNodesID: id.String()}
-
-	res, err := s.db.Collection(colNodes).UpdateOne(nil, filterdoc, updatedoc)
+	res, err := s.db.Collection(colNodes).UpdateOne(nil, nodeFilter(id), updatedoc)
 	if err != nil {
 		return errors.New("mongostore add reader: " + err.Error()) // dunno how to test this
 	}
