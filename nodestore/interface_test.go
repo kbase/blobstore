@@ -172,6 +172,11 @@ func TestNodeWithOwner(t *testing.T) {
 	assert.Equal(t, *owner, n.GetOwner(), "incorrect owner")
 	assert.Equal(t, &[]User{*owner, *r1}, n.GetReaders(), "incorrect readers")
 
+	// test with new owner = owner
+	no := n.WithOwner(*owner)
+	assert.Equal(t, n, no, "incorrect node")
+	assert.Equal(t, &[]User{*owner, *r1}, no.GetReaders(), "incorrect readers")
+
 	// test with new owner already in read list
 	n2, _ := NewNode(
 		nid,
@@ -248,11 +253,11 @@ func TestNodeWithoutReaders(t *testing.T) {
 		Reader(*r1), Reader(*r3),
 		)
 
-		n2 := n.WithoutReaders(*r2, *owner)
-		assert.Equal(t, expected, n2, "incorrect node")
-		assert.Equal(t, &[]User{*owner, *r1, *r3}, n2.GetReaders(), "incorrect readers")
-		// check orignal node unchanged
-		assert.Equal(t, &[]User{*owner, *r1, *r2, *r3}, n.GetReaders(), "incorrect readers")
+	n2 := n.WithoutReaders(*r2, *owner)
+	assert.Equal(t, expected, n2, "incorrect node")
+	assert.Equal(t, &[]User{*owner, *r1, *r3}, n2.GetReaders(), "incorrect readers")
+	// check orignal node unchanged
+	assert.Equal(t, &[]User{*owner, *r1, *r2, *r3}, n.GetReaders(), "incorrect readers")
 }
 
 func TestNodeHasReader(t *testing.T) {
