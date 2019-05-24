@@ -82,7 +82,7 @@ func Public(public bool) func(*Node) error {
 	}
 }
 
-// NewNode creates a new node.
+// NewNode creates a new node. The owner is automatically added to the reader list.
 func NewNode(
 	id uuid.UUID,
 	owner User,
@@ -95,8 +95,7 @@ func NewNode(
 		return nil, errors.New("size must be > 0")
 	}
 	//TODO INPUT check valid MD5
-	//TODO INPUT use a set intead of a list for readers, or at least ensure no dupes
-	r := []User(nil)
+	r := []User{}
 	n := &Node{id: id, owner: owner, size: size, md5: md5, stored: stored, readers: &r}
 
 	for _, option := range options {
@@ -107,6 +106,15 @@ func NewNode(
 		// 	return nil, err
 		// }
 	}
+	rclean := []User{owner}
+	seen := map[User]struct{}{owner: struct{}{}}
+	for _, u := range *n.readers {
+		if _, ok := seen[u]; !ok {
+			rclean = append(rclean, u)
+		}
+		seen[u] = struct{}{}
+	}
+	n.readers = &rclean
 	return n, nil
 }
 
@@ -198,19 +206,19 @@ type NodeStore interface {
 	// AddReader adds a user to a node's read ACL.
 	// The caller is responsible for ensuring the user is valid - retrieving the user via
 	// GetUser() is the proper way to do so.
-	// Has no effect if the user is the node's owner or the user is already in the read ACL.
+	// Has no effect if the user is already in the read ACL.
 	// Returns NoNodeError if the node does not exist.
 	AddReader(id uuid.UUID, user User) error
 
 	// RemoveReader removes a user from the node's read ACL.
-	// Has no effect if the user is not in the read ACL.
+	// Has no effect if the user is not in the read ACL or is the node owner.
 	// Returns NoNodeError if the node does not exist.
 	RemoveReader(id uuid.UUID, user User) error
 
 	// ChangeOwner changes the owner of a node.
 	// The caller is responsible for ensuring the user is valid - retrieving the user via
 	// GetUser() is the proper way to do so.
-	// If the new owner is in the read ACL, the new owner will be removed.
+	// Adds the new owner to the the read acl.
 	// Setting the new owner to the current owner has no effect.
 	// Returns NoNodeError if the node does not exist.
 	ChangeOwner(id uuid.UUID, user User) error

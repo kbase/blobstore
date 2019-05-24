@@ -483,7 +483,7 @@ func fromNodeToACL(node *core.BlobNode, verbose bool) map[string]interface{} {
 		"owner":  o,
 		"delete": []interface{}{o},
 		"write":  []interface{}{o},
-		"read":   toUsers(o, node.Readers, verbose),
+		"read":   toUsers(node.Readers, verbose),
 		"public": map[string]bool{
 			"write":  false,
 			"delete": false,
@@ -492,8 +492,8 @@ func fromNodeToACL(node *core.BlobNode, verbose bool) map[string]interface{} {
 	}
 }
 
-func toUsers(owner interface{}, users *[]core.User, verbose bool) []interface{} {
-	ulist := &[]interface{}{owner}
+func toUsers(users *[]core.User, verbose bool) []interface{} {
+	ulist := &[]interface{}{}
 	for _, u := range *users {
 		*ulist = append(*ulist, toUser(u, verbose))
 	}

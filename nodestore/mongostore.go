@@ -180,6 +180,8 @@ func toUserDocCreate(id uuid.UUID, accountName string) bson.D {
 }
 
 // StoreNode stores a node.
+// The caller is responsible for ensuring any users are valid - retrieving users via
+// GetUser() is the proper way to do so.
 // Attempting to store Nodes with the same ID is an error.
 func (s *MongoNodeStore) StoreNode(node *Node) error {
 	if node == nil {
@@ -210,7 +212,7 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 	return nil
 }
 
-// GetNode gets a node.
+// GetNode gets a node. Returns NoNodeError if the node does not exist.
 func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 	res := s.db.Collection(colNodes).FindOne(nil, nodeFilter(id))
 	if res.Err() != nil {
@@ -294,27 +296,36 @@ func (s *MongoNodeStore) updateNode(id uuid.UUID, update map[string]interface{},
 // AddReader adds a user to a node's read ACL.
 // The caller is responsible for ensuring the user is valid - retrieving the user via
 // GetUser() is the proper way to do so.
-// Has no effect if the user is the node's owner or the user is already in the read ACL.
+// Has no effect if the user is already in the read ACL.
 // Returns NoNodeError if the node does not exist.
 func (s *MongoNodeStore) AddReader(id uuid.UUID, user User) error {
+	updatedoc := map[string]interface{}{
+		"$addToSet": map[string]interface{}{keyNodesReaders: toUserDoc(user)},
+	}
+	return s.updateNode(id, updatedoc, "add reader")
+}
+
+// RemoveReader removes a user from the node's read ACL.
+// Has no effect if the user is not in the read ACL or is the node owner.
+// Returns NoNodeError if the node does not exist.
+func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
 	userdoc := toUserDoc(user)
 	updatedoc := map[string]interface{}{
-		"$addToSet": map[string]interface{}{keyNodesReaders: userdoc},
+		"$pull": map[string]interface{}{keyNodesReaders: userdoc},
 	}
 	filterdoc := map[string]interface{}{
 		keyNodesID:    id.String(),
 		keyNodesOwner: map[string]interface{}{"$ne": userdoc},
 	}
-
 	res, err := s.db.Collection(colNodes).UpdateOne(nil, filterdoc, updatedoc)
 	if err != nil {
-		return errors.New("mongostore add reader: " + err.Error()) // dunno how to test this
+		return errors.New("mongostore remove reader: " + err.Error()) // dunno how to test this
 	}
 	if res.MatchedCount < 1 {
 		c, err := s.db.Collection(colNodes).CountDocuments(nil, nodeFilter(id))
 		if err != nil {
 			// dunno how to test this
-			return errors.New("mongostore set node public count: " + err.Error())
+			return errors.New("mongostore remove reader count: " + err.Error())
 		}
 		if c < 1 {
 			return NewNoNodeError("No such node " + id.String())
@@ -324,27 +335,17 @@ func (s *MongoNodeStore) AddReader(id uuid.UUID, user User) error {
 	return nil
 }
 
-// RemoveReader removes a user from the node's read ACL.
-// Has no effect if the user is not in the read ACL.
-// Returns NoNodeError if the node does not exist.
-func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
-	updatedoc := map[string]interface{}{
-		"$pull": map[string]interface{}{keyNodesReaders: toUserDoc(user)},
-	}
-	return s.updateNode(id, updatedoc, "remove reader")
-}
-
 // ChangeOwner changes the owner of a node.
 // The caller is responsible for ensuring the user is valid - retrieving the user via
 // GetUser() is the proper way to do so.
-// If the new owner is in the read ACL, the new owner will be removed.
+// Adds the new owner the the read acl.
 // Setting the new owner to the current owner has no effect.
 // Returns NoNodeError if the node does not exist.
 func (s *MongoNodeStore) ChangeOwner(id uuid.UUID, user User) error {
 	userdoc := toUserDoc(user)
 	updatedoc := map[string]interface{}{
 		"$set":  map[string]interface{}{keyNodesOwner: userdoc},
-		"$pull": map[string]interface{}{keyNodesReaders: userdoc},
+		"$addToSet": map[string]interface{}{keyNodesReaders: userdoc},
 	}
 	return s.updateNode(id, updatedoc, "change owner")
 

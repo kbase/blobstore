@@ -36,7 +36,7 @@ func TestNewNodeMin(t *testing.T) {
 		)
 	assert.Nil(t, err, "unexpected error")
 
-	readers := []User(nil)
+	readers := []User{*owner}
 	assert.Equal(t, id, n.GetID(), "incorrect ID")
 	assert.Equal(t, *owner, n.GetOwner(), "incorrect owner")
 	assert.Equal(t, int64(67), n.GetSize(), "incorrect size")
@@ -63,11 +63,11 @@ func TestNewNodeFull(t *testing.T) {
 		Format("    txt   "),
 		FileName("   file.txt   "),
 		Public(true),
-		Reader(*r1), Reader(*r2),
+		Reader(*r1), Reader(*r2), Reader(*r1), Reader(*owner), // test duplicates are removed
 		)
 	assert.Nil(t, err, "unexpected error")
 
-	readers := []User{*r1, *r2}
+	readers := []User{*owner, *r1, *r2}
 	assert.Equal(t, id, n.GetID(), "incorrect ID")
 	assert.Equal(t, *owner, n.GetOwner(), "incorrect owner")
 	assert.Equal(t, int64(67), n.GetSize(), "incorrect size")
@@ -93,7 +93,7 @@ func TestNodeImmutable(t *testing.T) {
 		)
 	
 	// this test isn't really failsafe since it's not clear when append returns a new slice
-	readers := []User{*r1}
+	readers := []User{*owner, *r1}
 	_ = append(*n.GetReaders(), *r2)
 	assert.Equal(t, &readers, n.GetReaders(), "incorrect readers")
 }
