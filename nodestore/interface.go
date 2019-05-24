@@ -128,6 +128,19 @@ func (n *Node) GetOwner() User {
 	return n.owner
 }
 
+// WithOwner returns a copy of the node with the owner as specified.
+// The new owner will also be added to the readers list.
+func (n *Node) WithOwner(user User) *Node {
+	readers := []User{user}
+	for _, r := range *n.readers {
+		if r != user {
+			readers = append(readers, r)
+		}
+	}
+	return &Node{n.id, user, &readers, n.filename, n.format, n.size, n.md5, n.stored, n.public}
+
+}
+
 // GetSize returns the size of the file associated with the node.
 func (n *Node) GetSize() int64 {
 	return n.size
@@ -155,13 +168,68 @@ func (n *Node) GetFormat() string {
 
 // GetReaders gets the IDs of users that may read the node.
 func (n *Node) GetReaders() *[]User {
-	r := append([]User(nil), *n.readers...)
-	return &r
+	return n.copyReaders()
+}
+
+// HasReader returns true if the given user exists in the node's list of readers.
+func (n *Node) HasReader(user User) bool {
+	for _, r := range *n.readers {
+		if r == user {
+			return true
+		}
+	}
+	return false
+}
+
+// WithReaders returns a copy of the node with the sepecified readers added.
+func (n *Node) WithReaders(readers ...User) *Node {
+	rdrs := []User{}
+	rs := map[User]struct{}{}
+	for _, r := range *n.readers {
+		rs[r] = struct{}{}
+		rdrs = append(rdrs, r)
+	}
+	for _, r := range readers {
+		if _, ok := rs[r]; !ok {
+			rdrs = append(rdrs, r)
+		}
+	}
+	return &Node{n.id, n.owner, &rdrs, n.filename, n.format, n.size, n.md5, n.stored, n.public}
+}
+
+// WithoutReaders returns a copy of the node without the sepecified readers.
+// If any of the readers are the node's owner, they are not removed from the list.
+func (n *Node) WithoutReaders(readers ...User) *Node {
+	rs := map[User]struct{}{}
+	for _, r := range readers {
+		rs[r] = struct{}{}
+	}
+	clean := []User{}
+	for _, r := range *n.readers {
+		if r == n.owner {
+			clean = append(clean, r)
+		} else if _, ok := rs[r]; !ok {
+			clean = append(clean, r)
+		}
+	}
+	return &Node{n.id, n.owner, &clean, n.filename, n.format, n.size, n.md5, n.stored, n.public}
 }
 
 // GetPublic gets whether the node is publicly readable or not.
 func (n *Node) GetPublic() bool {
 	return n.public
+}
+
+func (n *Node) copyReaders() *[]User {
+	r := make([]User, len(*n.readers))
+	copy(r, *n.readers)
+	return &r
+}
+
+// WithPublic returns a copy of the node with the public flag set as specified.
+func (n *Node) WithPublic(public bool) *Node {
+	return &Node{n.id, n.owner, n.copyReaders(), n.filename, n.format, n.size, n.md5, n.stored,
+		public}
 }
 
 // NoNodeError is returned when a node doesn't exist.
