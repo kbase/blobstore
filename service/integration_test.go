@@ -766,7 +766,7 @@ func (t *TestSuite) TestGetACLs() {
 		"status": float64(200),
 	}
 
-	for _, urlsuffix := range []string{"", "/read", "/write", "/delete",
+	for _, urlsuffix := range []string{"", "/owner", "/read", "/write", "/delete",
 		"/public_read", "/public_write", "/public_delete"} {
 
 		t.checkACL(id, urlsuffix, "", &t.noRole, 395, expected)
@@ -812,7 +812,7 @@ func (t *TestSuite) TestGetACLAsAdminVerbose() {
 		"status": float64(200),
 	}
 
-	for _, urlsuffix := range []string{"", "/read", "/write", "/delete",
+	for _, urlsuffix := range []string{"", "/owner", "/read", "/write", "/delete",
 		"/public_read", "/public_write", "/public_delete"} {
 
 		t.checkACL(id, urlsuffix, "?verbosity=full", &t.kBaseAdmin, 617, expectedverbose)
@@ -830,6 +830,7 @@ contentLength int64, expected map[string]interface{}) {
 	t.Equal(expected, body, "incorrect return")
 }
 
+// TODO TEST need to check errors for logs below this line
 func (t *TestSuite) TestGetACLsBadType() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
@@ -1185,7 +1186,6 @@ func getExpectedACL(owner map[string]interface{}, readers []map[string]interface
 
 }
 
-
 func (t *TestSuite) TestSetReadACLsFail() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -1220,7 +1220,6 @@ func (t *TestSuite) TestSetReadACLsFail() {
 			"Invalid users: fakename, fakename2", 95},
 		testcase{"DELETE", id + "/acl/read?users=fakename,fakename2", t.noRole.token, 400,
 			"Invalid users: fakename, fakename2", 95},
-
 		testcase{"PUT", badid + "/acl/read?users=" + t.noRole2.user, t.noRole.token, 404,
 			"Node not found", 75},
 		testcase{"DELETE", badid + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 404,
@@ -1228,6 +1227,122 @@ func (t *TestSuite) TestSetReadACLsFail() {
 		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
 			notown, 129},
 		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
+			notown, 129},
+	}
+
+	for _, tc := range testcases {
+		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		t.checkError(body, tc.status, tc.errstring)
+	}
+}
+
+func (t *TestSuite) TestChangeOwner() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	uid := t.getUserIDFromMongo(t.noRole.user)
+	t.loggerhook.Reset()
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	id := data["id"].(string)
+	
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	owner := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+
+	// check no readers and non-admins can't read
+	t.checkACL(id, "", "", &t.noRole, 395, getExpectedACL(owner, []map[string]interface{}{},false))
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.loggerhook.Reset()
+
+	// change owner. Also check whitespace is ignored.
+	body = t.req("PUT", t.url + "/node/" + id + "/acl/owner?users=%20%20,%20%20%20,%20%20" +
+		t.noRole2.user + "%20%20,%20%20", nil, t.noRole.token, 441)
+	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/owner", 200,
+		&t.noRole.user, "request complete", mtmap(), false},
+	)
+	
+	u2 := map[string]interface{}{
+		"uuid": t.getUserIDFromMongo(t.noRole2.user),
+		"username": t.noRole2.user,
+	}
+	expectedACL := getExpectedACL(u2, []map[string]interface{}{owner}, false)
+	t.Equal(expectedACL, body, "incorrect acls")
+
+	t.checkNode(id, &t.noRole2, 374, expected)
+	t.checkACL(id, "", "", &t.noRole2, 441, expectedACL)
+	t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, &t.noRole2, 9, id,
+		[]byte("foobarbaz"))
+	t.loggerhook.Reset()
+
+	// change owner as admin with verbose response and trailing slash
+	body = t.req("PUT", t.url + "/node/" + id + "/acl/owner/?verbosity=full;users=" +
+		t.noRole.user, nil, t.stdRole.token, 721)
+	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/owner/", 200,
+		&t.stdRole.user, "request complete", mtmap(), false},
+	)
+	expectedACL = getExpectedACL(owner, []map[string]interface{}{u2}, true)
+	t.Equal(expectedACL, body, "incorrect acls")
+
+	t.checkNode(id, &t.noRole, 374, expected)
+	t.checkACL(id, "", "?verbosity=full", &t.noRole, 721, expectedACL)
+	t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, &t.noRole, 9, id,
+		[]byte("foobarbaz"))
+	t.loggerhook.Reset()
+}
+
+func (t *TestSuite) TestChangeOwnerFail() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	type testcase struct {
+		method string
+		urlsuffix string
+		token string
+		status int
+		errstring string
+		conlen int64
+	}
+
+	notown := "Users that are not node owners can only delete themselves from ACLs."
+	nousers := "Action requires list of comma separated usernames in 'users' parameter"
+	invauth := "Invalid authorization header or content"
+	delown := "Deleting ownership is not a supported request type."
+	toomany := "Too many users. Nodes may have only one owner."
+	badid := uuid.New().String()
+	testcases := []testcase{
+		testcase{"PUT", id + "/acl/ownah", "", 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/ownah", "", 400, "Invalid acl type", 77},
+		testcase{"PUT", "/badid/acl/owner/", "", 404, "Node not found", 75},
+		testcase{"DELETE", "/worseid/acl/owner", "", 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/owner", "", 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/owner/", "", 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/owner/", "badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", "badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", t.noRole.token, 400, delown, 112},
+		testcase{"PUT", id + "/acl/owner?users=%20%20,%20%09%20%20,%20", t.noRole.token, 400,
+			nousers, 131},
+		testcase{"PUT", id + "/acl/owner?users=" + t.noRole2.user + "," + t.noRole3.user,
+			t.noRole.token, 400, toomany, 107},
+		testcase{"PUT", id + "/acl/read?users=fakename", t.noRole.token, 400,
+			"Invalid users: fakename", 84},
+		testcase{"PUT", badid + "/acl/owner?users=" + t.noRole2.user, t.noRole.token, 404,
+			"Node not found", 75},
+		testcase{"PUT", id + "/acl/owner/?users=" + t.noRole2.user, t.noRole.token, 400,
 			notown, 129},
 	}
 

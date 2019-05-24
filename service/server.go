@@ -90,8 +90,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
 	//TODO DELETE handle node delete
-	//TODO ACLs handle node acls
-	// TODO ACLS chown node
 	// TODO DOCKER and docker-compose-up
 	return s, nil
 }
@@ -334,9 +332,9 @@ func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
 }
 
-// TODO ACL add owner
 var aclTypes = map[string]struct{}{
 	"":              struct{}{},
+	"owner":         struct{}{},
 	"read":          struct{}{},
 	"write":         struct{}{},
 	"delete":        struct{}{},
@@ -386,6 +384,7 @@ func (s *Server) removeNodeACL(w http.ResponseWriter, r *http.Request) {
 	s.setNodeACL(w, r, false)
 }
 
+// maybe break this up. not hard to read though.
 func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 	le := getLogger(r)
 	id, acltype, err := getACLParams(le, w, r)
@@ -402,8 +401,9 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 			writeError(le, err, w)
 			return
 		}
+		// TODO ACL allow delete self
 	} else if acltype == "read" {
-		users, err := s.getUserList(le, w, r)
+		users, err := s.getUserList(le, w, r, false)
 		if err != nil {
 			return
 		}
@@ -412,6 +412,20 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 		} else {
 			err = s.store.RemoveReaders(*user, *id, *users)
 		}
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+	} else if acltype == "owner" {
+		if !add {
+			writeErrorWithCode(le, "Deleting ownership is not a supported request type.", 400, w)
+			return
+		}
+		users, err := s.getUserList(le, w, r, true)
+		if err != nil {
+			return
+		}
+		err = s.store.ChangeOwner(*user, *id, (*users)[0])
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -432,8 +446,13 @@ func getUserRequired(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
 }
 
 const noUsersError = "Action requires list of comma separated usernames in 'users' parameter"
+const tooManyUsersError = "Too many users. Nodes may have only one owner."
 
-func (s *Server) getUserList(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
+func (s *Server) getUserList(
+	le *logrus.Entry,
+	w http.ResponseWriter,
+	r *http.Request,
+	singleUser bool,
 ) (*[]string, error) {
 	ul := getQuery(r.URL, "users")
 	uls := strings.Split(ul, ",")
@@ -447,6 +466,10 @@ func (s *Server) getUserList(le *logrus.Entry, w http.ResponseWriter, r *http.Re
 	if len(ulst) < 1 {
 		writeErrorWithCode(le, noUsersError, 400, w)
 		return nil, errors.New(noUsersError)
+	}
+	if singleUser && len(ulst) > 1 {
+		writeErrorWithCode(le, tooManyUsersError, 400, w)
+		return nil, errors.New(tooManyUsersError)
 	}
 	err := s.auth.ValidateUserNames(&ulst, getToken(r))
 	if err != nil {
