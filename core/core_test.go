@@ -80,7 +80,7 @@ func TestStoreBasic(t *testing.T) {
 		Filename: "",
 		Format: "",
 		Owner: User{userid, "username"},
-		Readers: &[]User{},
+		Readers: &[]User{User{userid, "username"}},
 		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
@@ -139,7 +139,7 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		Filename: "myfile",
 		Format: "excel",
 		Owner: User{userid, "username"},
-		Readers: &[]User{},
+		Readers: &[]User{User{userid, "username"}},
 		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
@@ -297,7 +297,7 @@ func TestGetAsOwner(t *testing.T) {
 		Filename: "fn",
 		Format: "json",
 		Owner: User{userid, "username"},
-		Readers: &[]User{},
+		Readers: &[]User{User{userid, "username"}},
 		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
@@ -337,7 +337,7 @@ func TestGetAsReader(t *testing.T) {
 		Filename: "",
 		Format: "",
 		Owner: User{nid, "username"},
-		Readers: &[]User{User{oid, "other"}, User{rid, "reader"}},
+		Readers: &[]User{User{nid, "username"}, User{oid, "other"}, User{rid, "reader"}},
 		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
@@ -375,7 +375,7 @@ func TestGetAsAdmin(t *testing.T) {
 		Filename: "",
 		Format: "",
 		Owner: User{nid, "username"},
-		Readers: &[]User{User{oid, "other"}},
+		Readers: &[]User{User{nid, "username"}, User{oid, "other"}},
 		Public: false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
@@ -409,7 +409,7 @@ func TestGetPublic(t *testing.T) {
 		Filename: "",
 		Format: "",
 		Owner: User{nid, "username"},
-		Readers: &[]User{},
+		Readers: &[]User{User{nid, "username"}},
 		Public: true,
 	}
 	bnode, err := bs.Get(nil, uid)

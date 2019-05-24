@@ -463,6 +463,27 @@ func (t *TestSuite) TestAddOwnerAsReader() {
 	t.Equal(expected, node, "incorrect node")
 }
 
+func (t *TestSuite) TestRemoveOwnerAsReader() {
+	// expect no change to the node and no error
+	mns, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "expected no error")
+	own, _ := NewUser(uuid.New(), "owner")
+	nid := uuid.New()
+	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+
+	err = mns.StoreNode(n)
+	t.Nil(err, "expected no error")
+
+	err = mns.RemoveReader(nid, *own)
+	t.Nil(err, "expected no error")
+
+	node, err := mns.GetNode(nid)
+	t.Nil(err, "expected no error")
+
+	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", node.GetStoredTime())
+	t.Equal(expected, node, "incorrect node")
+}
+
 func (t *TestSuite) TestAddReaderTwice() {
 	// expect no change to the node and no error
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
@@ -553,7 +574,7 @@ func (t *TestSuite) TestRemoveReaderFailNoNode() {
 }
 
 func (t *TestSuite) TestChangeOwner() {
-	// tests that user is removed from the read acl if made owner
+	// tests that user is added to the read acl if made owner
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
@@ -564,14 +585,12 @@ func (t *TestSuite) TestChangeOwner() {
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
 
-	err = mns.AddReader(nid, *newown)
-	t.Nil(err, "expected no error")
 	node, err := mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 
 	tme := node.GetStoredTime()
 	
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*newown))
+	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
 	t.Equal(expected, node, "incorrect node")
 
 	// test that changing to the current owner has no effect
@@ -586,7 +605,7 @@ func (t *TestSuite) TestChangeOwner() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	
-	expected, _= NewNode(nid, *newown, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	expected, _= NewNode(nid, *newown, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*own))
 	t.Equal(expected, node, "incorrect node")
 }
 
