@@ -395,8 +395,9 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 	if err != nil {
 		return
 	}
+	var node *core.BlobNode
 	if acltype == "public_read" {
-		err := s.store.SetNodePublic(*user, *id, add)
+		node, err = s.store.SetNodePublic(*user, *id, add)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -408,9 +409,9 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 			return
 		}
 		if add {
-			err = s.store.AddReaders(*user, *id, *users)
+			node, err = s.store.AddReaders(*user, *id, *users)
 		} else {
-			err = s.store.RemoveReaders(*user, *id, *users)
+			node, err = s.store.RemoveReaders(*user, *id, *users)
 		}
 		if err != nil {
 			writeError(le, err, w)
@@ -425,13 +426,17 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 		if err != nil {
 			return
 		}
-		err = s.store.ChangeOwner(*user, *id, (*users)[0])
+		node, err = s.store.ChangeOwner(*user, *id, (*users)[0])
 		if err != nil {
 			writeError(le, err, w)
 			return
 		}
 	}
-	s.getAndWriteACL(le, w, r, user, *id)
+	if node == nil {
+		s.getAndWriteACL(le, w, r, user, *id)
+	} else {
+		s.writeACL(w, r, node)
+	}
 }
 
 func getUserRequired(le *logrus.Entry, w http.ResponseWriter, r *http.Request,
@@ -491,6 +496,10 @@ func (s *Server) getAndWriteACL(
 		writeError(le, err, w)
 		return
 	}
+	s.writeACL(w, r, node)
+}
+
+func (s *Server) writeACL(w http.ResponseWriter, r *http.Request, node *core.BlobNode) {
 	verbose := getQuery(r.URL, "verbosity") == "full"
 	ret := map[string]interface{}{
 		"status": 200,
