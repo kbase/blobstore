@@ -728,7 +728,8 @@ func TestSetNodePublicTrueAsOwner(t *testing.T) {
 
 	auser, _ := auth.NewUser("un", false)
 	
-	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	oid := uuid.New()
+	nuser, _ := nodestore.NewUser(oid, "un")
 	
 	nsmock.On("GetUser", "un").Return(nuser, nil)
 	
@@ -740,8 +741,20 @@ func TestSetNodePublicTrueAsOwner(t *testing.T) {
 
 	nsmock.On("SetNodePublic", nid, true).Return(nil)
 
-	err := bs.SetNodePublic(*auser, nid, true)
+	bnode, err := bs.SetNodePublic(*auser, nid, true)
 	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{oid, "un"},
+		Readers: &[]User{User{oid, "un"}},
+		Public: true,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
 func TestSetNodePublicFalseAsAdmin(t *testing.T) {
@@ -754,7 +767,8 @@ func TestSetNodePublicFalseAsAdmin(t *testing.T) {
 	
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
-	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	oid := uuid.New()
+	nowner, _ := nodestore.NewUser(oid, "owner")
 	
 	nsmock.On("GetUser", "un").Return(nuser, nil)
 	
@@ -766,8 +780,20 @@ func TestSetNodePublicFalseAsAdmin(t *testing.T) {
 
 	nsmock.On("SetNodePublic", nid, false).Return(nil)
 
-	err := bs.SetNodePublic(*auser, nid, false)
+	bnode, err := bs.SetNodePublic(*auser, nid, false)
 	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{oid, "owner"},
+		Readers: &[]User{User{oid, "owner"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
 func TestSetNodePublicFailGetUser(t *testing.T) {
@@ -781,8 +807,9 @@ func TestSetNodePublicFailGetUser(t *testing.T) {
 
 	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
 
-	err := bs.SetNodePublic(*auser, uid, true)
+	bnode, err := bs.SetNodePublic(*auser, uid, true)
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestSetNodePublicFailGetNode(t *testing.T) {
@@ -806,7 +833,8 @@ func TestSetNodePublicFailGetNode(t *testing.T) {
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
 	
-		err := bs.SetNodePublic(*auser, uid, false)
+		bnode, err := bs.SetNodePublic(*auser, uid, false)
+		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
 	}
 }
@@ -831,9 +859,10 @@ func TestSetNodePublicFailUnauthorized(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	err := bs.SetNodePublic(*auser, nid, false)
+	bnode, err := bs.SetNodePublic(*auser, nid, false)
 	assert.Equal(t, NewUnauthorizedACLError("Only the node owner can alter ACLs"), err,
 		"incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestSetNodePublicFailSetPublic(t *testing.T) {
@@ -862,18 +891,20 @@ func TestSetNodePublicFailSetPublic(t *testing.T) {
 
 		nsmock.On("SetNodePublic", nid, false).Return(causeerr)
 
-		err := bs.SetNodePublic(*auser, nid, false)
+		bnode, err := bs.SetNodePublic(*auser, nid, false)
+		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
 	}
 }
 
-func TestAddAndRemoveReaders(t *testing.T) {
+func TestAddReaders(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
 	
 	auser, _ := auth.NewUser("owner", false)
-	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	oid := uuid.New()
+	o, _ := nodestore.NewUser(oid, "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
 	
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
@@ -882,49 +913,90 @@ func TestAddAndRemoveReaders(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	r1, _ := nodestore.NewUser(uuid.New(), "r1")
+	r1id := uuid.New()
+	r1, _ := nodestore.NewUser(r1id, "r1")
 	nsmock.On("GetUser", "r1").Return(r1, nil)
 	nsmock.On("AddReader", nid, *r1).Return(nil)
-	nsmock.On("RemoveReader", nid, *r1).Return(nil)
 
-	r2, _ := nodestore.NewUser(uuid.New(), "r2")
+	r2id := uuid.New()
+	r2, _ := nodestore.NewUser(r2id, "r2")
 	nsmock.On("GetUser", "r2").Return(r2, nil)
 	nsmock.On("AddReader", nid, *r2).Return(nil)
-	nsmock.On("RemoveReader", nid, *r2).Return(nil)
 
-	err := bs.AddReaders(*auser, nid, []string{"r1", "r2"})
+	bnode, err := bs.AddReaders(*auser, nid, []string{"r1", "r2"})
 	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{oid, "owner"},
+		Readers: &[]User{User{oid, "owner"}, User{r1id, "r1"}, User{r2id, "r2"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
 
-	err = bs.RemoveReaders(*auser, nid, []string{"r1", "r2"})
+	// test as admin
+	auser, _ = auth.NewUser("notowner", true)
+	no, _ := nodestore.NewUser(uuid.New(), "notowner")
+	nsmock.On("GetUser", "notowner").Return(no, nil)
+	bnode, err = bs.AddReaders(*auser, nid, []string{"r1", "r2"})
 	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
-func TestAddAndRemoveReadersAsAdmin(t *testing.T) {
+func TestRemoveReaders(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
 	
-	auser, _ := auth.NewUser("notowner", true)
-	no, _ := nodestore.NewUser(uuid.New(), "notowner")
-	nsmock.On("GetUser", "notowner").Return(no, nil)
+	auser, _ := auth.NewUser("owner", false)
+	oid := uuid.New()
+	o, _ := nodestore.NewUser(oid, "owner")
+	nsmock.On("GetUser", "owner").Return(o, nil)
 	
-	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	r1id := uuid.New()
+	r1, _ := nodestore.NewUser(r1id, "r1")
+	r2id := uuid.New()
+	r2, _ := nodestore.NewUser(r2id, "r2")
+	
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
-	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"),
+		nodestore.Reader(*r1), nodestore.Reader(*r2))
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	r1, _ := nodestore.NewUser(uuid.New(), "r1")
 	nsmock.On("GetUser", "r1").Return(r1, nil)
-	nsmock.On("AddReader", nid, *r1).Return(nil)
 	nsmock.On("RemoveReader", nid, *r1).Return(nil)
 
-	err := bs.AddReaders(*auser, nid, []string{"r1"})
-	assert.Nil(t, err, "unexpected error")
+	nsmock.On("GetUser", "r2").Return(r2, nil)
+	nsmock.On("RemoveReader", nid, *r2).Return(nil)
 
-	err = bs.RemoveReaders(*auser, nid, []string{"r1"})
+	bnode, err := bs.RemoveReaders(*auser, nid, []string{"r1", "r2"})
 	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{oid, "owner"},
+		Readers: &[]User{User{oid, "owner"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+
+	// test as admin
+	auser, _ = auth.NewUser("notowner", true)
+	no, _ := nodestore.NewUser(uuid.New(), "notowner")
+	nsmock.On("GetUser", "notowner").Return(no, nil)
+	bnode, err = bs.RemoveReaders(*auser, nid, []string{"r1", "r2"})
+	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
 func TestAddAndRemoveReadersFailGetUser(t *testing.T) {
@@ -938,11 +1010,13 @@ func TestAddAndRemoveReadersFailGetUser(t *testing.T) {
 
 	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
 
-	err := bs.AddReaders(*auser, uid, []string{"r"})
+	bnode, err := bs.AddReaders(*auser, uid, []string{"r"})
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 
-	err = bs.RemoveReaders(*auser, uid, []string{"r"})
+	bnode, err = bs.RemoveReaders(*auser, uid, []string{"r"})
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestAddAndRemoveReadersFailGetNode(t *testing.T) {
@@ -966,10 +1040,12 @@ func TestAddAndRemoveReadersFailGetNode(t *testing.T) {
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
 	
-		err := bs.AddReaders(*auser, uid, []string{"r"})
+		bnode, err := bs.AddReaders(*auser, uid, []string{"r"})
+		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
 
-		err = bs.RemoveReaders(*auser, uid, []string{"r"})
+		bnode, err = bs.RemoveReaders(*auser, uid, []string{"r"})
+		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
 	}
 }
@@ -994,12 +1070,14 @@ func TestAddAndRemoveReadersFailUnauthorized(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	err := bs.AddReaders(*auser, nid, []string{"r"})
+	bnode, err := bs.AddReaders(*auser, nid, []string{"r"})
 	expectederr := NewUnauthorizedACLError("Only the node owner can alter ACLs")
 	assert.Equal(t, expectederr, err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 
-	err = bs.RemoveReaders(*auser, nid, []string{"r"})
+	bnode, err = bs.RemoveReaders(*auser, nid, []string{"r"})
 	assert.Equal(t, expectederr, err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestAddAndRemoveReadersFailGetReader(t *testing.T) {
@@ -1020,11 +1098,13 @@ func TestAddAndRemoveReadersFailGetReader(t *testing.T) {
 
 	nsmock.On("GetUser", "r").Return(nil, errors.New("Yeah? Sausages and?"))
 
-	err := bs.AddReaders(*auser, nid, []string{"r"})
+	bnode, err := bs.AddReaders(*auser, nid, []string{"r"})
 	assert.Equal(t, errors.New("Yeah? Sausages and?"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 
-	err = bs.RemoveReaders(*auser, nid, []string{"r"})
+	bnode, err = bs.RemoveReaders(*auser, nid, []string{"r"})
 	assert.Equal(t, errors.New("Yeah? Sausages and?"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestAddAndRemoveReadersFailAddRemoveReader(t *testing.T) {
@@ -1058,11 +1138,13 @@ func TestAddAndRemoveReadersFailAddRemoveReader(t *testing.T) {
 		nsmock.On("AddReader", nid, *r).Return(causeerr)
 		nsmock.On("RemoveReader", nid, *r).Return(causeerr)
 
-		err := bs.AddReaders(*auser, nid, []string{"r"})
+		bnode, err := bs.AddReaders(*auser, nid, []string{"r"})
 		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
 
-		err = bs.RemoveReaders(*auser, nid, []string{"r"})
+		bnode, err = bs.RemoveReaders(*auser, nid, []string{"r"})
 		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
 	}
 }
 
@@ -1072,45 +1154,48 @@ func TestChangeOwner(t *testing.T) {
 	bs := New(fsmock, nsmock)
 	
 	auser, _ := auth.NewUser("owner", false)
-	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	oid := uuid.New()
+	o, _ := nodestore.NewUser(oid, "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
 	
+	r1id := uuid.New()
+	r1, _ := nodestore.NewUser(r1id, "r1")
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
-	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"),
+		nodestore.Reader(*r1))
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	newowner, _ := nodestore.NewUser(uuid.New(), "new")
+	newid := uuid.New()
+	newowner, _ := nodestore.NewUser(newid, "new")
 	nsmock.On("GetUser", "new").Return(newowner, nil)
 	nsmock.On("ChangeOwner", nid, *newowner).Return(nil)
 
-	err := bs.ChangeOwner(*auser, nid, "new")
+	bnode, err := bs.ChangeOwner(*auser, nid, "new")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{newid, "new"},
+		Readers: &[]User{User{newid, "new"}, User{oid, "owner"}, User{r1id, "r1"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
 	assert.Nil(t, err, "unexpected error")
-}
 
-func TestChangeOwnerAsAdmin(t *testing.T) {
-	fsmock := new(fsmocks.FileStore)
-	nsmock := new(nsmocks.NodeStore)
-	bs := New(fsmock, nsmock)
-	
-	auser, _ := auth.NewUser("notowner", true)
+	// test as admin
+	auser, _ = auth.NewUser("notowner", true)
 	no, _ := nodestore.NewUser(uuid.New(), "notowner")
 	nsmock.On("GetUser", "notowner").Return(no, nil)
-	o, _  := nodestore.NewUser(uuid.New(), "owner")
-	
-	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
-	tme := time.Now()
-	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
-
-	nsmock.On("GetNode", nid).Return(node, nil)
-
-	newowner, _ := nodestore.NewUser(uuid.New(), "new")
-	nsmock.On("GetUser", "new").Return(newowner, nil)
-	nsmock.On("ChangeOwner", nid, *newowner).Return(nil)
-
-	err := bs.ChangeOwner(*auser, nid, "new")
+	bnode, err = bs.ChangeOwner(*auser, nid, "new")
 	assert.Nil(t, err, "unexpected error")
+	assert.Equal(t, expected, bnode, "incorrect node")
+	
 }
 
 func TestChangeOwnerFailGetUser(t *testing.T) {
@@ -1124,8 +1209,9 @@ func TestChangeOwnerFailGetUser(t *testing.T) {
 
 	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
 
-	err := bs.ChangeOwner(*auser, uid, "foo")
+	bnode, err := bs.ChangeOwner(*auser, uid, "foo")
 	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestChangeOwnerFailGetNode(t *testing.T) {
@@ -1149,8 +1235,9 @@ func TestChangeOwnerFailGetNode(t *testing.T) {
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
 	
-		err := bs.ChangeOwner(*auser, uid, "foo")
+		bnode, err := bs.ChangeOwner(*auser, uid, "foo")
 		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
 	}
 }
 
@@ -1175,13 +1262,14 @@ func TestChangeOwnerFailUnauthorized(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	err := bs.ChangeOwner(*auser, nid, "foo")
+	bnode, err := bs.ChangeOwner(*auser, nid, "foo")
 	expectederr := NewUnauthorizedACLError("Only the node owner can alter ACLs")
 	assert.Equal(t, expectederr, err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 
-func TestAddAndRemoveReadersFailGetNewOwner(t *testing.T) {
+func TestChangeOwnerFailGetNewOwner(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
@@ -1199,8 +1287,9 @@ func TestAddAndRemoveReadersFailGetNewOwner(t *testing.T) {
 
 	nsmock.On("GetUser", "newown").Return(nil, errors.New("I've discharged my responsibilities"))
 
-	err := bs.ChangeOwner(*auser, nid, "newown")
+	bnode, err := bs.ChangeOwner(*auser, nid, "newown")
 	assert.Equal(t, errors.New("I've discharged my responsibilities"), err, "incorrect error")
+	assert.Nil(t, bnode, "expected error")
 }
 
 func TestChangeOwnerFailChangeOwner(t *testing.T) {
@@ -1233,7 +1322,8 @@ func TestChangeOwnerFailChangeOwner(t *testing.T) {
 		
 		nsmock.On("ChangeOwner", nid, *newowner).Return(causeerr)
 
-		err := bs.ChangeOwner(*auser, nid, "new")
+		bnode, err := bs.ChangeOwner(*auser, nid, "new")
 		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
 	}
 }

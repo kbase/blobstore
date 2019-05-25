@@ -250,33 +250,36 @@ func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
 
 // SetNodePublic sets whether a node can be read by anyone, including anonymous users.
 // Returns NoBlobError and UnauthorizedACLError.
-func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool) error {
-	err := bs.writeok(user, id)
+func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool,
+) (*BlobNode, error) {
+	node, err := bs.writeok(user, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = bs.nodeStore.SetNodePublic(id, public)
 	if err != nil {
-		return translateError(err)
+		return nil, translateError(err)
 	}
-	return nil
+	return toBlobNode(node.WithPublic(public)), nil
 }
 
-func (bs *BlobStore) writeok(user auth.User, id uuid.UUID) error {
+func (bs *BlobStore) writeok(user auth.User, id uuid.UUID,
+) (*nodestore.Node, error) {
 	node, nodeuser, err := bs.getNode(&user, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
-		return NewUnauthorizedACLError("Only the node owner can alter ACLs")
+		return nil, NewUnauthorizedACLError("Only the node owner can alter ACLs")
 	}
-	return nil
+	return node, nil
 }
 
 // AddReaders adds readers to a node.
 // Has no effect if the user is the node's owner or the user is already in the read ACL.
 // Returns NoBlobError and UnauthorizedACLError.
-func (bs *BlobStore) AddReaders(user auth.User, id uuid.UUID, readerAccountNames []string) error {
+func (bs *BlobStore) AddReaders(user auth.User, id uuid.UUID, readerAccountNames []string,
+) (*BlobNode, error) {
 	return bs.alterReaders(user, id, readerAccountNames, true)
 }
 
@@ -284,7 +287,7 @@ func (bs *BlobStore) AddReaders(user auth.User, id uuid.UUID, readerAccountNames
 // Has no effect if the user is not already in the read ACL.
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) RemoveReaders(user auth.User, id uuid.UUID, readerAccountNames []string,
-) error {
+) (*BlobNode, error) {
 	return bs.alterReaders(user, id, readerAccountNames, false)
 }
 
@@ -293,44 +296,52 @@ func (bs *BlobStore) alterReaders(
 	id uuid.UUID,
 	readerAccountNames []string,
 	add bool,
-) error {
-	err := bs.writeok(user, id)
+) (*BlobNode, error) {
+	node, err := bs.writeok(user, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// errors at this point should be unusual since we've already fetched the node
+	readers := []nodestore.User{}
 	for _, ran := range readerAccountNames {
 		u, err := bs.nodeStore.GetUser(ran)
 		if err != nil {
-			return err // errors should only occur for unusual situations here
+			return nil, err // errors should only occur for unusual situations here
 		}
+		readers = append(readers, *u)
 		if add {
 			err = bs.nodeStore.AddReader(id, *u)
 		} else {
 			err = bs.nodeStore.RemoveReader(id, *u)
 		}
 		if err != nil {
-			return translateError(err)
+			return nil, translateError(err)
 		}
+		}
+	if add {
+		node = node.WithReaders(readers...)
+	} else {
+		node = node.WithoutReaders(readers...)
 	}
-	return nil
+	return toBlobNode(node), nil
 }
 
 // ChangeOwner changes the owner of a node.
 // If the new owner is in the read ACL, the new owner will be removed.
 // Setting the new owner to the current owner has no effect.
 // Returns NoBlobError and UnauthorizedACLError.
-func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string) error {
-	err := bs.writeok(user, id)
+func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string,
+) (*BlobNode, error) {
+	node, err := bs.writeok(user, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	u, err := bs.nodeStore.GetUser(newowner)
 	if err != nil {
-		return err // errors should only occur for unusual situations here
+		return nil, err // errors should only occur for unusual situations here
 	}
 	if err = bs.nodeStore.ChangeOwner(id, *u); err != nil {
-		return translateError(err)
+		return nil, translateError(err)
 	}
-	return nil
+	return toBlobNode(node.WithOwner(*u)), nil
 }
