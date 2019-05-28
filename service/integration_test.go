@@ -1149,6 +1149,70 @@ func (t *TestSuite) TestSetReadACL() {
 	t.getNodeFailUnauth(id, &t.noRole3)
 }
 
+func (t *TestSuite) TestRemoveSelfFromReadACL() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	uid := t.getUserIDFromMongo(t.noRole.user)
+	t.loggerhook.Reset()
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	id := data["id"].(string)
+	
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	owner := map[string]interface{}{"uuid": uid, "username": t.noRole.user}
+
+	// check no readers and non-admins can't read
+	t.checkACL(id, "", "", &t.noRole, 395, getExpectedACL(owner, []map[string]interface{}{},false))
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.loggerhook.Reset()
+
+	// add readers as owner
+	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?users=" + t.noRole2.user, nil,
+		t.noRole.token, 441)
+	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
+		&t.noRole.user, "request complete", mtmap(), false},
+	)
+	
+	u2 := map[string]interface{}{
+		"uuid": t.getUserIDFromMongo(t.noRole2.user),
+		"username": t.noRole2.user,
+	}
+	expectedACL := getExpectedACL(owner, []map[string]interface{}{u2}, false)
+	t.Equal(expectedACL, body, "incorrect acls")
+
+	t.checkNode(id, &t.noRole2, 374, expected)
+	t.checkACL(id, "", "", &t.noRole2, 441, expectedACL)
+	t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, &t.noRole2, 9, id,
+		[]byte("foobarbaz"))
+
+	// remove reader as self with verbose response and trailing slash
+	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?verbosity=full;users=" +
+		t.noRole2.user, nil, t.noRole2.token, 617)
+	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
+		&t.noRole2.user, "request complete", mtmap(), false},
+	)
+	expectedACL = getExpectedACL(owner, []map[string]interface{}{}, true)
+	t.Equal(expectedACL, body, "incorrect acls")
+	t.getNodeFailUnauth(id, &t.noRole2)
+	t.checkACL(id, "", "?verbosity=full", &t.noRole, 617, expectedACL)
+}
+
 func getExpectedACL(owner map[string]interface{}, readers []map[string]interface{}, verbose bool,
 ) map[string]interface{} {
 	var ownerdoc interface{}
@@ -1227,6 +1291,9 @@ func (t *TestSuite) TestSetReadACLsFail() {
 		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
 			notown, 129},
 		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
+			notown, 129},
+		// fail to delete self
+		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole2.token, 400,
 			notown, 129},
 	}
 

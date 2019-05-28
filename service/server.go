@@ -145,6 +145,7 @@ func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 		le := initLogger(r)
 
 		token := r.Header.Get("authorization")
+		//TODO AUTH header should start with oauth
 		var user *auth.User
 		if token != "" {
 			var err error
