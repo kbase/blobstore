@@ -860,8 +860,8 @@ func TestSetNodePublicFailUnauthorized(t *testing.T) {
 	nsmock.On("GetNode", nid).Return(node, nil)
 
 	bnode, err := bs.SetNodePublic(*auser, nid, false)
-	assert.Equal(t, NewUnauthorizedACLError("Only the node owner can alter ACLs"), err,
-		"incorrect error")
+	assert.Equal(t, NewUnauthorizedACLError("Users can only remove themselves from the read ACL"),
+		err, "incorrect error")
 	assert.Nil(t, bnode, "expected error")
 }
 
@@ -999,6 +999,48 @@ func TestRemoveReaders(t *testing.T) {
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
+func TestRemoveReaderSelf(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("r1", false)
+
+	oid := uuid.New()
+	o, _ := nodestore.NewUser(oid, "owner")
+	
+	r1id := uuid.New()
+	r1, _ := nodestore.NewUser(r1id, "r1")
+	r2id := uuid.New()
+	r2, _ := nodestore.NewUser(r2id, "r2")
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"),
+		nodestore.Reader(*r1), nodestore.Reader(*r2))
+	
+	nsmock.On("GetUser", "r1").Return(r1, nil)
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("RemoveReader", nid, *r1).Return(nil)
+
+	bnode, err := bs.RemoveReaders(*auser, nid, []string{"r1"})
+	assert.Nil(t, err, "unexpected error")
+	expected := &BlobNode {
+		ID: nid,
+		Size: 12,
+		MD5: "fakemd5",
+		Stored: tme,
+		Filename: "foo",
+		Format: "",
+		Owner: User{oid, "owner"},
+		Readers: &[]User{User{oid, "owner"}, User{r2id, "r2"}},
+		Public: false,
+	}
+	assert.Equal(t, expected, bnode, "incorrect node")
+}
+
 func TestAddAndRemoveReadersFailGetUser(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
@@ -1070,12 +1112,48 @@ func TestAddAndRemoveReadersFailUnauthorized(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	bnode, err := bs.AddReaders(*auser, nid, []string{"r"})
-	expectederr := NewUnauthorizedACLError("Only the node owner can alter ACLs")
-	assert.Equal(t, expectederr, err, "incorrect error")
-	assert.Nil(t, bnode, "expected error")
+	readers := [][]string{
+		[]string{"r"},       // tests reader != self check
+		[]string{"un", "r2"}, // tests single reader check
+	}
 
-	bnode, err = bs.RemoveReaders(*auser, nid, []string{"r"})
+	for _, rdrs := range readers {
+		bnode, err := bs.AddReaders(*auser, nid, rdrs)
+		expectederr := NewUnauthorizedACLError(
+			"Users can only remove themselves from the read ACL")
+		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
+
+		bnode, err = bs.RemoveReaders(*auser, nid, rdrs)
+		assert.Equal(t, expectederr, err, "incorrect error")
+		assert.Nil(t, bnode, "expected error")
+	}
+}
+
+func TestAddReaderSelfFailUnauthorized(t *testing.T) {
+	// check that the remove self code doesn't allow adding self
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("reader", false)
+	
+	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nsmock.On("GetUser", "reader").Return(ruser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	bnode, err := bs.AddReaders(*auser, nid, []string{"reader"})
+	expectederr := NewUnauthorizedACLError(
+		"Users can only remove themselves from the read ACL")
 	assert.Equal(t, expectederr, err, "incorrect error")
 	assert.Nil(t, bnode, "expected error")
 }
@@ -1241,7 +1319,6 @@ func TestChangeOwnerFailGetNode(t *testing.T) {
 	}
 }
 
-
 func TestChangeOwnerFailUnauthorized(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
@@ -1263,7 +1340,7 @@ func TestChangeOwnerFailUnauthorized(t *testing.T) {
 	nsmock.On("GetNode", nid).Return(node, nil)
 
 	bnode, err := bs.ChangeOwner(*auser, nid, "foo")
-	expectederr := NewUnauthorizedACLError("Only the node owner can alter ACLs")
+	expectederr := NewUnauthorizedACLError("Users can only remove themselves from the read ACL")
 	assert.Equal(t, expectederr, err, "incorrect error")
 	assert.Nil(t, bnode, "expected error")
 }

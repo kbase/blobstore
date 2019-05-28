@@ -252,7 +252,7 @@ func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool,
 ) (*BlobNode, error) {
-	node, err := bs.writeok(user, id)
+	_, node, err := bs.writeok(user, id, false)
 	if err != nil {
 		return nil, err
 	}
@@ -263,16 +263,20 @@ func (bs *BlobStore) SetNodePublic(user auth.User, id uuid.UUID, public bool,
 	return toBlobNode(node.WithPublic(public)), nil
 }
 
-func (bs *BlobStore) writeok(user auth.User, id uuid.UUID,
-) (*nodestore.Node, error) {
+func (bs *BlobStore) writeok(user auth.User, id uuid.UUID, removeself bool,
+) (*nodestore.User, *nodestore.Node, error) {
 	node, nodeuser, err := bs.getNode(&user, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if removeself && node.HasReader(*nodeuser) {
+		return nodeuser, node, nil
 	}
 	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
-		return nil, NewUnauthorizedACLError("Only the node owner can alter ACLs")
+		return nil, nil,
+			NewUnauthorizedACLError("Users can only remove themselves from the read ACL")
 	}
-	return node, nil
+	return nodeuser, node, nil
 }
 
 // AddReaders adds readers to a node.
@@ -297,27 +301,36 @@ func (bs *BlobStore) alterReaders(
 	readerAccountNames []string,
 	add bool,
 ) (*BlobNode, error) {
-	node, err := bs.writeok(user, id)
+	removeself := !add &&
+		len(readerAccountNames) == 1 &&
+		user.GetUserName() == readerAccountNames[0]
+	nodeuser, node, err := bs.writeok(user, id, removeself)
 	if err != nil {
 		return nil, err
 	}
 	// errors at this point should be unusual since we've already fetched the node
 	readers := []nodestore.User{}
-	for _, ran := range readerAccountNames {
-		u, err := bs.nodeStore.GetUser(ran)
-		if err != nil {
-			return nil, err // errors should only occur for unusual situations here
+	if removeself {
+		readers = append(readers, *nodeuser)
+	} else {
+		for _, ran := range readerAccountNames {
+			u, err := bs.nodeStore.GetUser(ran)
+			if err != nil {
+				return nil, err // errors should only occur for unusual situations here
+			}
+			readers = append(readers, *u)
 		}
-		readers = append(readers, *u)
+	}
+	for _, u := range readers {
 		if add {
-			err = bs.nodeStore.AddReader(id, *u)
+			err = bs.nodeStore.AddReader(id, u)
 		} else {
-			err = bs.nodeStore.RemoveReader(id, *u)
+			err = bs.nodeStore.RemoveReader(id, u)
 		}
 		if err != nil {
 			return nil, translateError(err)
 		}
-		}
+	}
 	if add {
 		node = node.WithReaders(readers...)
 	} else {
@@ -332,7 +345,7 @@ func (bs *BlobStore) alterReaders(
 // Returns NoBlobError and UnauthorizedACLError.
 func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string,
 ) (*BlobNode, error) {
-	node, err := bs.writeok(user, id)
+	_, node, err := bs.writeok(user, id, false)
 	if err != nil {
 		return nil, err
 	}
