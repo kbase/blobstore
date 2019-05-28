@@ -1404,3 +1404,156 @@ func TestChangeOwnerFailChangeOwner(t *testing.T) {
 		assert.Nil(t, bnode, "expected error")
 	}
 }
+
+func TestDeleteNode(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("owner", false)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	nsmock.On("GetUser", "owner").Return(o, nil)
+
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("DeleteNode", nid).Return(nil)
+
+	fsmock.On("DeleteFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(nil)
+
+	err := bs.DeleteNode(*auser, nid)
+	assert.Nil(t, err, "unexpected error")
+
+	// test as admin
+	auser, _ = auth.NewUser("notowner", true)
+	no, _ := nodestore.NewUser(uuid.New(), "notowner")
+	nsmock.On("GetUser", "notowner").Return(no, nil)
+	err = bs.DeleteNode(*auser, nid)
+	assert.Nil(t, err, "unexpected error")
+}
+
+func TestDeleteNodeFailGetUser(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
+
+	err := bs.DeleteNode(*auser, uid)
+	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+}
+
+func TestDeleteNodeFailGetNode(t *testing.T) {
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+
+	inputs := map[error]error{
+		errors.New("I'm not"): errors.New("I'm not"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+
+		nsmock.On("GetNode", uid).Return(nil, causeerr)
+	
+		err := bs.DeleteNode(*auser, uid)
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
+
+func TestDeleteNodeFailUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	err := bs.DeleteNode(*auser, nid)
+	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
+}
+
+func TestDeleteNodeFailDeleteNode(t *testing.T) {
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+	
+	inputs := map[error]error{
+		errors.New("vivian! You bastard"):
+			errors.New("vivian! You bastard"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+		
+		tme := time.Now()
+		node, _ := nodestore.NewNode(nid, *nuser, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+		nsmock.On("GetNode", nid).Return(node, nil)
+
+		nsmock.On("DeleteNode", nid).Return(causeerr)
+
+		err := bs.DeleteNode(*auser, nid)
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
+
+func TestDeleteNodeFailDeleteFile(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+	bs := New(fsmock, nsmock)
+	
+	auser, _ := auth.NewUser("owner", false)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	nsmock.On("GetUser", "owner").Return(o, nil)
+
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	nsmock.On("DeleteNode", nid).Return(nil)
+
+	fsmock.On("DeleteFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+		errors.New("whoopsie daisy"),
+	)
+
+	err := bs.DeleteNode(*auser, nid)
+	assert.Equal(t, errors.New("whoopsie daisy"), err, "incorrect error")
+}

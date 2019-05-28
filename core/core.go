@@ -358,3 +358,22 @@ func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string,
 	}
 	return toBlobNode(node.WithOwner(*u)), nil
 }
+
+// DeleteNode deletes the given node.
+// Returns NoBlobError and UnauthorizedError.
+func (bs *BlobStore) DeleteNode(user auth.User, id uuid.UUID) error {
+	node, nodeuser, err := bs.getNode(&user, id)
+	if err != nil {
+		return err
+	}
+	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
+		return NewUnauthorizedError("Unauthorized")
+	}
+	err = bs.nodeStore.DeleteNode(id)
+	if err != nil {
+		return translateError(err)
+	}
+	// theoretically there's a race here but probably not worth worrying about
+	// also a possibility of leaving orphaned files, no way to avoid that really.
+	return bs.fileStore.DeleteFile(uuidToFilePath(id))
+}
