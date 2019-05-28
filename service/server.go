@@ -422,7 +422,6 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 			writeError(le, err, w)
 			return
 		}
-		// TODO ACL allow delete self
 	} else if acltype == "read" {
 		users, err := s.getUserList(le, w, r, false)
 		if err != nil {

@@ -615,8 +615,9 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 
 func (t *TestSuite) TestBadToken() {
 	for _, token := range []string{
-			"oath",
+			"oauth",
 			"oauth   ",
+			"oath " + t.noRole.token,
 			"oauth bad_token",
 			"oauth " + t.noRole.token + " foo"} {
 		body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), token, 100)
@@ -753,7 +754,6 @@ func (t *TestSuite) TestNotAllowed() {
 	)
 }
 
-// TODO ACL TEST multiple readers
 func (t *TestSuite) TestGetACLs() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"OAuth " + t.noRole.token, 374)
