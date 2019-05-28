@@ -356,7 +356,7 @@ func (t *TestSuite) TestRoot() {
 func (t *TestSuite) TestStoreAndGetWithFilename() {
 	// check whitespace
 	body := t.req("POST", t.url + "/node?filename=%20%20myfile%20%20",
-		strings.NewReader("foobarbaz"), t.noRole.token, 380)
+		strings.NewReader("foobarbaz"), "     OAuth    " + t.noRole.token + "      ", 380)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
@@ -414,7 +414,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 
 func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
 	body := t.req("POST", t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
-		t.noRole.token, 378)
+		"oauth " + t.noRole.token, 378)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
@@ -450,7 +450,8 @@ func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
 
 func (t *TestSuite) TestGetNodeFileACLPublic() {
 	// not testing logging here, tested elsewhere
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.kBaseAdmin.token, 374)
 	uid := t.getUserIDFromMongo(t.kBaseAdmin.user)
 
 	data := body["data"].(map[string]interface{})
@@ -492,7 +493,8 @@ func (t *TestSuite) TestGetNodeFileACLPublic() {
 
 	t.getNodeFailUnauth(id, &t.noRole)
 
-	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 394)
+	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, "OAuth " + t.kBaseAdmin.token,
+		394)
 	t.loggerhook.Reset()
 
 	for _, u := range []*User{&t.noRole, nil} {
@@ -502,7 +504,8 @@ func (t *TestSuite) TestGetNodeFileACLPublic() {
 			[]byte("foobarbaz"))
 	}
 
-	t.req("DELETE", t.url + "/node/" + id + "/acl/public_read", nil, t.kBaseAdmin.token, 395)
+	t.req("DELETE", t.url + "/node/" + id + "/acl/public_read", nil, "OAuth " + t.kBaseAdmin.token,
+		395)
 	
 	t.getNodeFailUnauth(id, &t.noRole)
 }
@@ -541,7 +544,7 @@ func (t *TestSuite) get(url string, user *User, contentLength int64) map[string]
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
 	if user != nil {
-		req.Header.Set("authorization", user.token)
+		req.Header.Set("authorization", "oauth " + user.token)
 	}
 	return t.requestToJSON(req, contentLength)
 }
@@ -563,7 +566,7 @@ expected []byte) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
 	if user != nil {
-		req.Header.Set("authorization", user.token)
+		req.Header.Set("authorization", "oauth " + user.token)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	t.checkHeaders(resp, "application/octet-stream", size, size,
@@ -611,17 +614,24 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 }
 
 func (t *TestSuite) TestBadToken() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), "bad_token", 100)
-	t.checkError(body, 400, "Invalid authorization header or content")
-	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, nil,
-		"Invalid authorization header or content", mtmap(), false},
-	)
+	for _, token := range []string{
+			"oauth",
+			"oauth   ",
+			"oath " + t.noRole.token,
+			"oauth bad_token",
+			"oauth " + t.noRole.token + " foo"} {
+		body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), token, 100)
+		t.checkError(body, 400, "Invalid authorization header or content")
+		t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, nil,
+			"Invalid authorization header or content", mtmap(), false},
+		)
+	}
 }
 
 func (t *TestSuite) TestNoContentLength() {
 	req, err := http.NewRequest(http.MethodPost, t.url + "/node", strings.NewReader("foobarbaz"))
 	t.Nil(err, "unexpected error")
-	req.Header.Set("authorization", t.noRole.token)
+	req.Header.Set("authorization", "OAuth " + t.noRole.token)
 	req.ContentLength = -1
 	body := t.requestToJSON(req, 76)
 
@@ -667,7 +677,8 @@ func (t *TestSuite) TestGetNodeBadID() {
 }
 
 func (t *TestSuite) TestGetNodeFailPerms() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -697,7 +708,8 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 
 func (t *TestSuite) TestUnexpectedError() {
 	defer t.createTestBucket()
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), false},
@@ -728,7 +740,8 @@ func (t *TestSuite) createTestBucket() {
 }
 
 func (t *TestSuite) TestNotFound() {
-	body := t.req("POST", t.url + "/nde", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 70)
+	body := t.req("POST", t.url + "/nde", strings.NewReader("foobarbaz"),
+	"OAuth " + t.kBaseAdmin.token, 70)
 	t.checkError(body, 404, "Not Found")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/nde", 404, nil, "Not Found", mtmap(), false})
 }
@@ -741,9 +754,9 @@ func (t *TestSuite) TestNotAllowed() {
 	)
 }
 
-// TODO ACL TEST multiple readers
 func (t *TestSuite) TestGetACLs() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
@@ -788,7 +801,8 @@ func (t *TestSuite) getUserIDFromMongo(name string) string {
 }
 
 func (t *TestSuite) TestGetACLAsAdminVerbose() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	// ID gen is random, so we'll just fetch the generated ID from the DB.
@@ -832,7 +846,8 @@ contentLength int64, expected map[string]interface{}) {
 
 // TODO TEST need to check errors for logs below this line
 func (t *TestSuite) TestGetACLsBadType() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
 	t.loggerhook.Reset() // tested this enough already
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	body2 := t.get(t.url + "/node/" + id + "/acl/pubwic_wead", &t.noRole, 77)
@@ -855,7 +870,8 @@ func (t *TestSuite) TestGetACLsBadID() {
 }
 
 func (t *TestSuite) TestGetACLsFailPerms() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.loggerhook.Reset()
 	
@@ -873,7 +889,8 @@ func (t *TestSuite) TestGetACLsFailPerms() {
 }
 
 func (t *TestSuite) TestSetGlobalACLs() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.loggerhook.Reset()
 	uid := t.getUserIDFromMongo(t.noRole.user)
@@ -924,7 +941,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 			"status": float64(200),
 		}
 
-		body := t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		body := t.req(tc.method, t.url + path + params, nil, "OAuth " + tc.user.token, tc.conlen)
 		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
@@ -932,7 +949,7 @@ func (t *TestSuite) TestSetGlobalACLs() {
 		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
 
 		path = path + "/"
-		body = t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		body = t.req(tc.method, t.url + path + params, nil, "OAuth " + tc.user.token, tc.conlen)
 		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
@@ -942,7 +959,8 @@ func (t *TestSuite) TestSetGlobalACLs() {
 }
 
 func (t *TestSuite) TestSetGlobalACLsFail() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 
 	type testcase struct {
@@ -964,12 +982,14 @@ func (t *TestSuite) TestSetGlobalACLsFail() {
 		testcase{"DELETE", "/worseid/acl/public_write", "", 404, "Node not found", 75},
 		testcase{"PUT", id + "/acl/public_read", "", 401, "No Authorization", 77},
 		testcase{"DELETE", id + "/acl/public_write", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/public_read", "badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/public_read", "badtoken", 400, invauth, 100},
-		testcase{"PUT", badid + "/acl/public_read", t.noRole.token, 404, "Node not found", 75},
-		testcase{"DELETE", badid + "/acl/public_read", t.noRole.token, 404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
-		testcase{"DELETE", id + "/acl/public_read", t.noRole.token, 400, longun, 129},
+		testcase{"PUT", id + "/acl/public_read", "oauth badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/public_read", "oauth badtoken", 400, invauth, 100},
+		testcase{"PUT", badid + "/acl/public_read", "Oauth " + t.noRole.token, 404,
+			"Node not found", 75},
+		testcase{"DELETE", badid + "/acl/public_read", "Oauth " + t.noRole.token, 404,
+			"Node not found", 75},
+		testcase{"PUT", id + "/acl/public_read", "Oauth " + t.noRole.token, 400, longun, 129},
+		testcase{"DELETE", id + "/acl/public_read", "Oauth " + t.noRole.token, 400, longun, 129},
 	}
 
 	for _, tc := range testcases {
@@ -981,7 +1001,8 @@ func (t *TestSuite) TestSetGlobalACLsFail() {
 func (t *TestSuite) TestSetIgnoredACLs() {
 	// write and delete acl change requests are silently ignored, since we don't support
 	// those acls
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.noRole.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	t.loggerhook.Reset()
 	uid := t.getUserIDFromMongo(t.noRole.user)
@@ -1028,7 +1049,7 @@ func (t *TestSuite) TestSetIgnoredACLs() {
 			"status": float64(200),
 		}
 
-		body := t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		body := t.req(tc.method, t.url + path + params, nil, "Oauth " + tc.user.token, tc.conlen)
 		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
@@ -1036,7 +1057,7 @@ func (t *TestSuite) TestSetIgnoredACLs() {
 		t.checkACL(id, "", params, &tc.user, tc.conlen, expected)
 
 		path = path + "/"
-		body = t.req(tc.method, t.url + path + params, nil, tc.user.token, tc.conlen)
+		body = t.req(tc.method, t.url + path + params, nil, "Oauth " + tc.user.token, tc.conlen)
 		t.checkLogs(logEvent{logrus.InfoLevel, tc.method, path, 200,
 			getUserName(&tc.user), "request complete", mtmap(), false},
 		)
@@ -1046,7 +1067,8 @@ func (t *TestSuite) TestSetIgnoredACLs() {
 }
 
 func (t *TestSuite) TestSetReadACL() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.noRole.token, 374)
 	uid := t.getUserIDFromMongo(t.noRole.user)
 	t.loggerhook.Reset()
 
@@ -1081,7 +1103,7 @@ func (t *TestSuite) TestSetReadACL() {
 
 	// add readers as owner. Also check whitespace is ignored.
 	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?users=%20%20,%20%20%20,%20%20" +
-		t.noRole2.user + "%20%20,%20%20" + t.noRole3.user, nil, t.noRole.token, 487)
+		t.noRole2.user + "%20%20,%20%20" + t.noRole3.user, nil, "Oauth " + t.noRole.token, 487)
 	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
 		&t.noRole.user, "request complete", mtmap(), false},
 	)
@@ -1107,7 +1129,7 @@ func (t *TestSuite) TestSetReadACL() {
 
 	// remove readers as owner with verbose response and trailing slash
 	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?verbosity=full;users=" +
-		t.noRole2.user, nil, t.noRole.token, 721)
+		t.noRole2.user, nil, "Oauth " + t.noRole.token, 721)
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
 		&t.noRole.user, "request complete", mtmap(), false},
 	)
@@ -1121,7 +1143,7 @@ func (t *TestSuite) TestSetReadACL() {
 
 	// add readers as admin with verbose response
 	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?verbosity=full;users=" +
-		t.noRole2.user + "," + t.noRole3.user, nil, t.stdRole.token, 825)
+		t.noRole2.user + "," + t.noRole3.user, nil, "Oauth " + t.stdRole.token, 825)
 	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
 		&t.stdRole.user, "request complete", mtmap(), false},
 	)
@@ -1139,7 +1161,7 @@ func (t *TestSuite) TestSetReadACL() {
 
 	// remove readers as admin with trailing slash, check whitespace is ignored
 	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?users=%20%20,%20%20,%20" +
-		t.noRole2.user + ",%20%20" +  t.noRole3.user, nil, t.stdRole.token, 395)
+		t.noRole2.user + ",%20%20" +  t.noRole3.user, nil, "Oauth " + t.stdRole.token, 395)
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
 		&t.stdRole.user, "request complete", mtmap(), false},
 	)
@@ -1150,7 +1172,8 @@ func (t *TestSuite) TestSetReadACL() {
 }
 
 func (t *TestSuite) TestRemoveSelfFromReadACL() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.noRole.token, 374)
 	uid := t.getUserIDFromMongo(t.noRole.user)
 	t.loggerhook.Reset()
 
@@ -1184,7 +1207,7 @@ func (t *TestSuite) TestRemoveSelfFromReadACL() {
 
 	// add readers as owner
 	body = t.req("PUT", t.url + "/node/" + id + "/acl/read?users=" + t.noRole2.user, nil,
-		t.noRole.token, 441)
+		"Oauth " + t.noRole.token, 441)
 	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/read", 200,
 		&t.noRole.user, "request complete", mtmap(), false},
 	)
@@ -1203,7 +1226,7 @@ func (t *TestSuite) TestRemoveSelfFromReadACL() {
 
 	// remove reader as self with verbose response and trailing slash
 	body = t.req("DELETE", t.url + "/node/" + id + "/acl/read/?verbosity=full;users=" +
-		t.noRole2.user, nil, t.noRole2.token, 617)
+		t.noRole2.user, nil, "Oauth " + t.noRole2.token, 617)
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/acl/read/", 200,
 		&t.noRole2.user, "request complete", mtmap(), false},
 	)
@@ -1251,7 +1274,8 @@ func getExpectedACL(owner map[string]interface{}, readers []map[string]interface
 }
 
 func (t *TestSuite) TestSetReadACLsFail() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 
 	type testcase struct {
@@ -1274,27 +1298,27 @@ func (t *TestSuite) TestSetReadACLsFail() {
 		testcase{"DELETE", "/worseid/acl/read", "", 404, "Node not found", 75},
 		testcase{"PUT", id + "/acl/read", "", 401, "No Authorization", 77},
 		testcase{"DELETE", id + "/acl/read/", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/read/", "badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/read", "badtoken", 400, invauth, 100},
-		testcase{"PUT", id + "/acl/read?users=%20%20,%20%09%20%20,%20", t.noRole.token, 400,
-			nousers, 131},
-		testcase{"DELETE", id + "/acl/read?users=%20%20,%20%20%20,%09%20", t.noRole.token, 400,
-			nousers, 131},
-		testcase{"PUT", id + "/acl/read?users=fakename,fakename2", t.noRole.token, 400,
+		testcase{"PUT", id + "/acl/read/", "oauth badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/read", "oauth badtoken", 400, invauth, 100},
+		testcase{"PUT", id + "/acl/read?users=%20%20,%20%09%20%20,%20", "Oauth " + t.noRole.token,
+			400, nousers, 131},
+		testcase{"DELETE", id + "/acl/read?users=%20%20,%20%20%20,%09%20",
+			"Oauth " + t.noRole.token, 400, nousers, 131},
+		testcase{"PUT", id + "/acl/read?users=fakename,fakename2", "Oauth " + t.noRole.token, 400,
 			"Invalid users: fakename, fakename2", 95},
-		testcase{"DELETE", id + "/acl/read?users=fakename,fakename2", t.noRole.token, 400,
-			"Invalid users: fakename, fakename2", 95},
-		testcase{"PUT", badid + "/acl/read?users=" + t.noRole2.user, t.noRole.token, 404,
-			"Node not found", 75},
-		testcase{"DELETE", badid + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 404,
-			"Node not found", 75},
-		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
+		testcase{"DELETE", id + "/acl/read?users=fakename,fakename2", "Oauth " + t.noRole.token,
+			400, "Invalid users: fakename, fakename2", 95},
+		testcase{"PUT", badid + "/acl/read?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			404, "Node not found", 75},
+		testcase{"DELETE", badid + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token, 400,
 			notown, 129},
-		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole.token, 400,
-			notown, 129},
+		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			400, notown, 129},
 		// fail to delete self
-		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, t.noRole2.token, 400,
-			notown, 129},
+		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole2.token,
+			400, notown, 129},
 	}
 
 	for _, tc := range testcases {
@@ -1304,7 +1328,8 @@ func (t *TestSuite) TestSetReadACLsFail() {
 }
 
 func (t *TestSuite) TestChangeOwner() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.noRole.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.noRole.token, 374)
 	uid := t.getUserIDFromMongo(t.noRole.user)
 	t.loggerhook.Reset()
 
@@ -1338,7 +1363,7 @@ func (t *TestSuite) TestChangeOwner() {
 
 	// change owner. Also check whitespace is ignored.
 	body = t.req("PUT", t.url + "/node/" + id + "/acl/owner?users=%20%20,%20%20%20,%20%20" +
-		t.noRole2.user + "%20%20,%20%20", nil, t.noRole.token, 441)
+		t.noRole2.user + "%20%20,%20%20", nil, "Oauth " + t.noRole.token, 441)
 	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/owner", 200,
 		&t.noRole.user, "request complete", mtmap(), false},
 	)
@@ -1358,7 +1383,7 @@ func (t *TestSuite) TestChangeOwner() {
 
 	// change owner as admin with verbose response and trailing slash
 	body = t.req("PUT", t.url + "/node/" + id + "/acl/owner/?verbosity=full;users=" +
-		t.noRole.user, nil, t.stdRole.token, 721)
+		t.noRole.user, nil, "Oauth " + t.stdRole.token, 721)
 	t.checkLogs(logEvent{logrus.InfoLevel, "PUT", "/node/" + id + "/acl/owner/", 200,
 		&t.stdRole.user, "request complete", mtmap(), false},
 	)
@@ -1369,11 +1394,11 @@ func (t *TestSuite) TestChangeOwner() {
 	t.checkACL(id, "", "?verbosity=full", &t.noRole, 721, expectedACL)
 	t.checkFile(t.url + "/node/" + id + "?download", "/node/" + id, &t.noRole, 9, id,
 		[]byte("foobarbaz"))
-	t.loggerhook.Reset()
 }
 
 func (t *TestSuite) TestChangeOwnerFail() {
-	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), t.kBaseAdmin.token, 374)
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 
 	type testcase struct {
@@ -1398,18 +1423,18 @@ func (t *TestSuite) TestChangeOwnerFail() {
 		testcase{"DELETE", "/worseid/acl/owner", "", 404, "Node not found", 75},
 		testcase{"PUT", id + "/acl/owner", "", 401, "No Authorization", 77},
 		testcase{"DELETE", id + "/acl/owner/", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/owner/", "badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/owner", "badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/owner", t.noRole.token, 400, delown, 112},
-		testcase{"PUT", id + "/acl/owner?users=%20%20,%20%09%20%20,%20", t.noRole.token, 400,
-			nousers, 131},
+		testcase{"PUT", id + "/acl/owner/", "oauth badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", "oauth badtoken", 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", "Oauth " + t.noRole.token, 400, delown, 112},
+		testcase{"PUT", id + "/acl/owner?users=%20%20,%20%09%20%20,%20",
+			"Oauth " + t.noRole.token, 400, nousers, 131},
 		testcase{"PUT", id + "/acl/owner?users=" + t.noRole2.user + "," + t.noRole3.user,
-			t.noRole.token, 400, toomany, 107},
-		testcase{"PUT", id + "/acl/read?users=fakename", t.noRole.token, 400,
+			"Oauth " + t.noRole.token, 400, toomany, 107},
+		testcase{"PUT", id + "/acl/read?users=fakename", "Oauth " + t.noRole.token, 400,
 			"Invalid users: fakename", 84},
-		testcase{"PUT", badid + "/acl/owner?users=" + t.noRole2.user, t.noRole.token, 404,
-			"Node not found", 75},
-		testcase{"PUT", id + "/acl/owner/?users=" + t.noRole2.user, t.noRole.token, 400,
+		testcase{"PUT", badid + "/acl/owner?users=" + t.noRole2.user,
+			"Oauth " + t.noRole.token, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/owner/?users=" + t.noRole2.user, "Oauth " + t.noRole.token, 400,
 			notown, 129},
 	}
 

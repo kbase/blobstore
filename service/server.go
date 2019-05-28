@@ -139,13 +139,32 @@ func getLogger(r *http.Request) *logrus.Entry {
 	return r.Context().Value(servkey{"log"}).(*logrus.Entry)
 }
 
+func getTokenFromHeader(r *http.Request) (string, error) {
+	tokenh := r.Header.Get("authorization")
+	if strings.TrimSpace(tokenh) == "" {
+		return "", nil
+	}
+	tokenparts := strings.Fields(tokenh)
+	if len(tokenparts) != 2 {
+		return "", errors.New(invalidAuthHeader)
+	}
+	if strings.ToLower(tokenparts[0]) != "oauth" {
+		return "", errors.New(invalidAuthHeader)
+	}
+	return tokenparts[1], nil
+
+}
+
 func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// would like to split out the log middleware, but no way to pass the user up the stack
 		le := initLogger(r)
 
-		token := r.Header.Get("authorization")
-		//TODO AUTH header should start with oauth
+		token, err := getTokenFromHeader(r)
+		if err != nil {
+			writeErrorWithCode(le, err.Error(), 400, w)
+			return
+		}
 		var user *auth.User
 		if token != "" {
 			var err error
@@ -403,7 +422,6 @@ func (s *Server) setNodeACL(w http.ResponseWriter, r *http.Request, add bool) {
 			writeError(le, err, w)
 			return
 		}
-		// TODO ACL allow delete self
 	} else if acltype == "read" {
 		users, err := s.getUserList(le, w, r, false)
 		if err != nil {
