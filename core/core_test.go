@@ -1498,8 +1498,7 @@ func TestDeleteNodeFailUnauthorized(t *testing.T) {
 	nsmock.On("GetNode", nid).Return(node, nil)
 
 	err := bs.DeleteNode(*auser, nid)
-	expectederr := NewUnauthorizedACLError("Users can only remove themselves from the read ACL")
-	assert.Equal(t, expectederr, err, "incorrect error")
+	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
 }
 
 func TestDeleteNodeFailDeleteNode(t *testing.T) {

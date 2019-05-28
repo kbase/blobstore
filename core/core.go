@@ -360,11 +360,14 @@ func (bs *BlobStore) ChangeOwner(user auth.User, id uuid.UUID, newowner string,
 }
 
 // DeleteNode deletes the given node.
-// Returns NoBlobError and UnauthorizedACLError.
+// Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) DeleteNode(user auth.User, id uuid.UUID) error {
-	_, _, err := bs.writeok(user, id, false)
+	node, nodeuser, err := bs.getNode(&user, id)
 	if err != nil {
 		return err
+	}
+	if node.GetOwner() != *nodeuser && !user.IsAdmin() {
+		return NewUnauthorizedError("Unauthorized")
 	}
 	err = bs.nodeStore.DeleteNode(id)
 	if err != nil {
