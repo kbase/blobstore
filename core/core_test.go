@@ -50,7 +50,7 @@ func TestStoreBasic(t *testing.T) {
 		12,
 		strings.NewReader("012345678910"))
 	tme := time.Now()
-	sto := filestore.StoreFileOutput{
+	sto := filestore.FileInfo{
 		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		Size: 12,
 		Format: "",
@@ -107,7 +107,7 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		filestore.FileName("myfile"),
 		filestore.Format("excel"))
 	tme := time.Now()
-	sto := filestore.StoreFileOutput{
+	sto := filestore.FileInfo{
 		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		Size: 12,
 		Format: "myfile",
@@ -241,7 +241,7 @@ func TestStoreFailStoreNode(t *testing.T) {
 		12,
 		strings.NewReader("012345678910"))
 	tme := time.Now()
-	sto := filestore.StoreFileOutput{
+	sto := filestore.FileInfo{
 		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		Size: 12,
 		Format: "",
