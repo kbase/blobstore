@@ -81,6 +81,9 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
 
+	router.HandleFunc("/node/{id}", s.deleteNode).Methods(http.MethodDelete)
+	router.HandleFunc("/node/{id}/", s.deleteNode).Methods(http.MethodDelete)
+
 	router.HandleFunc("/node/{id}/acl", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.getACL).Methods(http.MethodGet)
@@ -89,7 +92,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.addNodeACL).Methods(http.MethodPut)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
-	//TODO DELETE handle node delete
 	// TODO DOCKER and docker-compose-up
 	return s, nil
 }
@@ -350,6 +352,29 @@ const timeFormat = "2006-01-02T15:04:05.000Z"
 
 func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
+}
+
+func (s *Server) deleteNode(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
+	id, err := getNodeID(le, w, r)
+	if err != nil {
+		return
+	}
+	user, err := getUserRequired(le, w, r)
+	if err != nil {
+		return
+	}
+	err = s.store.DeleteNode(*user, *id)
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	ret := map[string]interface{}{
+		"status": 200,
+		"error":  nil,
+		"data":   nil,
+	}
+	encodeToJSON(w, 200, &ret)
 }
 
 var aclTypes = map[string]struct{}{
