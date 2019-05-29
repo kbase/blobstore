@@ -377,3 +377,29 @@ func (bs *BlobStore) DeleteNode(user auth.User, id uuid.UUID) error {
 	// also a possibility of leaving orphaned files, no way to avoid that really.
 	return bs.fileStore.DeleteFile(uuidToFilePath(id))
 }
+
+// CopyNode makes a copy of the given node with an empty readers list.
+// Returns NoBlobError and UnauthorizedError.
+func (bs *BlobStore) CopyNode(user auth.User, id uuid.UUID) (*BlobNode, error) {
+	node, nodeuser, err := bs.getNode(&user, id)
+	if err != nil {
+		return nil, err
+	}
+	if !authok(&user, nodeuser, node) {
+		return nil, NewUnauthorizedError("Unauthorized")
+	}
+	newid := bs.uuidGen.GetUUID()
+	fi, err := bs.fileStore.CopyFile(uuidToFilePath(id), uuidToFilePath(newid))
+	if err != nil {
+		return nil, err // since node exists file should exist
+	}
+	newnode, _ := nodestore.NewNode(newid, *nodeuser, node.GetSize(), node.GetMD5(), fi.Stored,
+		nodestore.FileName(node.GetFileName()), nodestore.Format(node.GetFormat()))
+	err = bs.nodeStore.StoreNode(newnode)
+	if err != nil {
+		return nil, err // errors should only occur for unusual situations here
+		// consider deleting the file here, although errors should be extremely rare
+		// since we recently contacted mongo
+	}
+	return toBlobNode(newnode), nil
+}
