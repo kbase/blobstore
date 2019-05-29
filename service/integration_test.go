@@ -739,6 +739,72 @@ func (t *TestSuite) createTestBucket() {
 	}
 }
 
+func (t *TestSuite) TestDeleteNode() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	body = t.req("DELETE", t.url + "/node/" + id, nil, "OAuth " + t.noRole.token, 53)
+
+	expected := map[string]interface{}{"status": float64(200), "data": nil, "error": nil}
+	t.Equal(expected, body, "incorrect response")
+	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id, 200, &t.noRole.user,
+		"request complete", mtmap(), true},
+	)
+
+	// test delete as admin and with trailing slash
+	body = t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"OAuth " + t.noRole.token, 374)
+	id = (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	body = t.req("DELETE", t.url + "/node/" + id + "/", nil, "OAuth " + t.kBaseAdmin.token, 53)
+
+	t.Equal(expected, body, "incorrect response")
+	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/", 200, &t.kBaseAdmin.user,
+		"request complete", mtmap(), true},
+	)
+}
+
+func (t *TestSuite) TestDeleteNodeFail() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	type testcase struct {
+		urlsuffix string
+		token string
+		user *string
+		status int
+		errstring string
+		conlen int64
+	}
+
+	invauth := "Invalid authorization header or content"
+	badid := uuid.New().String()
+	testcases := []testcase{
+		testcase{"badid", "", nil, 404, "Node not found", 75},
+		testcase{"worseid/", "", nil, 404, "Node not found", 75},
+		testcase{id, "", nil, 401, "No Authorization", 77},
+		testcase{id + "/", "", nil, 401, "No Authorization", 77},
+		testcase{id, "oauth badtoken", nil, 400, invauth, 100},
+		testcase{id, "oauh " + t.noRole.token, nil, 400, invauth, 100},
+		testcase{badid, "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 404, "Node not found",
+			75},
+		testcase{id, "oauth " + t.noRole.token, &t.noRole.user, 401, "User Unauthorized", 78},
+	}
+
+	for _, tc := range testcases {
+		body := t.req("DELETE", t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		t.checkError(body, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, "DELETE", "/node/" + tc.urlsuffix, tc.status,
+			tc.user, tc.errstring, mtmap(), false},
+		)
+	}
+}
+
 func (t *TestSuite) TestNotFound() {
 	body := t.req("POST", t.url + "/nde", strings.NewReader("foobarbaz"),
 	"OAuth " + t.kBaseAdmin.token, 70)
