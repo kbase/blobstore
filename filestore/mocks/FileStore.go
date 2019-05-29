@@ -11,17 +11,26 @@ type FileStore struct {
 }
 
 // CopyFile provides a mock function with given fields: sourceID, targetID
-func (_m *FileStore) CopyFile(sourceID string, targetID string) error {
+func (_m *FileStore) CopyFile(sourceID string, targetID string) (*filestore.FileInfo, error) {
 	ret := _m.Called(sourceID, targetID)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+	var r0 *filestore.FileInfo
+	if rf, ok := ret.Get(0).(func(string, string) *filestore.FileInfo); ok {
 		r0 = rf(sourceID, targetID)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*filestore.FileInfo)
+		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(sourceID, targetID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // DeleteFile provides a mock function with given fields: id
@@ -62,15 +71,15 @@ func (_m *FileStore) GetFile(id string) (*filestore.GetFileOutput, error) {
 }
 
 // StoreFile provides a mock function with given fields: p
-func (_m *FileStore) StoreFile(p *filestore.StoreFileParams) (*filestore.StoreFileOutput, error) {
+func (_m *FileStore) StoreFile(p *filestore.StoreFileParams) (*filestore.FileInfo, error) {
 	ret := _m.Called(p)
 
-	var r0 *filestore.StoreFileOutput
-	if rf, ok := ret.Get(0).(func(*filestore.StoreFileParams) *filestore.StoreFileOutput); ok {
+	var r0 *filestore.FileInfo
+	if rf, ok := ret.Get(0).(func(*filestore.StoreFileParams) *filestore.FileInfo); ok {
 		r0 = rf(p)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*filestore.StoreFileOutput)
+			r0 = ret.Get(0).(*filestore.FileInfo)
 		}
 	}
 

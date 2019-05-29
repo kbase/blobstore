@@ -5,7 +5,6 @@ import (
 	"os"
 	"bytes"
 	"time"
-	"github.com/stretchr/testify/assert"
 	"errors"
 	"io/ioutil"
 	"strings"
@@ -129,7 +128,7 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
 	testhelpers.AssertCloseToNow(t.T(), stored, 2 * time.Second)
-	expected := &StoreFileOutput{
+	expected := &FileInfo{
 		ID:       "myid",
 		Size:     12,
 		Stored:   stored, // fake
@@ -379,22 +378,30 @@ func (t *TestSuite) copy(filename string, format string) {
 	)
 	res, _ := fstore.StoreFile(p)
 	time.Sleep(1 * time.Second) // otherwise the store times are the same
-	err := fstore.CopyFile("  myid   ", "   myid3  ")
+	fi, err := fstore.CopyFile("  myid   ", "   myid3  ")
 	if err != nil {
 		t.Fail(err.Error())
 	}
-
-	obj, _ := fstore.GetFile("  myid3   ")
 	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
-	testhelpers.AssertCloseToNow(t.T(), obj.Stored, 2 * time.Second)
+	testhelpers.AssertCloseToNow(t.T(), fi.Stored, 2 * time.Second)
+	t.True(fi.Stored.After(res.Stored), "expected copy time later than source time")
+	fiexpected := FileInfo{
+		ID: "myid3",
+		Size: 12,
+		Format: format,
+		Filename: filename,
+		MD5: "5d838d477ddf355fc15df1db90bee0aa",
+		Stored: fi.Stored, // fake
+	}
+	t.Equal(&fiexpected, fi, "incorrect copy result")
+
+	obj, _ := fstore.GetFile("  myid3   ")
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
-
-	assert.True(t.T(), obj.Stored.After(res.Stored), "expected copy time later than source time")
 
 	expected := &GetFileOutput{
 		ID:       "myid3",
@@ -403,7 +410,7 @@ func (t *TestSuite) copy(filename string, format string) {
 		Format:   format,
 		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
-		Stored:   obj.Stored, // fake
+		Stored:   fi.Stored, // fake
 	}
 	t.Equal(expected, obj, "incorrect object")
 }
@@ -422,7 +429,8 @@ func (t *TestSuite) TestCopyBadInput() {
 }
 
 func (t *TestSuite) copyFail(fstore FileStore, src string, dst string, expected error) {
-	err := fstore.CopyFile(src, dst)
+	fi, err := fstore.CopyFile(src, dst)
+	t.Nil(fi, "expected error")
 	if err == nil {
 		t.Fail("expected error")
 	}
@@ -471,10 +479,11 @@ func (t* TestSuite) testCopyLargeObject() {
 	stored := time.Now()
 	fmt.Println(obj)
 
-	err = fstore.CopyFile("myid", "myid2")
+	finfo, err := fstore.CopyFile("myid", "myid2")
 	if err != nil {
 		t.Fail(err.Error())
 	}
+	fmt.Printf("%v\n", finfo)
 	fmt.Printf("Copy took %s\n", time.Since(stored))
 	copied := time.Now()
 	res, err := fstore.GetFile("myid2")
