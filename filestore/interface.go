@@ -68,8 +68,8 @@ func NewStoreFileParams(
 	return p, nil
 }
 
-// StoreFileOutput the output of the file storage operation.
-type StoreFileOutput struct {
+// FileInfo contains information about a file.
+type FileInfo struct {
 	// The id by which the file can be accessed.
 	ID string
 	// The size of the file.
@@ -119,7 +119,7 @@ func (e *NoFileError) Error() string {
 // by ID.
 type FileStore interface {
 	// Store a file.
-	StoreFile(p *StoreFileParams) (*StoreFileOutput, error)
+	StoreFile(p *StoreFileParams) (*FileInfo, error)
 	// Get a file by the ID of the file.
 	// Returns NoFileError if there is no file by the given ID.
 	GetFile(id string) (*GetFileOutput, error)
@@ -127,5 +127,5 @@ type FileStore interface {
 	DeleteFile(id string) error
 	// CopyFile copies a file from one ID to another.
 	// Returns NoFileError if there is no file by the source ID.
-	CopyFile(sourceID string, targetID string) error
+	CopyFile(sourceID string, targetID string) (*FileInfo, error)
 }

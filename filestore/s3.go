@@ -80,7 +80,7 @@ func (fs *S3FileStore) GetBucket() string {
 }
 
 // StoreFile stores a file.
-func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err error) {
+func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *FileInfo, err error) {
 	if p == nil {
 		return nil, errors.New("Params cannot be nil")
 	}
@@ -112,19 +112,23 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *StoreFileOutput, err 
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
 	// returned by head. Head should be cheap compared to a write
-	headObj, err := fs.s3client.HeadObject(&s3.HeadObjectInput{Bucket: &fs.bucket, Key: &p.id})
+	return fs.getFileInfo(p.id)
+}
+
+func (fs *S3FileStore) getFileInfo(id string) (*FileInfo, error) {
+	headObj, err := fs.s3client.HeadObject(&s3.HeadObjectInput{Bucket: &fs.bucket, Key: &id})
 	if err != nil {
 		return nil, errors.New("s3 store head: " + err.Error()) // not sure how to test this
 	}
-	return &StoreFileOutput{
-			ID:       p.id,
-			Filename: p.filename,
-			Format:   p.format,
+	return &FileInfo{
+			ID:       id,
+			Filename: getMeta(headObj.Metadata, "Filename"),
+			Format:   getMeta(headObj.Metadata, "Format"),
 			// theoretically, the Etag is opaque. In practice, it's the md5
 			// If that changes, MultiWrite the file to an md5 writer.
 			// That means that we can't return the md5 in get file though.
 			MD5:    strings.Trim(*headObj.ETag, `"`),
-			Size:   p.size,
+			Size:   *headObj.ContentLength,
 			Stored: headObj.LastModified.UTC(),
 		},
 		nil
@@ -185,14 +189,14 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 }
 
 // CopyFile copies the file with the source ID to the target ID.
-func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
+func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*FileInfo, error) {
 	sourceID = strings.TrimSpace(sourceID)
 	targetID = strings.TrimSpace(targetID)
 	if sourceID == "" {
-		return errors.New("sourceID cannot be empty or whitespace only")
+		return nil, errors.New("sourceID cannot be empty or whitespace only")
 	}
 	if targetID == "" {
-		return errors.New("targetID cannot be empty or whitespace only")
+		return nil, errors.New("targetID cannot be empty or whitespace only")
 	}
 	// TODO INPUT check valid source and target IDs
 	src := minio.NewSourceInfo(fs.bucket, sourceID, nil)
@@ -204,11 +208,11 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) error {
 	if err != nil {
 		err2 := err.(minio.ErrorResponse)
 		if err2.Code == minioNoSuchKey {
-			return NewNoFileError("No such ID: " + sourceID)
+			return nil, NewNoFileError("No such ID: " + sourceID)
 		}
 		// not sure how to test this.
-		return errors.New("s3 store copy: " + err.Error())
+		return nil, errors.New("s3 store copy: " + err.Error())
 
 	}
-	return nil
+	return fs.getFileInfo(targetID)
 }
