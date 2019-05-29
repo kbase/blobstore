@@ -1557,3 +1557,218 @@ func TestDeleteNodeFailDeleteFile(t *testing.T) {
 	err := bs.DeleteNode(*auser, nid)
 	assert.Equal(t, errors.New("whoopsie daisy"), err, "incorrect error")
 }
+
+func TestCopyNode(t *testing.T) {
+	testCopyNodeWithFnF(t, "", "")
+	testCopyNodeWithFnF(t, "filename.txt", "JSON")
+}
+
+func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
+	
+	owner, _ := auth.NewUser("owner", false)
+	admin, _ := auth.NewUser("admin", true)
+	reader, _ := auth.NewUser("r1", true)
+	noperms, _ := auth.NewUser("noperms", true)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	a, _ := nodestore.NewUser(uuid.New(), "admin")
+	r1, _ := nodestore.NewUser(uuid.New(), "r1")
+	r2, _ := nodestore.NewUser(uuid.New(), "r2")
+	np, _ := nodestore.NewUser(uuid.New(), "noperms")
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.Reader(*r1),
+		nodestore.Reader(*r2), nodestore.FileName(filename), nodestore.Format(format))
+
+	pubnode, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.Public(true),
+		nodestore.FileName(filename), nodestore.Format(format))
+
+
+	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
+	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	newtme, _ := time.Parse("2000-01-01T01:01:02Z01:00", time.RFC3339)
+
+	type testcase struct {
+		node *nodestore.Node
+		user auth.User
+		nuser nodestore.User
+	}
+
+	testcases := []testcase{
+		testcase{node, *owner, *o},
+		testcase{node, *admin, *a},
+		testcase{node, *reader, *r1},
+		testcase{pubnode, *noperms, *np},
+	}
+
+	for _, tc := range testcases {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		uuidmock := new(cmocks.UUIDGen)
+		bs := NewWithUUIDGen(fsmock, nsmock, uuidmock)
+
+		nsmock.On("GetUser", tc.user.GetUserName()).Return(&tc.nuser, nil)
+		nsmock.On("GetNode", nid).Return(tc.node, nil)
+		uuidmock.On("GetUUID").Return(newnid)
+		fsmock.On("CopyFile", fid, newfid).Return(
+			&filestore.FileInfo{
+				ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: "ignored",
+				Stored: newtme},
+			nil,
+		)
+
+		newnode, _ := nodestore.NewNode(newnid, tc.nuser, 12, "fakemd5", newtme,
+			nodestore.FileName(filename), nodestore.Format(format))
+		nsmock.On("StoreNode", newnode).Return(nil)
+
+		bnode, err := bs.CopyNode(tc.user, nid)
+		assert.Nil(t, err, "unexpected error for user " + tc.user.GetUserName())
+		expected := &BlobNode {
+			ID: newnid,
+			Size: 12,
+			MD5: "fakemd5",
+			Stored: newtme,
+			Filename: filename,
+			Format: format,
+			Owner: User{tc.nuser.GetID(), tc.user.GetUserName()},
+			Readers: &[]User{User{tc.nuser.GetID(), tc.user.GetUserName()}},
+			Public: false,
+		}
+		assert.Equal(t, expected, bnode, "incorrect node")
+	}
+}
+
+func TestCopyNodeFailGetUser(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	nsmock.On("GetUser", "un").Return(nil, errors.New("no users here"))
+
+	bnode, err := bs.CopyNode(*auser, uid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("no users here"), err, "incorrect error")
+}
+
+func TestCopyNodeFailGetNode(t *testing.T) {
+	uid := uuid.New()
+	auser, _ := auth.NewUser("un", false)
+
+	userid := uuid.New()
+	nuser, _ := nodestore.NewUser(userid, "username")
+
+
+	inputs := map[error]error{
+		errors.New("Bacon sandwich"): errors.New("Bacon sandwich"),
+		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+	}
+
+	for causeerr, expectederr := range inputs {
+		fsmock := new(fsmocks.FileStore)
+		nsmock := new(nsmocks.NodeStore)
+		bs := New(fsmock, nsmock)
+		nsmock.On("GetUser", "un").Return(nuser, nil)
+
+		nsmock.On("GetNode", uid).Return(nil, causeerr)
+	
+		bnode, err := bs.CopyNode(*auser, uid)
+		assert.Nil(t, bnode, "expected error")
+		assert.Equal(t, expectederr, err, "incorrect error")
+	}
+}
+
+func TestCopyNodeFailUnauthorized(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+	
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	node, _ := nodestore.NewNode(nid, *nowner, 12, "fakemd5", tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	bnode, err := bs.CopyNode(*auser, nid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
+}
+
+func TestCopyNodeFailCopyFile(t *testing.T) {
+	owner, _ := auth.NewUser("owner", false)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme)
+
+	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
+	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	fsmock := new(fsmocks.FileStore)
+	
+	nsmock := new(nsmocks.NodeStore)
+	uuidmock := new(cmocks.UUIDGen)
+	bs := NewWithUUIDGen(fsmock, nsmock, uuidmock)
+
+	nsmock.On("GetUser", "owner").Return(o, nil)
+	nsmock.On("GetNode", nid).Return(node, nil)
+	uuidmock.On("GetUUID").Return(newnid)
+	fsmock.On("CopyFile", fid, newfid).Return(nil, errors.New("well poop"))
+
+	bnode, err := bs.CopyNode(*owner, nid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("well poop"), err, "incorrect error")
+}
+
+func TestCopyNodeFailStoreNode(t *testing.T) {
+	owner, _ := auth.NewUser("owner", false)
+	
+	o, _ := nodestore.NewUser(uuid.New(), "owner")
+	
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
+	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme)
+
+	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
+	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	fsmock := new(fsmocks.FileStore)
+	
+	nsmock := new(nsmocks.NodeStore)
+	uuidmock := new(cmocks.UUIDGen)
+	bs := NewWithUUIDGen(fsmock, nsmock, uuidmock)
+
+	storedtime := time.Now()
+	nsmock.On("GetUser", "owner").Return(o, nil)
+	nsmock.On("GetNode", nid).Return(node, nil)
+	uuidmock.On("GetUUID").Return(newnid)
+	fsmock.On("CopyFile", fid, newfid).Return(
+		&filestore.FileInfo{
+			ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: "ignored",
+			Stored: storedtime},
+		nil,
+	)
+
+	newnode, _ := nodestore.NewNode(newnid, *o, 12, "fakemd5", storedtime)
+	nsmock.On("StoreNode", newnode).Return(errors.New("some error here"))
+
+	bnode, err := bs.CopyNode(*owner, nid)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("some error here"), err, "incorrect error")
+}
