@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,9 +30,11 @@ import (
 
 // TODO LOG log or ignore X-IP headers
 // TODO LOG insecure urls
+// TODO TEST check error when content length too small
 
 const (
-	service = "BlobStore"
+	service      = "BlobStore"
+	formCopyData = "copy_data"
 )
 
 // ServerStaticConf Static configuration items for the Server.
@@ -77,6 +80,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
 
 	router.HandleFunc("/node", s.createNode).Methods(http.MethodPost, http.MethodPut)
+	router.HandleFunc("/node/", s.createNode).Methods(http.MethodPost, http.MethodPut)
 
 	router.HandleFunc("/node/{id}", s.getNode).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/", s.getNode).Methods(http.MethodGet)
@@ -246,9 +250,74 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	form, err := r.MultipartReader()
+	if err != nil {
+		if err == http.ErrNotMultipart {
+			s.createNodeFromBody(le, w, r, user)
+			return
+		}
+		writeErrorWithCode(le, err.Error(), 400, w)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeErrorWithCode(le, http.StatusText(405), 405, w)
+		return
+	}
+	s.createNodeFromForm(le, w, r, form, user)
+}
+
+// caller is expected to close the reader
+func (s *Server) createNodeFromForm(
+	le *logrus.Entry,
+	w http.ResponseWriter,
+	r *http.Request,
+	form *multipart.Reader,
+	user *auth.User,
+) {
+	part, err := form.NextPart()
+	if err != nil {
+		errstr := err.Error()
+		if err == io.EOF {
+			errstr = "Expected " + formCopyData + " form name"
+		}
+		writeErrorWithCode(le, errstr, 400, w)
+		return
+	}
+	defer part.Close()
+	if part.FormName() != formCopyData {
+		writeErrorWithCode(le, "Unexpected form name: "+part.FormName(), 400, w)
+		return
+	}
+	// uuid is 36 ascii chars. We leave a few extra to throw errors if the submitted uuid is
+	// too long, rather than ignoring the extra chars.
+	buffer := make([]byte, 40)
+	n, err := part.Read(buffer)
+	if err != nil && err != io.EOF {
+		// dunno how to test this
+		writeErrorWithCode(le, err.Error(), 400, w)
+		return
+	}
+	cid, err := uuid.Parse(string(buffer[:n]))
+	if err != nil {
+		writeErrorWithCode(le, "Invalid "+formCopyData+": "+err.Error(), 400, w)
+		return
+	}
+	node, err := s.store.CopyNode(*user, cid)
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	writeNode(w, node)
+}
+
+func (s *Server) createNodeFromBody(
+	le *logrus.Entry,
+	w http.ResponseWriter,
+	r *http.Request,
+	user *auth.User,
+) {
 	filename := getQuery(r.URL, "filename")
 	format := getQuery(r.URL, "format")
-	//TODO CREATE handle copy
 	node, err := s.store.Store(*user, r.Body, r.ContentLength, filename, format)
 	if err != nil {
 		// can't figure out how to easily test this case.

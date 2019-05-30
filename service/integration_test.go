@@ -1,6 +1,8 @@
 package service
 
 import (
+	"mime/multipart"
+	"bytes"
 	"github.com/sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -412,10 +414,10 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetNodeAsAdminWithFormat() {
-	body := t.req("POST", t.url + "/node?format=JSON", strings.NewReader("foobarbaz"),
+func (t *TestSuite) TestGetNodeAsAdminWithFormatAndTrailingSlash() {
+	body := t.req("POST", t.url + "/node/?format=JSON", strings.NewReader("foobarbaz"),
 		"oauth " + t.noRole.token, 378)
-	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
 
@@ -801,6 +803,212 @@ func (t *TestSuite) TestDeleteNodeFail() {
 		t.checkError(body, tc.status, tc.errstring)
 		t.checkLogs(logEvent{logrus.ErrorLevel, "DELETE", "/node/" + tc.urlsuffix, tc.status,
 			tc.user, tc.errstring, mtmap(), false},
+		)
+	}
+}
+
+func (t *TestSuite) TestCopyNode() {
+	t.testCopyNode("/node")
+	t.testCopyNode("/node/")
+}
+
+func (t *TestSuite) testCopyNode(path string) {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	// add public read
+	t.req("PUT", t.url + "/node/" + id + "/acl/public_read", nil, "OAuth " + t.noRole.token, 394)
+	// add user
+	t.req("PUT", t.url + "/node/" + id + "/acl/read?users=" + t.noRole2.user, nil,
+		"Oauth " + t.noRole.token, 440)
+	t.loggerhook.Reset()
+
+	noroleID := t.getUserIDFromMongo(t.noRole.user)
+	noroleUser := map[string]interface{}{"uuid": noroleID, "username": t.noRole.user}
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	_ = writer.WriteField("copy_data", id)
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url + path, form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 374)
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", path, 200, &t.noRole.user,
+		"request complete", mtmap(), false},
+	)
+
+	data2 := body2["data"].(map[string]interface{})
+	time := data2["created_on"].(string)
+	id2 := data2["id"].(string)
+	t.NotEqual(id2, id, "expected non equal ids")
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id2,
+			"format": "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name": "",
+				"size": float64(9),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+
+	expectedacl := getExpectedACL(noroleUser, []map[string]interface{}{}, false)
+
+	t.checkNode(id2, &t.noRole, 374, expected)
+	t.checkACL(id2, "", "", &t.noRole, 395, expectedacl)
+	t.checkFile(t.url + "/node/" + id2 + "?download", "/node/" + id2, &t.noRole, 9, id2,
+		[]byte("foobarbaz"))
+}
+
+func (t *TestSuite) TestCopyNodeFailCorruptFormHeader() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+	"Oauth " + t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	_ = writer.WriteField("copy_data", id)
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url + "/node", form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", "multipart/form-data;") // no boundary
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 104)
+	t.checkError(body2, 400, "no multipart boundary param in Content-Type")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"no multipart boundary param in Content-Type", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestCopyNodeFailEmptyForm() {
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url + "/node", form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 89)
+	t.checkError(body2, 400, "Expected copy_data form name")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"Expected copy_data form name", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestCopyNodeFailEarlyEOF() {
+	f := "foo"
+	_ = f
+	req, err := http.NewRequest("POST", t.url + "/node", strings.NewReader("--supahboundary"))
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=supahboundary")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 85)
+	// crappy error, but really shouldn't happen. Have to check the string to ID the error,
+	// not a specific class
+	t.checkError(body2, 400, "multipart: NextPart: EOF")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"multipart: NextPart: EOF", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestCopyNodeFailBadFormName() {
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+	"Oauth " + t.noRole.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	_ = writer.WriteField("attributes", id)
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url + "/node", form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 93)
+	t.checkError(body2, 400, "Unexpected form name: attributes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"Unexpected form name: attributes", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestCopyNodeFail() {
+	// tests the more standard cases where form mangling isn't required
+
+	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
+		"Oauth " + t.kBaseAdmin.token, 374)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	type testcase struct {
+		method string
+		id string
+		token string
+		user *string
+		status int
+		errstring string
+		conlen int64
+	}
+
+	invauth := "Invalid authorization header or content"
+	badid := uuid.New().String()
+	badid2 := []byte(id)
+	badid2[3] = '$'
+	testcases := []testcase{
+		testcase{"POST", id, "", nil, 401, "No Authorization", 77},
+		testcase{"POST", id, "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"POST", id, "oauh " + t.noRole.token, nil, 400, invauth, 100},
+		testcase{"POST", badid, "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 404,
+			"Node not found", 75},
+		testcase{"POST", id, "oauth " + t.noRole.token, &t.noRole.user, 401, "User Unauthorized",
+			78},
+		testcase{"PUT", id, "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 405,
+			"Method Not Allowed", 79},
+		testcase{"POST", id + "a", "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
+			"Invalid copy_data: invalid UUID length: 37", 103},
+		testcase{"POST", id[:35], "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
+			"Invalid copy_data: invalid UUID length: 35", 103},
+		testcase{"POST", string(badid2), "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
+			"Invalid copy_data: invalid UUID format", 99},
+		testcase{"POST", "", "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
+			"Invalid copy_data: invalid UUID length: 0", 102},
+	}
+
+	for _, tc := range testcases {
+		// don't do this normally, memory hog
+		form := new(bytes.Buffer)
+		writer := multipart.NewWriter(form)
+		_ = writer.WriteField("copy_data", tc.id)
+		_ = writer.Close()
+
+		req, err := http.NewRequest(tc.method, t.url + "/node", form)
+		t.Nil(err, "unexpected error")
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("authorization", tc.token)
+		body2 := t.requestToJSON(req, tc.conlen)
+		t.checkError(body2, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, tc.method, "/node", tc.status, tc.user,
+			tc.errstring, mtmap(), false},
 		)
 	}
 }
