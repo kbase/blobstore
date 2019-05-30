@@ -986,6 +986,8 @@ func (t *TestSuite) TestCopyNodeFail() {
 			"Method Not Allowed", 79},
 		testcase{"POST", id + "a", "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
 			"Invalid copy_data: invalid UUID length: 37", 103},
+		testcase{"POST", id + "aaaaa", "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
+			"Invalid copy_data: invalid UUID length: 40", 103},
 		testcase{"POST", id[:35], "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
 			"Invalid copy_data: invalid UUID length: 35", 103},
 		testcase{"POST", string(badid2), "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 400,
