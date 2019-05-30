@@ -60,6 +60,7 @@ func New(p Params) (*Controller, error) {
 	cmd := exec.Command(
 		p.ExecutablePath,
 		"server",
+		"--compat",
 		"--address", "localhost:"+strconv.Itoa(port),
 		ddir)
 	cmd.Env = append(
