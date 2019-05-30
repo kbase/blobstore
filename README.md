@@ -38,6 +38,14 @@ cannot be relative.
 
 Mocks are generated with https://github.com/vektra/mockery v1.0.0.
 
+
+# Known issues
+
+* Providing a `Content-Type` header of `multipart/form-data; boundary=` when trying to copy a node
+  will result in the `go` function that parses multipart data asserting that the http body is
+  not form data, and so the body will be processed as a file upload. This is an issue in the
+  `go` `mime` library.
+
 # TODO
 * HTTP2 support
 
