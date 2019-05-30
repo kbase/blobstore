@@ -358,19 +358,23 @@ func (t *TestSuite) TestDeleteFailNoBucket() {
 		"incorrect error: " + err.Error())
 }
 
-func (t *TestSuite) TestCopy() {
-	t.copy("", "")
+func (t *TestSuite) TestCopyWithInitialSlashes() {
+	t.copy("  /my/myid  ",  "   /my/myid3     ", "", "")
 }
 func (t *TestSuite) TestCopyWithMeta() {
-	t.copy("fn", "json")
+	t.copy("  myid"  , "   myid3   ", "fn", "json")
 }
 
-func (t *TestSuite) copy(filename string, format string) {
+func (t *TestSuite) copy(
+	srcobj string,
+	dstobj string,
+	filename string,
+	format string) {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams(
-		"myid",
+		srcobj,
 		12,
 		strings.NewReader("012345678910"),
 		Format(format),
@@ -378,7 +382,7 @@ func (t *TestSuite) copy(filename string, format string) {
 	)
 	res, _ := fstore.StoreFile(p)
 	time.Sleep(1 * time.Second) // otherwise the store times are the same
-	fi, err := fstore.CopyFile("  myid   ", "   myid3  ")
+	fi, err := fstore.CopyFile(srcobj, dstobj)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -388,7 +392,7 @@ func (t *TestSuite) copy(filename string, format string) {
 	testhelpers.AssertCloseToNow(t.T(), fi.Stored, 2 * time.Second)
 	t.True(fi.Stored.After(res.Stored), "expected copy time later than source time")
 	fiexpected := FileInfo{
-		ID: "myid3",
+		ID: strings.TrimSpace(dstobj),
 		Size: 12,
 		Format: format,
 		Filename: filename,
@@ -397,14 +401,14 @@ func (t *TestSuite) copy(filename string, format string) {
 	}
 	t.Equal(&fiexpected, fi, "incorrect copy result")
 
-	obj, _ := fstore.GetFile("  myid3   ")
+	obj, _ := fstore.GetFile(dstobj)
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
 
 	expected := &GetFileOutput{
-		ID:       "myid3",
+		ID:       strings.TrimSpace(dstobj),
 		Size:     12,
 		Filename: filename,
 		Format:   format,
