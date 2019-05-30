@@ -358,8 +358,8 @@ func (t *TestSuite) TestDeleteFailNoBucket() {
 		"incorrect error: " + err.Error())
 }
 
-func (t *TestSuite) TestCopyWithInitialSlashes() {
-	t.copy("  /my/myid  ",  "   /my/myid3     ", "", "")
+func (t *TestSuite) TestCopyWithSlashes() {
+	t.copy("  my/myid  ",  "   my/myid3     ", "", "")
 }
 func (t *TestSuite) TestCopyWithMeta() {
 	t.copy("  myid"  , "   myid3   ", "fn", "json")

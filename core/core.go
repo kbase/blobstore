@@ -171,7 +171,7 @@ func toUser(u nodestore.User) User {
 
 func uuidToFilePath(uid uuid.UUID) string {
 	uidstr := uid.String()
-	return "/" + uidstr[0:2] + "/" + uidstr[2:4] + "/" + uidstr[4:6] + "/" + uidstr
+	return uidstr[0:2] + "/" + uidstr[2:4] + "/" + uidstr[4:6] + "/" + uidstr
 }
 
 // Get gets details about a node. Returns NoBlobError and UnauthorizedError.
