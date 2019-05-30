@@ -46,12 +46,12 @@ func TestStoreBasic(t *testing.T) {
 	nsmock.On("GetUser", "username").Return(nuser, nil)
 
 	p, _ := filestore.NewStoreFileParams(
-		"/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		"41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		12,
 		strings.NewReader("012345678910"))
 	tme := time.Now()
 	sto := filestore.FileInfo{
-		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		ID: "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		Size: 12,
 		Format: "",
 		Filename: "",
@@ -101,14 +101,14 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 	nsmock.On("GetUser", "username").Return(nuser, nil)
 
 	p, _ := filestore.NewStoreFileParams(
-		"/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		"41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		12,
 		strings.NewReader("012345678910"),
 		filestore.FileName("myfile"),
 		filestore.Format("excel"))
 	tme := time.Now()
 	sto := filestore.FileInfo{
-		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		ID: "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		Size: 12,
 		Format: "myfile",
 		Filename: "excel",
@@ -204,7 +204,7 @@ func TestStoreFailStoreFile(t *testing.T) {
 	nsmock.On("GetUser", "username").Return(nuser, nil)
 
 	p, _ := filestore.NewStoreFileParams(
-		"/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		"41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		12,
 		strings.NewReader("012345678910"))
 	fsmock.On("StoreFile", p).Return(nil, errors.New("even more lovely"))
@@ -237,7 +237,7 @@ func TestStoreFailStoreNode(t *testing.T) {
 	nsmock.On("GetUser", "username").Return(nuser, nil)
 
 	p, _ := filestore.NewStoreFileParams(
-		"/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		"41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		12,
 		strings.NewReader("012345678910"))
 	tme := time.Now()
@@ -516,7 +516,7 @@ func TestGetFileAsOwner(t *testing.T) {
 	nsmock.On("GetNode", uid).Return(node, nil)
 
 	gfo := filestore.GetFileOutput{
-		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
 		Filename: "my_lovely_file",
@@ -524,7 +524,7 @@ func TestGetFileAsOwner(t *testing.T) {
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -555,7 +555,7 @@ func TestGetFileAsReader(t *testing.T) {
 	nsmock.On("GetNode", uid).Return(node, nil)
 
 	gfo := filestore.GetFileOutput{
-		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
 		Filename: "",
@@ -563,7 +563,7 @@ func TestGetFileAsReader(t *testing.T) {
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -594,7 +594,7 @@ func TestGetFileAsAdmin(t *testing.T) {
 	nsmock.On("GetNode", uid).Return(node, nil)
 
 	gfo := filestore.GetFileOutput{
-		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
 		Filename: "afile",
@@ -602,7 +602,7 @@ func TestGetFileAsAdmin(t *testing.T) {
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -635,7 +635,7 @@ func TestGetFilePublic(t *testing.T) {
 	nsmock.On("GetNode", uid).Return(node, nil)
 
 	gfo := filestore.GetFileOutput{
-		ID: "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
 		Size: 9,
 		Format: "who cares",
 		Filename: "afile",
@@ -643,7 +643,7 @@ func TestGetFilePublic(t *testing.T) {
 		Stored: time.Now(),
 		Data: ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -710,7 +710,7 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	fsmock.On("GetFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
 		nil, errors.New("whoopsie"))
 
 	rd, size, filename, err := bs.GetFile(auser, nid)
@@ -1423,7 +1423,7 @@ func TestDeleteNode(t *testing.T) {
 
 	nsmock.On("DeleteNode", nid).Return(nil)
 
-	fsmock.On("DeleteFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(nil)
+	fsmock.On("DeleteFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(nil)
 
 	err := bs.DeleteNode(*auser, nid)
 	assert.Nil(t, err, "unexpected error")
@@ -1550,7 +1550,7 @@ func TestDeleteNodeFailDeleteFile(t *testing.T) {
 
 	nsmock.On("DeleteNode", nid).Return(nil)
 
-	fsmock.On("DeleteFile", "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+	fsmock.On("DeleteFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
 		errors.New("whoopsie daisy"),
 	)
 
@@ -1577,7 +1577,7 @@ func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
 	np, _ := nodestore.NewUser(uuid.New(), "noperms")
 	
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
-	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
 	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme, nodestore.Reader(*r1),
 		nodestore.Reader(*r2), nodestore.FileName(filename), nodestore.Format(format))
@@ -1587,7 +1587,7 @@ func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
 
 
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
-	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	newtme, _ := time.Parse("2000-01-01T01:01:02Z01:00", time.RFC3339)
 
 	type testcase struct {
@@ -1714,12 +1714,12 @@ func TestCopyNodeFailCopyFile(t *testing.T) {
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
-	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
 	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme)
 
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
-	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	fsmock := new(fsmocks.FileStore)
 	
 	nsmock := new(nsmocks.NodeStore)
@@ -1742,12 +1742,12 @@ func TestCopyNodeFailStoreNode(t *testing.T) {
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
-	fid := "/f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
+	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
 	node, _ := nodestore.NewNode(nid, *o, 12, "fakemd5", tme)
 
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
-	newfid := "/b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
+	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	fsmock := new(fsmocks.FileStore)
 	
 	nsmock := new(nsmocks.NodeStore)

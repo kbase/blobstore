@@ -18,6 +18,8 @@ const (
 	minioNoSuchKey = "NoSuchKey"
 )
 
+//TODO INPUT check for acceptable object names all over. No leading slashes.
+
 // S3FileStore is a file store that stores files in an S3 API compatible storage system.
 // It impelements FileStore.
 type S3FileStore struct {
@@ -192,11 +194,6 @@ func (fs *S3FileStore) DeleteFile(id string) error {
 func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*FileInfo, error) {
 	sourceID = strings.TrimSpace(sourceID)
 	targetID = strings.TrimSpace(targetID)
-	cleanTarg := targetID
-	if strings.HasPrefix(targetID, "/") {
-		// work around for https://github.com/minio/minio/issues/7717
-		cleanTarg = targetID[1:] // only works w/ single byte chars like /
-	}
 	if sourceID == "" {
 		return nil, errors.New("sourceID cannot be empty or whitespace only")
 	}
@@ -206,7 +203,7 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*FileInfo, er
 	// TODO INPUT check valid source and target IDs
 	src := minio.NewSourceInfo(fs.bucket, sourceID, nil)
 	// err is returned on invalid bucket & object names.
-	dst, _ := minio.NewDestinationInfo(fs.bucket, cleanTarg, nil, nil)
+	dst, _ := minio.NewDestinationInfo(fs.bucket, targetID, nil, nil)
 	// tested this manually with 12G object. Locally takes about the same amount of time
 	// as StoreFile. Disk limited, presumably
 	err := fs.minioClient.CopyObject(dst, src)
