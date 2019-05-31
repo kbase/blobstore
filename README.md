@@ -177,8 +177,7 @@ RETURNS: the file content.
 ```
 
 `?download_raw`, as opposed to `?download`, causes the `Content-Disposition` header to be
-omitted. This will cause the file to be displayed in the browser rather than the browser displaying
-a download dialog box.
+omitted.
 
 ## Set a node to be publicly readable
 ```
@@ -227,7 +226,8 @@ The `users` parameter must contain a single user name.
 # Requirements:
 * go 1.12
 * An S3 compatible storage system. The Blobstore is tested with Minio version 2019-05-23T00-29-34Z.
-  * If Minio is used, at least version 2019-05-14T23-57-45Z is required.
+  * If Minio is used and the version is 2019-05-14T23-57-45Z or larger the server must
+    be run in `--compat` mode.
 * MongoDB 2.6+
 
 # Running the server:
