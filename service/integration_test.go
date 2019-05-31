@@ -354,7 +354,6 @@ func (t *TestSuite) TestRoot() {
 	)
 }
 
-// TODO DOCS for store, get, get file
 func (t *TestSuite) TestStoreAndGetWithFilename() {
 	// check whitespace
 	body := t.req("POST", t.url + "/node?filename=%20%20myfile%20%20",
@@ -538,8 +537,6 @@ func (t *TestSuite) req(
 	}
 	return t.requestToJSON(req, contentLength)
 }
-
-// TODO DOCS document effect of sending large file with incorrect content-length
 
 //TODO TEST check status code
 func (t *TestSuite) get(url string, user *User, contentLength int64) map[string]interface{} {
