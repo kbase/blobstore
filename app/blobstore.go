@@ -57,10 +57,11 @@ func main() {
 	server := &http.Server{
 		Addr:    cfg.Host,
 		Handler: serv,
+		ReadTimeout:    24 * time.Hour,
+		WriteTimeout:   24 * time.Hour,
 	}
 
-	// TODO BUGNASTY_1 use a server with timeouts & figure out how to abort when no more data is being sent
-	// TODO BUGNASTY_1_cont https://groups.google.com/forum/#!topic/golang-nuts/Hmjf5Ws8g5w
+	// TODO BUGNASTY figure out how to abort when no more data is being sent https://groups.google.com/forum/#!topic/golang-nuts/Hmjf5Ws8g5w
 	fmt.Printf("Listening on " + cfg.Host + "\n")
 	go func() {
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
