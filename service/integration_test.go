@@ -1117,7 +1117,6 @@ contentLength int64, expected map[string]interface{}) {
 	t.Equal(expected, body, "incorrect return")
 }
 
-// TODO TEST need to check errors for logs below this line
 func (t *TestSuite) TestGetACLsBadType() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"OAuth " + t.noRole.token, 374)
@@ -1125,6 +1124,9 @@ func (t *TestSuite) TestGetACLsBadType() {
 	id := (body["data"].(map[string]interface{}))["id"].(string)
 	body2 := t.get(t.url + "/node/" + id + "/acl/pubwic_wead", &t.noRole, 77)
 	t.checkError(body2, 400, "Invalid acl type")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id + "/acl/pubwic_wead", 400,
+		&t.noRole.user, "Invalid acl type", mtmap(), false},
+	)
 }
 
 func (t *TestSuite) TestGetACLsBadID() {
@@ -1235,11 +1237,13 @@ func (t *TestSuite) TestSetGlobalACLsFail() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"OAuth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
 
 	type testcase struct {
 		method string
 		urlsuffix string
 		token string
+		user *string
 		status int
 		errstring string
 		conlen int64
@@ -1249,25 +1253,30 @@ func (t *TestSuite) TestSetGlobalACLsFail() {
 	invauth := "Invalid authorization header or content"
 	badid := uuid.New().String()
 	testcases := []testcase{
-		testcase{"PUT", id + "/acl/pubwic_wead", "", 400, "Invalid acl type", 77},
-		testcase{"DELETE", id + "/acl/pubwic_dewete", "", 400, "Invalid acl type", 77},
-		testcase{"PUT", "/badid/acl/public_read", "", 404, "Node not found", 75},
-		testcase{"DELETE", "/worseid/acl/public_write", "", 404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/public_read", "", 401, "No Authorization", 77},
-		testcase{"DELETE", id + "/acl/public_write", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/public_read", "oauth badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/public_read", "oauth badtoken", 400, invauth, 100},
-		testcase{"PUT", badid + "/acl/public_read", "Oauth " + t.noRole.token, 404,
-			"Node not found", 75},
-		testcase{"DELETE", badid + "/acl/public_read", "Oauth " + t.noRole.token, 404,
-			"Node not found", 75},
-		testcase{"PUT", id + "/acl/public_read", "Oauth " + t.noRole.token, 400, longun, 129},
-		testcase{"DELETE", id + "/acl/public_read", "Oauth " + t.noRole.token, 400, longun, 129},
+		testcase{"PUT", id + "/acl/pubwic_wead", "", nil, 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/pubwic_dewete", "", nil, 400, "Invalid acl type", 77},
+		testcase{"PUT", "badid/acl/public_read", "", nil, 404, "Node not found", 75},
+		testcase{"DELETE", "worseid/acl/public_write", "", nil, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/public_read", "", nil, 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/public_write", "", nil, 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/public_read", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/public_read", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"PUT", badid + "/acl/public_read", "Oauth " + t.noRole.token, &t.noRole.user,
+			 404, "Node not found", 75},
+		testcase{"DELETE", badid + "/acl/public_read", "Oauth " + t.noRole.token, &t.noRole.user,
+			404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/public_read", "Oauth " + t.noRole.token, &t.noRole.user, 400,
+			longun, 129},
+		testcase{"DELETE", id + "/acl/public_read", "Oauth " + t.noRole.token, &t.noRole.user,
+			400, longun, 129},
 	}
 
 	for _, tc := range testcases {
 		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
 		t.checkError(body, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, tc.method, "/node/" + tc.urlsuffix, tc.status,
+			tc.user, tc.errstring, mtmap(), false},
+		)
 	}
 }
 
@@ -1550,11 +1559,14 @@ func (t *TestSuite) TestSetReadACLsFail() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"Oauth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
 
 	type testcase struct {
 		method string
-		urlsuffix string
+		path string
+		query string
 		token string
+		user *string
 		status int
 		errstring string
 		conlen int64
@@ -1565,38 +1577,42 @@ func (t *TestSuite) TestSetReadACLsFail() {
 	invauth := "Invalid authorization header or content"
 	badid := uuid.New().String()
 	testcases := []testcase{
-		testcase{"PUT", id + "/acl/wead", "", 400, "Invalid acl type", 77},
-		testcase{"DELETE", id + "/acl/wead/", "", 400, "Invalid acl type", 77},
-		testcase{"PUT", "/badid/acl/read/", "", 404, "Node not found", 75},
-		testcase{"DELETE", "/worseid/acl/read", "", 404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/read", "", 401, "No Authorization", 77},
-		testcase{"DELETE", id + "/acl/read/", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/read/", "oauth badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/read", "oauth badtoken", 400, invauth, 100},
-		testcase{"PUT", id + "/acl/read?users=%20%20,%20%09%20%20,%20", "Oauth " + t.noRole.token,
-			400, nousers, 131},
-		testcase{"DELETE", id + "/acl/read?users=%20%20,%20%20%20,%09%20",
-			"Oauth " + t.noRole.token, 400, nousers, 131},
-		testcase{"PUT", id + "/acl/read?users=fakename,fakename2", "Oauth " + t.noRole.token, 400,
-			"Invalid users: fakename, fakename2", 95},
-		testcase{"DELETE", id + "/acl/read?users=fakename,fakename2", "Oauth " + t.noRole.token,
-			400, "Invalid users: fakename, fakename2", 95},
-		testcase{"PUT", badid + "/acl/read?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
-			404, "Node not found", 75},
-		testcase{"DELETE", badid + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
-			404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token, 400,
-			notown, 129},
-		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
-			400, notown, 129},
+		testcase{"PUT", id + "/acl/wead", "", "", nil, 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/wead/", "", "", nil, 400, "Invalid acl type", 77},
+		testcase{"PUT", "badid/acl/read/", "", "", nil, 404, "Node not found", 75},
+		testcase{"DELETE", "worseid/acl/read", "", "", nil, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/read", "", "", nil, 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/read/", "", "", nil, 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/read/", "", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/read", "", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"PUT", id + "/acl/read", "?users=%20%20,%20%09%20%20,%20",
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, nousers, 131},
+		testcase{"DELETE", id + "/acl/read", "?users=%20%20,%20%20%20,%09%20",
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, nousers, 131},
+		testcase{"PUT", id + "/acl/read", "?users=fakename,fakename2", "Oauth " + t.noRole.token,
+			&t.noRole.user, 400, "Invalid users: fakename, fakename2", 95},
+		testcase{"DELETE", id + "/acl/read", "?users=fakename,fakename2",
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, "Invalid users: fakename, fakename2",
+			95},
+		testcase{"PUT", badid + "/acl/read", "?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			&t.noRole.user, 404, "Node not found", 75},
+		testcase{"DELETE", badid + "/acl/read/", "?users=" + t.noRole2.user,
+			"Oauth " + t.noRole.token, &t.noRole.user, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/read/", "?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			&t.noRole.user, 400, notown, 129},
+		testcase{"DELETE", id + "/acl/read/", "?users=" + t.noRole2.user,
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, notown, 129},
 		// fail to delete self
-		testcase{"DELETE", id + "/acl/read/?users=" + t.noRole2.user, "Oauth " + t.noRole2.token,
-			400, notown, 129},
+		testcase{"DELETE", id + "/acl/read/", "?users=" + t.noRole2.user,
+			"Oauth " + t.noRole2.token, &t.noRole2.user, 400, notown, 129},
 	}
 
 	for _, tc := range testcases {
-		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		body := t.req(tc.method, t.url + "/node/" + tc.path + tc.query, nil, tc.token, tc.conlen)
 		t.checkError(body, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, tc.method, "/node/" + tc.path, tc.status,
+			tc.user, tc.errstring, mtmap(), false},
+		)
 	}
 }
 
@@ -1673,11 +1689,14 @@ func (t *TestSuite) TestChangeOwnerFail() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"Oauth " + t.kBaseAdmin.token, 374)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
 
 	type testcase struct {
 		method string
-		urlsuffix string
+		path string
+		query string
 		token string
+		user *string
 		status int
 		errstring string
 		conlen int64
@@ -1690,29 +1709,33 @@ func (t *TestSuite) TestChangeOwnerFail() {
 	toomany := "Too many users. Nodes may have only one owner."
 	badid := uuid.New().String()
 	testcases := []testcase{
-		testcase{"PUT", id + "/acl/ownah", "", 400, "Invalid acl type", 77},
-		testcase{"DELETE", id + "/acl/ownah", "", 400, "Invalid acl type", 77},
-		testcase{"PUT", "/badid/acl/owner/", "", 404, "Node not found", 75},
-		testcase{"DELETE", "/worseid/acl/owner", "", 404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/owner", "", 401, "No Authorization", 77},
-		testcase{"DELETE", id + "/acl/owner/", "", 401, "No Authorization", 77},
-		testcase{"PUT", id + "/acl/owner/", "oauth badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/owner", "oauth badtoken", 400, invauth, 100},
-		testcase{"DELETE", id + "/acl/owner", "Oauth " + t.noRole.token, 400, delown, 112},
-		testcase{"PUT", id + "/acl/owner?users=%20%20,%20%09%20%20,%20",
-			"Oauth " + t.noRole.token, 400, nousers, 131},
-		testcase{"PUT", id + "/acl/owner?users=" + t.noRole2.user + "," + t.noRole3.user,
-			"Oauth " + t.noRole.token, 400, toomany, 107},
-		testcase{"PUT", id + "/acl/read?users=fakename", "Oauth " + t.noRole.token, 400,
-			"Invalid users: fakename", 84},
-		testcase{"PUT", badid + "/acl/owner?users=" + t.noRole2.user,
-			"Oauth " + t.noRole.token, 404, "Node not found", 75},
-		testcase{"PUT", id + "/acl/owner/?users=" + t.noRole2.user, "Oauth " + t.noRole.token, 400,
-			notown, 129},
+		testcase{"PUT", id + "/acl/ownah", "", "", nil, 400, "Invalid acl type", 77},
+		testcase{"DELETE", id + "/acl/ownah", "", "", nil, 400, "Invalid acl type", 77},
+		testcase{"PUT", "badid/acl/owner/", "", "", nil, 404, "Node not found", 75},
+		testcase{"DELETE", "worseid/acl/owner", "", "", nil, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/owner", "", "", nil, 401, "No Authorization", 77},
+		testcase{"DELETE", id + "/acl/owner/", "", "", nil, 401, "No Authorization", 77},
+		testcase{"PUT", id + "/acl/owner/", "", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", "", "oauth badtoken", nil, 400, invauth, 100},
+		testcase{"DELETE", id + "/acl/owner", "", "Oauth " + t.noRole.token, &t.noRole.user, 400,
+			delown, 112},
+		testcase{"PUT", id + "/acl/owner", "?users=%20%20,%20%09%20%20,%20",
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, nousers, 131},
+		testcase{"PUT", id + "/acl/owner", "?users=" + t.noRole2.user + "," + t.noRole3.user,
+			"Oauth " + t.noRole.token, &t.noRole.user, 400, toomany, 107},
+		testcase{"PUT", id + "/acl/read", "?users=fakename", "Oauth " + t.noRole.token,
+			&t.noRole.user, 400, "Invalid users: fakename", 84},
+		testcase{"PUT", badid + "/acl/owner", "?users=" + t.noRole2.user,
+			"Oauth " + t.noRole.token, &t.noRole.user, 404, "Node not found", 75},
+		testcase{"PUT", id + "/acl/owner/", "?users=" + t.noRole2.user, "Oauth " + t.noRole.token,
+			&t.noRole.user, 400, notown, 129},
 	}
 
 	for _, tc := range testcases {
-		body := t.req(tc.method, t.url + "/node/" + tc.urlsuffix, nil, tc.token, tc.conlen)
+		body := t.req(tc.method, t.url + "/node/" + tc.path + tc.query, nil, tc.token, tc.conlen)
 		t.checkError(body, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, tc.method, "/node/" + tc.path, tc.status,
+			tc.user, tc.errstring, mtmap(), false},
+		)
 	}
 }
