@@ -75,8 +75,10 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {
 	copts := options.ClientOptions{Hosts: []string{cfg.MongoHost}}
 	if cfg.MongoUser != "" {
-		//TODO AUTH TEST this
-		creds := options.Credential{Username: cfg.MongoUser, Password: cfg.MongoPwd}
+		creds := options.Credential{
+			Username:   cfg.MongoUser,
+			Password:   cfg.MongoPwd,
+			AuthSource: cfg.MongoDatabase}
 		copts.SetAuth(creds)
 	}
 	err := copts.Validate()
