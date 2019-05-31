@@ -71,7 +71,7 @@ This data structure is a subset of Shock's ACL data structure.
 ```
 
 `delete` and `write` ACLs are deprecated and only provided for backwards compatibility reasons.
-They are always `false` for public access or contain only the node owner for standard ACLS.
+They are always `false` for public access or contain only the node owner for standard ACLs.
 
 A User is usually just the UUID assigned to the user by the blobstore, but when full verbosity
 (see below) is requested, the User data structure is:
@@ -113,8 +113,8 @@ GET /
 }
 ```
 
-The `id` and `version` fields are deprecated andpresent for backward compatibility with Shock.
-The `version` field will not change.
+The `id` and `version` fields are deprecated and present only for backwards compatibility with
+Shock. The `version` field will not change.
 
 ## Upload a file / create a node
 ```
@@ -149,7 +149,7 @@ the node to copy.
 
 Curl example:
 ```
-curl -H "Authorization: oauth $KBASE_TOKEN" -F "copy_data=<node id>" http://<host>/node/
+curl -H "Authorization: OAuth $KBASE_TOKEN" -F "copy_data=<node id>" http://<host>/node/
 ```
 
 ## Get a node
