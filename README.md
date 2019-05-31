@@ -177,8 +177,7 @@ RETURNS: the file content.
 ```
 
 `?download_raw`, as opposed to `?download`, causes the `Content-Disposition` header to be
-omitted. This will cause the file to be displayed in the browser rather than the browser displaying
-a download dialog box.
+omitted.
 
 ## Set a node to be publicly readable
 ```
