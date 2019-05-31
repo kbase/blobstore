@@ -30,6 +30,7 @@ import (
 
 // TODO LOG log or ignore X-IP headers
 // TODO LOG insecure urls
+// TODO TIMING vs shock & experimental server
 
 const (
 	service      = "BlobStore"
