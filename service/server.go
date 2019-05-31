@@ -322,7 +322,7 @@ func (s *Server) createNodeFromBody(
 	if err != nil {
 		// can't figure out how to easily test this case.
 		// the only triggerable error in the blobstore code is a bad content length,
-		// but the server complains before we even get here for small data.
+		// but the client complains before we even get here for small data.
 		writeError(le, err, w)
 		return
 	}
