@@ -30,7 +30,6 @@ import (
 
 // TODO LOG log or ignore X-IP headers
 // TODO LOG insecure urls
-// TODO TEST check error when content length too small
 
 const (
 	service      = "BlobStore"
@@ -376,7 +375,6 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 			if filename == "" {
 				filename = id.String()
 			}
-			//TODO TEST in browser
 			w.Header().Set("content-disposition", "attachment; filename="+filename)
 		}
 		w.Header().Set("content-length", strconv.FormatInt(size, 10))
