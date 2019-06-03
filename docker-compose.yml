@@ -4,17 +4,17 @@ version: "3.1"
 # deployment docker-compose file - for example, the name of the mongodb instance
 # that is started up and polled
 services:
-  kbase_groups:
+  kbase_blobstore:
     image: kbase/blobstore:latest
     ports:
       - "8080:8080"
     environment:
-      blobstore_host: localhost:8080
+      blobstore_host: 0.0.0.0:8080
       mongo_host: localhost:27017
       mongo_database: dc_blobstore_test
       kbase_auth_url: https://ci.kbase.us/services/auth
       kbase_auth_admin_roles: KBASE_ADMIN,BLOBSTORE_ADMIN
-      s3_host: localhost:9000
+      s3_host: minio:9000
       s3_bucket: blobbucket
       s3_access_key: mykey
       s3_access_secret: mysekrit
@@ -22,11 +22,12 @@ services:
       s3_disable_ssl: "true"
       # add more configurations here
     command:
-      - "-multiline"
       - "-wait"
       - "tcp://ci-mongo:27017"
       - "-wait"
       - "tcp://mongoinit:8080"
+      - "-wait"
+      - "tcp://minio:9000"
       - "-timeout"
       - "120s"
       - "-template"
@@ -49,7 +50,7 @@ services:
       # If your server is using self-signed certs, or otherwise problematic for cert validation
       # you can add the following flag:
     # - "-validateCert=false"
-    depends_on: ["ci-mongo", "mongoinit", minio]
+    depends_on: ["ci-mongo", "mongoinit", "minio"]
 
   mongoinit:
     image: kbase/db_initialize:latest

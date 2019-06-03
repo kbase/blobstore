@@ -8,7 +8,7 @@ host = {{default .Env.blobstore_host "localhost:8080"}}
 # MongoDB parameters. The user and password must both be supplied if either is supplied.
 mongodb-host = {{ default .Env.mongodb_host "ci-mongo" }}
 mongodb-database = {{ default .Env.mongodb_database "blobstore" }}
-mongodb-user = {{ default .Env.mongodb_user "bsserv" }}
+mongodb-user = {{ default .Env.mongodb_user "" }}
 mongodb-pwd = {{ default .Env.mongodb_pwd "" }}
 
 # S3 API parameters. All are required other than disable-ssl.
