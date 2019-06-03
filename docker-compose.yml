@@ -19,7 +19,7 @@ services:
       s3_access_key: mykey
       s3_access_secret: mysekrit
       s3_region: us-west-1
-      s3_disable_ssl: true
+      s3_disable_ssl: "true"
       # add more configurations here
     command:
       - "-multiline"
@@ -31,7 +31,9 @@ services:
       - "120s"
       - "-template"
       - "/kb/deployment/conf//deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "/kb/deployment/blobstore/blobstore", "--conf", "/kb/deployment/conf/deployment.cfg"
+      - "/kb/deployment/blobstore/blobstore"
+      - "--conf"
+      - "/kb/deployment/conf/deployment.cfg"
       # If you needed to pass in context for template evaluation you would put something like
       # these lines that tell dockerize to hit github for an INI style file for the context
     # - "-env"
