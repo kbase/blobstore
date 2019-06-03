@@ -31,7 +31,7 @@ services:
       - "-timeout"
       - "120s"
       - "-template"
-      - "/kb/deployment/conf//deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
+      - "/kb/deployment/conf/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
       - "/kb/deployment/blobstore/blobstore"
       - "--conf"
       - "/kb/deployment/conf/deployment.cfg"
