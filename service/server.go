@@ -96,7 +96,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.addNodeACL).Methods(http.MethodPut)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
-	// TODO DOCKER and docker-compose-up
+	// TODO CONVERT script from shock -> bs, key off minio files
 	return s, nil
 }
 
