@@ -45,5 +45,15 @@ script:
   - export TCFG=`pwd`/test.cfg
   - BLOBSTORE_TEST_CFG=$TCFG go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
+jobs:
+  include:
+    - stage: deploy
+      env: # The following are secure declarations for DOCKER_USER, DOCKER_PASS
+        - secure: "FOUsz7GwzqjxmoaB2kAQ7T+5twy4F844ApklMSgRynemayqsEWhuEzygXQ+QwLO426s39QtqNgkwYkhTvfInzf+wpUMmTr4tXu0ljYueiEWDOE8CA5FjkPe10e6UWlTqfKPj9jZv2JMc0N3S8evRVTO4UeGjg70gk00QrPsxU7c5gxt7zrabQ0aBXFFswfbnrVcEZXwyqKYOszUxeI7n2bRkLtUSgpKgluPYOcRu8YN51G5yUakC/eHqXM7MtivzTA/fQNbQSB3Ga8O7EmT7zZrpVHPpjEQBkRAhiQLgxNJaoQsRTh31qmj4S0r2/i6fSb2CJftVu2OmlbuQHHyJJvliR6rFTdPKDMXYWTJ7zGjgT5K5DUb96Yix+vEi1lq48mKfjqy+akeqC6z9mXHXZc4aCaLVCOHKCsttH0tUZ+Mb4akfjFFZeVsQ0NTMskfDSisyMniZffAA3A0qRPhgQVFw1F4CeiOabjXBn1K4pLLtbx4lYFrmRPV89umYKOJXV9yt5pPA69dTgJqaUTAdvA1MoKgZ5OzEUzxcVLQlQi+nxUKcBOac705s2rfYuo5yEbrbHrIshBq6cMTgoEzgOfja9Mm6pdL8pmcxp1MyiVcOtvQjHgJ2RWb1TbdKar4ZHVs1U1DsEeB4u/C+o02yVfJBqufFPUxEc74cn7pMMuE="
+        - secure: "XOdfRLxVxIwJxiwC0aiSGfzgNZVKXajqqil6mINuwuCTZAsGTvEyGsU9uy0QTsgjwIrg4USV3TQ0mEo74yQuUPBNKRUImn8ChKIsWkqY+8qbzm40WXQNZ/0DAM+NZ7vtrSXtNfP6Kvy8ffkntYt2zbUCAZDl5hyYzXL0WuAUWnINmwJ3SBTPPYbyvezSW9R1dTsL1xmY63exwqD8ebUslRRcRp3ssSnyLZ24kdqkWiCfbTvELqZkK4xhJ3WhNU0uTe7NHXZD0RDpNUOkHpFOuDJQvcYbp39ua3BpA6Atqtdhnz7n/kDj3osiKnAnDMtVdWodWePE2fOkXGlYobR0kGf2YXPIM4eH+3XstMb8XewmbqQeYPHs/y2Fn8bi7VlCjcvKNGUrEutit0nVINb1le86az08/Sf2wvpyOawTuGugJOdw1rRrEV6Eo1dM4DotIcYaywSP8R+GVh9fNb4rHIWaVq5jJT3rs55xe73417dVUDNcGg6qJ/sHvgxGorulVmKWzZrv6tTLpdq4+YNVzdQ71iD9rJqPbEWChVDDdtURjoW18jNynz4AVSDmzBFeWJobNnAxVpqn/2MlLEvCzar1X9w7dyp4KBTbLCb+1s5ZfJzO29tiaXSMrKLLbYsB5BTfHeMhQMy6m+jl26Z791zdatPZG7mL3ir9sdUAhXo="
+      script: # Only push to dockerhub if this isn't a PR and we're updating master or develop
+        - build/build_docker_image.sh
+        - IMAGE_NAME=kbase/blobstore build/push2dockerhub.sh
+
 after_success:
   - bash <(curl -s https://codecov.io/bash)
