@@ -33,7 +33,6 @@ script:
   - export JARSDIR=`pwd`/jars/lib/jars/
   - cd -
 
-
   # set up test config
   - cp test.cfg.example test.cfg
   - sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIOD#" test.cfg
