@@ -8,7 +8,11 @@ env:
   - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-05-23T00-29-34Z WIRED_TIGER=false
   - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-05-23T00-29-34Z WIRED_TIGER=true
 
-install:
+install: true
+
+# install dependencies in script vs install because the deploy job below makes install run
+# That fails because there are no matrix env varables set
+script: 
   - export GO111MODULE=on
 
   # set up minio
@@ -38,7 +42,7 @@ install:
   - sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=$WIRED_TIGER#" test.cfg
   - cat test.cfg
 
-script:
+  # build the executable
   - go build app/blobstore.go
 
   # run tests
