@@ -1,15 +1,17 @@
-FROM ubuntu/latest as build
+FROM ubuntu:bionic as build
+
+RUN apt-get update && apt-get install -y wget git
 
 ENV GO_VERSION=1.12.5
-RUN wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz &&
-    tar -C /tmp/go -xzf go$GO_VERSION.linux-amd64.tar.gz
+RUN wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz \
+    && tar -C /tmp -xzf go$GO_VERSION.linux-amd64.tar.gz
 ENV PATH=$PATH:/tmp/go/bin
 
 COPY . /tmp/blobstore
-RUN cd /tmp/blobstore &&
-    go build app/blobstore.go
+RUN cd /tmp/blobstore \
+    && go build app/blobstore.go
 
-FROM alpine/latest
+FROM alpine:3.9.4
 
 # These ARGs values are passed in via the docker build command
 ARG BUILD_DATE
@@ -17,7 +19,7 @@ ARG VCS_REF
 ARG BRANCH=develop
 
 # Dockerize installation
-RUN apt-get update && apt-get install -y wget
+RUN apk add wget
 ENV DOCKERIZE_VERSION v0.6.1
 RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
