@@ -1,11 +1,7 @@
-FROM ubuntu:bionic as build
+FROM golang:1.12.5-alpine3.9 as build
 
-RUN apt-get update && apt-get install -y wget git
-
-ENV GO_VERSION=1.12.5
-RUN wget https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz \
-    && tar -C /tmp -xzf go$GO_VERSION.linux-amd64.tar.gz
-ENV PATH=$PATH:/tmp/go/bin
+# git is not included, weirdly, so nothing with ext deps can build
+RUN apk add git
 
 COPY . /tmp/blobstore
 RUN cd /tmp/blobstore \
