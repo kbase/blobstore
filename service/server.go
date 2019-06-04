@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 
+	authcache "github.com/kbase/blobstore/auth/cache"
 	"github.com/kbase/blobstore/core"
 
 	"github.com/kbase/blobstore/auth"
@@ -58,7 +59,7 @@ type ServerStaticConf struct {
 type Server struct {
 	mux        *mux.Router
 	staticconf ServerStaticConf
-	auth       *auth.Cache
+	auth       *authcache.Cache
 	store      *core.BlobStore
 }
 
