@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"fmt"
+	"time"
 	"errors"
 	"net/url"
 	"strconv"
@@ -181,10 +183,18 @@ func (t *TestSuite) checkUser(tc *tgu) {
 
 	kb, err := NewKBaseProvider(*t.authURL, opts...)
 	t.Nil(err, "unexpected error")
-	u, err := kb.GetUser(tc.Token)
+	u, expires, cachefor, err := kb.GetUser(tc.Token)
 	t.Nil(err, "unexpected error")
 	expected := User{tc.UserName, tc.IsAdmin}
 	t.Equal(&expected, u, "incorrect user")
+	// testing against a local authserver, so checking more or less exact values is ok
+	t.Equal(5 * 60 * 1000, cachefor, "incorrect cachefor")
+	// test tokens expire in 1 hour
+	expectedtime := (time.Now().UnixNano() / 1000000) + 60 * 60 * 1000
+	t.True(expectedtime + 1000 > expires, fmt.Sprintf(
+		"expire time (%v) too large vs. expected (%v)", expires, expectedtime))
+	t.True(expectedtime - 1000 < expires, fmt.Sprintf(
+		"expire time (%v) too small vs. expected (%v)", expires, expectedtime))
 }
 
 func (t *TestSuite) TestGetUserFailBadInput() {
@@ -196,9 +206,11 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 	t.Nil(err, "unexpected error")
 
 	for token, expectederr := range tc {
-		u, err := kb.GetUser(token)
+		u, expires, cachefor, err := kb.GetUser(token)
 		t.Nil(u, "expected error")
 		t.Equal(expectederr, err, "incorrect error")
+		t.Equal(int64(-1), expires, "incorrect expires")
+		t.Equal(-1, cachefor, "incorrect cachefore")
 	}
 }
 
@@ -214,9 +226,11 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 		urp, _ := url.Parse(ur)
 		kb, err := NewKBaseProvider(*urp)
 		t.Nil(err, "unexpected error")
-		u, err := kb.GetUser("fake")
+		u, expires, cachefor, err := kb.GetUser("fake")
 		t.Nil(u, "expected error")
 		t.Equal(errors.New(errstr), err, "incorrect error")
+		t.Equal(int64(-1), expires, "incorrect expires")
+		t.Equal(-1, cachefor, "incorrect cachefore")
 	}
 }
 
@@ -229,8 +243,9 @@ func (t *TestSuite) TestValidateUserName() {
 	t.Nil(err, "unexpected error")
 
 	for _, names := range tc {
-		err := kb.ValidateUserNames(&names, t.tokenNoRole)
+		cachefor, err := kb.ValidateUserNames(&names, t.tokenNoRole)
 		t.Nil(err, "unexpected error")
+		t.Equal(30 * 60 * 1000, cachefor, "incorrect cachefor")
 	}
 }
 
@@ -255,8 +270,9 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 	t.Nil(err, "unexpected error")
 
 	for _, tcase := range tc {
-		err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
+		cachefor, err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
 		t.Equal(tcase.err, err, "incorrect error")
+		t.Equal(-1, cachefor, "incorrect cachefor")
 	}
 }
 
@@ -270,8 +286,9 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 	t.Nil(err, "unexpected error")
 	
 	for token, expectederr := range tc {
-		err := kb.ValidateUserNames(&[]string{"noroles"}, token)
+		cachefor, err := kb.ValidateUserNames(&[]string{"noroles"}, token)
 		t.Equal(expectederr, err, "incorrect error")
+		t.Equal(-1, cachefor, "incorrect cachefor")
 	}
 }
 
@@ -287,7 +304,8 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 		urp, _ := url.Parse(ur)
 		kb, err := NewKBaseProvider(*urp)
 		t.Nil(err, "unexpected error")
-		err = kb.ValidateUserNames(&[]string{"noroles"}, "fake")
+		cachefor, err := kb.ValidateUserNames(&[]string{"noroles"}, "fake")
 		t.Equal(errors.New(errstr), err, "incorrect error")
+		t.Equal(-1, cachefor, "incorrect cachefor")
 	}
 }
