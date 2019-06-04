@@ -16,8 +16,6 @@ import (
 	bserr "github.com/kbase/blobstore/errors"
 )
 
-//TODO CACHE token -> user & name -> valid
-
 const (
 	//https://github.com/kbase/auth2/blob/01a4d2c6e9bf8aff7d7f6eda78af47522ca158d8/src/us/kbase/auth2/lib/UserName.java#L39
 	nameInvalidChars = "[^a-z\\d_]+"
