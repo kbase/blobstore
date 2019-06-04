@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/kbase/blobstore/auth"
+	authcache "github.com/kbase/blobstore/auth/cache"
 	"github.com/kbase/blobstore/config"
 	"github.com/minio/minio-go"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,8 +29,8 @@ import (
 
 // Dependencies contain the built dependencies of the blobstore service.
 type Dependencies struct {
-	AuthCache    *auth.Cache
-	BlobStore    *core.BlobStore
+	AuthCache *authcache.Cache
+	BlobStore *core.BlobStore
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
@@ -93,7 +94,7 @@ func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {
 	return nodestore.NewMongoNodeStore(db)
 }
 
-func buildAuth(cfg *config.Config) (*auth.Cache, error) {
+func buildAuth(cfg *config.Config) (*authcache.Cache, error) {
 	roles := []func(*auth.KBaseProvider) error{}
 	for _, r := range *cfg.AuthAdminRoles {
 		roles = append(roles, auth.AdminRole(r))
@@ -102,5 +103,5 @@ func buildAuth(cfg *config.Config) (*auth.Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	return auth.NewCache(prov), nil
+	return authcache.NewCache(prov), nil
 }
