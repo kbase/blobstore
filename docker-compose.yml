@@ -22,6 +22,7 @@ services:
       s3_disable_ssl: "true"
       # add more configurations here
     command:
+      - "-multiline"
       - "-wait"
       - "tcp://ci-mongo:27017"
       - "-wait"

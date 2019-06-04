@@ -16,10 +16,9 @@ ARG BRANCH=develop
 
 # Dockerize installation
 RUN apk add wget ca-certificates
-ENV DOCKERIZE_VERSION v0.6.1
-RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
-    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
-    && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+RUN wget -O dockerize.tar.gz https://github.com/kbase/dockerize/blob/ed320f524669d49edc7c8215d520ddd7e085c9fd/dockerize-alpine-linux-amd64-v0.6.1.tar.gz?raw=true \
+    && tar -C /usr/local/bin -xzvf dockerize.tar.gz \
+    && rm dockerize.tar.gz
 
 COPY --from=build /tmp/blobstore/deployment /kb/deployment/
 RUN mkdir /kb/deployment/blobstore
@@ -34,10 +33,11 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.vcs-ref=$VCS_REF \
       org.label-schema.schema-version="1.0.0-rc1" \
       us.kbase.vcs-branch=$BRANCH \
-      maintainer="Steve Chan sychan@lbl.gov"
+      maintainer="Gavin Price gaprice@lbl.gov"
 
 EXPOSE 8080
 ENTRYPOINT [ "/usr/local/bin/dockerize" ]
 WORKDIR /kb/deployment/blobstore
-CMD [ "-template", "/kb/deployment/conf/deployment.cfg.templ:/kb/deployment/blobstore/deployment.cfg", \
-    "/kb/deployment/blobstore/blobstore", "--conf", "/kb/deployment/blobstore/deployment.cfg" ]
+CMD [ "-multiline", \
+      "-template", "/kb/deployment/conf/deployment.cfg.templ:/kb/deployment/blobstore/deployment.cfg", \
+      "/kb/deployment/blobstore/blobstore", "--conf", "/kb/deployment/blobstore/deployment.cfg" ]
