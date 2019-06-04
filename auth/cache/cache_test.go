@@ -50,13 +50,11 @@ func TestGetUserCacheFor(t *testing.T) {
 	assert.Equal(t, u, got, "incorrect user")
 	assert.Nil(t, err, "unexpected error")
 
-	time.Sleep(60 * time.Millisecond)
-
 	provmock.AssertNumberOfCalls(t, "GetUser", 2)
 	timemock.AssertNumberOfCalls(t, "Now", 2)
 }
 
-// could maybe combine w/ test above but I think it'd get too annoying to fullow
+// could maybe combine w/ test above but I think it'd get too annoying to follow
 
 func TestGetUserExpires(t *testing.T) {
 	// last test had cachefor set the expiry, now we'll check with expires
@@ -97,8 +95,6 @@ func TestGetUserExpires(t *testing.T) {
 	got, err = c.GetUser("sometoken")
 	assert.Equal(t, u, got, "incorrect user")
 	assert.Nil(t, err, "unexpected error")
-
-	time.Sleep(60 * time.Millisecond)
 
 	provmock.AssertNumberOfCalls(t, "GetUser", 2)
 	timemock.AssertNumberOfCalls(t, "Now", 2)
