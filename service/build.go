@@ -28,7 +28,7 @@ import (
 
 // Dependencies contain the built dependencies of the blobstore service.
 type Dependencies struct {
-	AuthProvider auth.Provider
+	AuthCache    *auth.Cache
 	BlobStore    *core.BlobStore
 }
 
@@ -39,7 +39,7 @@ func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.AuthProvider = auth
+	d.AuthCache = auth
 	ns, err := buildNodeStore(cfg)
 	if err != nil {
 		return nil, err
@@ -93,10 +93,14 @@ func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {
 	return nodestore.NewMongoNodeStore(db)
 }
 
-func buildAuth(cfg *config.Config) (auth.Provider, error) {
+func buildAuth(cfg *config.Config) (*auth.Cache, error) {
 	roles := []func(*auth.KBaseProvider) error{}
 	for _, r := range *cfg.AuthAdminRoles {
 		roles = append(roles, auth.AdminRole(r))
 	}
-	return auth.NewKBaseProvider(*cfg.AuthURL, roles...)
+	prov, err := auth.NewKBaseProvider(*cfg.AuthURL, roles...)
+	if err != nil {
+		return nil, err
+	}
+	return auth.NewCache(prov), nil
 }

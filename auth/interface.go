@@ -64,7 +64,7 @@ type Provider interface {
 	// GetUser gets a user given a token.
 	// Returns InvalidToken error.
 	GetUser(token string) (*User, error)
-	// ValidateUserName validates that user names exist in the auth system.
+	// ValidateUserNames validates that user names exist in the auth system.
 	// token can be any valid token - it's used only to look up the userName.
 	// Returns InvalidToken error and InvalidUserError.
 	ValidateUserNames(userNames *[]string, token string) error

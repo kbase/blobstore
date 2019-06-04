@@ -58,7 +58,7 @@ type ServerStaticConf struct {
 type Server struct {
 	mux        *mux.Router
 	staticconf ServerStaticConf
-	auth       auth.Provider
+	auth       *auth.Cache
 	store      *core.BlobStore
 }
 
@@ -74,7 +74,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	router.MethodNotAllowedHandler = http.HandlerFunc(notAllowedHandler)
 	// router.StrictSlash(true) // doesn't seem to have an effect...?
-	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthProvider, store: deps.BlobStore}
+	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthCache, store: deps.BlobStore}
 	router.Use(s.authLogMiddleWare)
 
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
