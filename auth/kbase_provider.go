@@ -21,11 +21,12 @@ import (
 const (
 	//https://github.com/kbase/auth2/blob/01a4d2c6e9bf8aff7d7f6eda78af47522ca158d8/src/us/kbase/auth2/lib/UserName.java#L39
 	nameInvalidChars = "[^a-z\\d_]+"
+	userExpireTimeMS = 30 * 60 * 1000
 )
 
 var nameRegex = regexp.MustCompile(nameInvalidChars)
 
-// KBaseProvider provides authentication based on the KBase auth server
+// KBaseProvider provides authentication based on the KBase auth server. Implements auth.Provider.
 // (https://github.com/kbase/auth2)
 type KBaseProvider struct {
 	url           url.URL
@@ -84,22 +85,25 @@ func (kb *KBaseProvider) GetURL() url.URL {
 }
 
 // GetUser gets a user given a token.
-func (kb *KBaseProvider) GetUser(token string) (*User, error) {
+// Returns InvalidToken error.
+func (kb *KBaseProvider) GetUser(token string) (*User, int64, int, error) {
 	if strings.TrimSpace(token) == "" {
-		return nil, bserr.WhiteSpaceError("token")
+		return nil, -1, -1, bserr.WhiteSpaceError("token")
 	}
 	tokenjson, err := get(kb.endpointToken, token)
 	if err != nil {
-		return nil, err
+		return nil, -1, -1, err
 	}
 	mejson, err := get(kb.endpointMe, token)
 	if err != nil {
-		return nil, err // not sure how to test this given the previous passed
+		return nil, -1, -1, err // not sure how to test this given the previous passed
 	}
 	roles := mejson["customroles"].([]interface{})
 	isadmin := kb.isAdmin(&roles)
-	//TODO CACHE return expiration time from token info
-	return &User{userName: tokenjson["user"].(string), isAdmin: isadmin}, nil
+	expires := int64(tokenjson["expires"].(float64))
+	cachetime := int(tokenjson["cachefor"].(float64))
+	u := &User{userName: tokenjson["user"].(string), isAdmin: isadmin}
+	return u, expires, cachetime, nil
 }
 
 // expects roles to be strings
@@ -165,21 +169,21 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 }
 
 // ValidateUserNames validates that user names exist in the auth system.
-// If one or more users are invalid, InvalidUsersError is returned.
 // token can be any valid token - it's used only to look up the userNames.
-func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) error {
+// Returns InvalidToken error and InvalidUserError.
+func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (int, error) {
 	if strings.TrimSpace(token) == "" {
-		return bserr.WhiteSpaceError("token")
+		return -1, bserr.WhiteSpaceError("token")
 	}
 	if userNames == nil || len(*userNames) < 1 {
-		return errors.New("userNames cannot be nil or empty")
+		return -1, errors.New("userNames cannot be nil or empty")
 	}
 	names := []string{}
 	invalid := []string{}
 	for _, n := range *userNames {
 		n = strings.TrimSpace(n)
 		if n == "" {
-			return bserr.WhiteSpaceError("names in userNames array")
+			return -1, bserr.WhiteSpaceError("names in userNames array")
 		}
 		if nameRegex.Match([]byte(n)) || !startsWithLetter(n) {
 			invalid = append(invalid, n)
@@ -189,12 +193,12 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) er
 	}
 	if len(invalid) > 0 {
 		// maybe a different error type here? Not actually checking all the names
-		return &InvalidUserError{&invalid}
+		return -1, &InvalidUserError{&invalid}
 	}
 	u, _ := url.Parse(kb.endpointUser + strings.Join(names, ","))
 	userjson, err := get(*u, token)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	for _, n := range names {
 		if _, ok := userjson[n]; !ok {
@@ -202,10 +206,9 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) er
 		}
 	}
 	if len(invalid) > 0 {
-		return &InvalidUserError{&invalid}
+		return -1, &InvalidUserError{&invalid}
 	}
-	// TODO CACHE return expiration time
-	return nil
+	return userExpireTimeMS, nil
 }
 
 func startsWithLetter(s string) bool {
