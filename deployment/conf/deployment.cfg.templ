@@ -1,0 +1,27 @@
+# Config file for the blobstore service.
+
+[BlobStore]
+
+# The host under which the server will run, typically localhost:[port] or 0.0.0.0:[port]
+host = {{default .Env.blobstore_host "localhost:8080"}}
+
+# MongoDB parameters. The user and password must both be supplied if either is supplied.
+mongodb-host = {{ default .Env.mongodb_host "ci-mongo" }}
+mongodb-database = {{ default .Env.mongodb_database "blobstore" }}
+mongodb-user = {{ default .Env.mongodb_user "" }}
+mongodb-pwd = {{ default .Env.mongodb_pwd "" }}
+
+# S3 API parameters. All are required other than disable-ssl.
+# disable-ssl treats any value other than 'true' as false.
+s3-host = {{ default .Env.s3_host "localhost:9000" }}
+s3-bucket = {{ default .Env.s3_bucket "blobstore" }}
+s3-access-key = {{ default .Env.s3_access_key "" }}
+s3-access-secret = {{ default .Env.s3_access_secret "" }}
+s3-region = {{ default .Env.s3_region "us-west-1" }}
+s3-disable-ssl = {{ default .Env.s3_disable_ssl "false" }}
+
+# KBase auth server parameters.
+# The root url of the auth server.
+kbase-auth-url = {{ default .Env.kbase_auth_url "https://ci.kbase.us/services/auth" }}
+# KBase auth server custom roles that denote the user is a blobstore admin. Comma delimited.
+kbase-auth-admin-roles = {{ default .Env.kbase_auth_admin_roles "KBASE_ADMIN, BLOBSTORE_ADMIN" }}
