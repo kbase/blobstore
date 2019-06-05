@@ -102,8 +102,8 @@ func (t *TestSuite) TestConstructFailAddConfigIndex() {
 	t.Contains(err.Error(), "mongo create index", "incorrect error")
 	t.Contains(err.Error(), "E11000 duplicate key error", "incorrect error")
 	t.Contains(err.Error(), testDB + ".config", "incorrect error")
-	t.Contains(err.Error(), "schema_1  dup key: { : \"schema\" }", "incorrect error")
-
+	t.Contains(err.Error(), "schema_1", "incorrect error")
+	t.Contains(err.Error(), "dup key: { : \"schema\" }", "incorrect error")
 }
 
 func (t *TestSuite) TestConstructFailTwoConfigDocs() {
