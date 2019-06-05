@@ -24,6 +24,9 @@ const (
 	deprecation = "The id and version fields are deprecated."
 )
 
+// expect initialization via go build -ldflags "-X main.gitCommit=$GIT_COMMIT"
+var gitCommit string
+
 type options struct {
 	// ConfigFile is the path to the config file for the server
 	ConfigFile string `long:"conf" required:"true" description:"service config file location"`
@@ -48,6 +51,7 @@ func main() {
 			ID:                  shockname,
 			ServerVersionCompat: shockver,
 			DeprecationWarning:  deprecation,
+			GitCommit:           gitCommit,
 		},
 	)
 	if err != nil {
