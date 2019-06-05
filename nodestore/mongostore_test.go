@@ -124,7 +124,6 @@ func (t *TestSuite) TestConstructFailBadSchemaVer() {
 	t.failConstruct(t.client.Database(testDB), errors.New(e))
 }
 
-
 func (t *TestSuite) TestConstructFailInUpdate() {
 	col := t.client.Database(testDB).Collection("config")
 	_, err := col.InsertOne(nil, map[string]interface{}{
@@ -150,6 +149,17 @@ func (t *TestSuite) TestConstructWithPreexistingSchemaDoc() {
 		"schemaver": 1})
 	t.Nil(err, "unexpected error")
 	cli, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "unexpected error")
+	t.NotNil(cli, "expected non-nil client") // going to test using the client later
+}
+
+func (t *TestSuite) TestConstructStartTwice() {
+	// check that the created schema doc is ok
+	cli, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "unexpected error")
+	t.NotNil(cli, "expected non-nil client")
+
+	cli, err = NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "unexpected error")
 	t.NotNil(cli, "expected non-nil client") // going to test using the client later
 }
