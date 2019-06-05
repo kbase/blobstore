@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kbase/blobstore/core/values"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/google/uuid"
@@ -319,9 +321,17 @@ func (s *Server) createNodeFromBody(
 	r *http.Request,
 	user *auth.User,
 ) {
-	filename := getQuery(r.URL, "filename")
-	format := getQuery(r.URL, "format")
-	node, err := s.store.Store(*user, r.Body, r.ContentLength, filename, format)
+	filename, err := values.NewFileName(getQuery(r.URL, "filename"))
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	format, err := values.NewFileFormat(getQuery(r.URL, "format"))
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	node, err := s.store.Store(*user, r.Body, r.ContentLength, *filename, *format)
 	if err != nil {
 		// can't figure out how to easily test this case.
 		// the only triggerable error in the blobstore code is a bad content length,

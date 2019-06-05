@@ -110,6 +110,7 @@ GET /
   "servertime": <server time in epoch milliseconds>,
   "serverversion": <server version>,
   "version": "0.9.6"
+  "gitcommit": <git commit from which the server was built>
 }
 ```
 
@@ -134,6 +135,9 @@ The `Content-Length` header must be present and accurate.
 curl -H "Authorization: OAuth $KBASE_TOKEN" -T mylittlefile
   "http://<host>node?filename=mylittlefile&format=text"
 ```
+
+`filename` can be at most 256 characters with no control characters.  
+`format` can be at most 100 characters with no control characters.
 
 ## Copy a node
 ```
@@ -236,6 +240,12 @@ The `users` parameter must contain a single user name.
 * In the module directory:
   * `go build app/blobstore.go`
   * `./blobstore --conf deploy.cfg`
+
+To build the git commit into the server:
+```
+export GIT_COMMIT=$(git rev-list -1 HEAD) 
+    && go build -ldflags "-X main.gitCommit=$GIT_COMMIT" app/blobstore.go
+```
 
 # Developers
 

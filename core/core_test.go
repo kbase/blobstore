@@ -66,12 +66,14 @@ func TestStoreBasic(t *testing.T) {
 	nsmock.On("StoreNode", node).Return(nil)
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("")
+	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
-		"",
-		"",	
+		*fn,
+		*ff,
 	)
 	assert.Nil(t, err, "unexpected error")
 	expected := &BlobNode {
@@ -126,12 +128,14 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("myfile")
+	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
-		"myfile",
-		"excel",
+		*fn,
+		*ff,
 	)
 	assert.Nil(t, err, "unexpected error")
 	expected := &BlobNode {
@@ -156,12 +160,14 @@ func TestStoreFailSize(t *testing.T) {
 
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("myfile")
+	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		0,
-		"myfile",
-		"excel",
+		*fn,
+		*ff,
 	)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect error")
@@ -181,12 +187,14 @@ func TestStoreFailGetUser(t *testing.T) {
 
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("myfile")
+	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
-		"myfile",
-		"excel",
+		*fn,
+		*ff,
 	)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("lovely error"), err, "incorrect error")
@@ -214,12 +222,14 @@ func TestStoreFailStoreFile(t *testing.T) {
 
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("")
+	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
-		"",
-		"",
+		*fn,
+		*ff,
 	)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("even more lovely"), err, "incorrect error")
@@ -260,12 +270,14 @@ func TestStoreFailStoreNode(t *testing.T) {
 
 	auser, _ := auth.NewUser("username", false)
 
+	fn, _ := values.NewFileName("")
+	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
-		"",
-		"",	
+		*fn,
+		*ff,	
 	)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("the loveliest of them all"), err, "incorrect error")

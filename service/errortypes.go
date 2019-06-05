@@ -3,6 +3,8 @@ package service
 import (
 	"net/http"
 
+	"github.com/kbase/blobstore/core/values"
+
 	"github.com/kbase/blobstore/core"
 
 	"github.com/kbase/blobstore/auth"
@@ -30,6 +32,8 @@ func translateError(err error) (code int, errstr string) {
 			"themselves from ACLs."
 	case *auth.InvalidUserError:
 		// no equivalent shock error, it accepts any string as a username
+		return http.StatusBadRequest, t.Error()
+	case *values.IllegalInputError:
 		return http.StatusBadRequest, t.Error()
 	default:
 		return 500, t.Error()
