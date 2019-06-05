@@ -1,6 +1,7 @@
 package nodestore
 
 import (
+	"github.com/kbase/blobstore/core/values"
 	"time"
 	"errors"
 	"github.com/stretchr/testify/assert"
@@ -27,11 +28,12 @@ func TestNewNodeMin(t *testing.T) {
 	id := uuid.New()
 	owner, _ := NewUser(uuid.New(), " owner ")
 	tm := time.Now()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, err := NewNode(
 		id,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tm,
 		)
 	assert.Nil(t, err, "unexpected error")
@@ -40,7 +42,7 @@ func TestNewNodeMin(t *testing.T) {
 	assert.Equal(t, id, n.GetID(), "incorrect ID")
 	assert.Equal(t, *owner, n.GetOwner(), "incorrect owner")
 	assert.Equal(t, int64(67), n.GetSize(), "incorrect size")
-	assert.Equal(t, "1b9554867d35f0d59e4705f6b2712cd1", n.GetMD5(), "incorrect MD5")
+	assert.Equal(t, *md5, n.GetMD5(), "incorrect MD5")
 	assert.Equal(t, tm, n.GetStoredTime(), "incorrect store time")
 	assert.Equal(t, "", n.GetFormat(), "incorrect format")
 	assert.Equal(t, "", n.GetFileName(), "incorrect filename")
@@ -54,11 +56,12 @@ func TestNewNodeFull(t *testing.T) {
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	r2, _ := NewUser(uuid.New(), " r2")
 	tm := time.Now()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, err := NewNode(
 		id,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tm,
 		Format("    txt   "),
 		FileName("   file.txt   "),
@@ -71,7 +74,7 @@ func TestNewNodeFull(t *testing.T) {
 	assert.Equal(t, id, n.GetID(), "incorrect ID")
 	assert.Equal(t, *owner, n.GetOwner(), "incorrect owner")
 	assert.Equal(t, int64(67), n.GetSize(), "incorrect size")
-	assert.Equal(t, "1b9554867d35f0d59e4705f6b2712cd1", n.GetMD5(), "incorrect MD5")
+	assert.Equal(t, *md5, n.GetMD5(), "incorrect MD5")
 	assert.Equal(t, tm, n.GetStoredTime(), "incorrect store time")
 	assert.Equal(t, "txt", n.GetFormat(), "incorrect format")
 	assert.Equal(t, "file.txt", n.GetFileName(), "incorrect filename")
@@ -83,11 +86,12 @@ func TestNodeImmutable(t *testing.T) {
 	owner, _ := NewUser(uuid.New(), " owner ")
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	r2, _ := NewUser(uuid.New(), " r2")
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		uuid.New(),
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		time.Now(),
 		Reader(*r1),
 		)
@@ -100,11 +104,12 @@ func TestNodeImmutable(t *testing.T) {
 
 func TestNodeBadInput(t *testing.T) {
 	owner, _ := NewUser(uuid.New(), " owner ")
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, err := NewNode(
 		uuid.New(),
 		*owner,
 		0,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		time.Now(),
 		)
 	assert.Nil(t, n, "expected nil object")
@@ -116,11 +121,12 @@ func TestNodeWithPublic(t *testing.T) {
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	tme := time.Now()
 	nid := uuid.New()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1),
 		)
@@ -129,7 +135,7 @@ func TestNodeWithPublic(t *testing.T) {
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1),
 		Public(true),
@@ -148,11 +154,12 @@ func TestNodeWithOwner(t *testing.T) {
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	tme := time.Now()
 	nid := uuid.New()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1),
 		)
@@ -161,7 +168,7 @@ func TestNodeWithOwner(t *testing.T) {
 		nid,
 		*newowner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*owner),
 		Reader(*r1),
@@ -182,7 +189,7 @@ func TestNodeWithOwner(t *testing.T) {
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1),
 		Reader(*newowner),
@@ -199,11 +206,12 @@ func TestNodeWithReaders(t *testing.T) {
 	r1, _ := NewUser(uuid.New(), " r1 ")
 	tme := time.Now()
 	nid := uuid.New()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1),
 		)
@@ -215,7 +223,7 @@ func TestNodeWithReaders(t *testing.T) {
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1), Reader(*r2), Reader(*r3),
 		)
@@ -234,11 +242,12 @@ func TestNodeWithoutReaders(t *testing.T) {
 	r3, _ := NewUser(uuid.New(), " r3 ")
 	tme := time.Now()
 	nid := uuid.New()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1), Reader(*r2), Reader(*r3),
 		)
@@ -248,7 +257,7 @@ func TestNodeWithoutReaders(t *testing.T) {
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1), Reader(*r3),
 		)
@@ -267,11 +276,12 @@ func TestNodeHasReader(t *testing.T) {
 	r3, _ := NewUser(uuid.New(), " r3 ")
 	tme := time.Now()
 	nid := uuid.New()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*owner,
 		67,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Reader(*r1), Reader(*r3),
 		)

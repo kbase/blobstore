@@ -1,6 +1,7 @@
 package filestore
 
 import (
+	"github.com/kbase/blobstore/core/values"
 	"fmt"
 	"os"
 	"bytes"
@@ -128,13 +129,14 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
 	testhelpers.AssertCloseToNow(t.T(), stored, 2 * time.Second)
+	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	expected := &FileInfo{
 		ID:       "myid",
 		Size:     12,
 		Stored:   stored, // fake
 		Filename: filename,
 		Format:   format,
-		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		MD5:      *md5,
 	}
 
 	t.Equal(expected, res, "unexpected output")
@@ -150,7 +152,7 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 		Size:     12,
 		Filename: filename,
 		Format:   format,
-		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		MD5:      *md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
 		Stored:   stored,
 	}
@@ -276,12 +278,13 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
 
+	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	expected := &GetFileOutput{
 		ID:       id,
 		Size:     12,
 		Filename: "",
 		Format:   "",
-		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		MD5:      *md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
 		Stored:   obj.Stored, //fake
 	}
@@ -391,12 +394,13 @@ func (t *TestSuite) copy(
 	// it's flipped over to the next second and the test fails.
 	testhelpers.AssertCloseToNow(t.T(), fi.Stored, 2 * time.Second)
 	t.True(fi.Stored.After(res.Stored), "expected copy time later than source time")
+	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	fiexpected := FileInfo{
 		ID: strings.TrimSpace(dstobj),
 		Size: 12,
 		Format: format,
 		Filename: filename,
-		MD5: "5d838d477ddf355fc15df1db90bee0aa",
+		MD5: *md5,
 		Stored: fi.Stored, // fake
 	}
 	t.Equal(&fiexpected, fi, "incorrect copy result")
@@ -412,7 +416,7 @@ func (t *TestSuite) copy(
 		Size:     12,
 		Filename: filename,
 		Format:   format,
-		MD5:      "5d838d477ddf355fc15df1db90bee0aa",
+		MD5:      *md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
 		Stored:   fi.Stored, // fake
 	}

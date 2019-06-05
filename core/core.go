@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kbase/blobstore/auth"
+	"github.com/kbase/blobstore/core/values"
 
 	"github.com/kbase/blobstore/filestore"
 	"github.com/kbase/blobstore/nodestore"
 )
 
-// TODO * MD5 make and use md5 class to catch s3hashes.
 // TODO * INPUT limits on string length.
 
 // User is a user that may own or read Nodes.
@@ -29,7 +29,7 @@ type User struct {
 type BlobNode struct {
 	ID       uuid.UUID
 	Size     int64
-	MD5      string
+	MD5      values.MD5
 	Stored   time.Time
 	Filename string
 	Format   string

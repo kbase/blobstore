@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kbase/blobstore/core/values"
+
 	"github.com/google/uuid"
 )
 
@@ -44,7 +46,7 @@ type Node struct {
 	filename string
 	format   string
 	size     int64
-	md5      string
+	md5      values.MD5
 	stored   time.Time
 	public   bool
 }
@@ -87,7 +89,7 @@ func NewNode(
 	id uuid.UUID,
 	owner User,
 	size int64,
-	md5 string,
+	md5 values.MD5,
 	stored time.Time,
 	options ...func(*Node) error) (*Node, error) {
 
@@ -147,7 +149,7 @@ func (n *Node) GetSize() int64 {
 }
 
 // GetMD5 returns the MD5 of the file associated with the node.
-func (n *Node) GetMD5() string {
+func (n *Node) GetMD5() values.MD5 {
 	return n.md5
 }
 
