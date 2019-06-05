@@ -619,7 +619,7 @@ func (t *TestSuite) checkError(err map[string]interface{}, code int, errorstr st
 	t.Equal(expected, err, "incorrect return")
 }
 
-func (t *TestSuite) TestBadToken() {
+func (t *TestSuite) TestStoreBadToken() {
 	for _, token := range []string{
 			"oauth",
 			"oauth   ",
@@ -634,7 +634,7 @@ func (t *TestSuite) TestBadToken() {
 	}
 }
 
-func (t *TestSuite) TestNoContentLength() {
+func (t *TestSuite) TestStoreNoContentLength() {
 	req, err := http.NewRequest(http.MethodPost, t.url + "/node", strings.NewReader("foobarbaz"))
 	t.Nil(err, "unexpected error")
 	req.Header.Set("authorization", "OAuth " + t.noRole.token)
@@ -652,6 +652,24 @@ func (t *TestSuite) TestStoreNoUser() {
 	t.checkError(body, 401, "No Authorization")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
 		"No Authorization", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestStoreBadFileName() {
+	body := t.req("POST", t.url + "/node?filename=foo%07bar", strings.NewReader("foobarbaz"),
+		"oauth " + t.noRole.token, 98, 400)
+	t.checkError(body, 400, "File name contains control characters")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File name contains control characters", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestStoreBadFileFormat() {
+	body := t.req("POST", t.url + "/node?format=foo%07bar", strings.NewReader("foobarbaz"),
+		"oauth " + t.noRole.token, 100, 400)
+	t.checkError(body, 400, "File format contains control characters")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File format contains control characters", mtmap(), false},
 	)
 }
 

@@ -15,8 +15,6 @@ import (
 	"github.com/kbase/blobstore/nodestore"
 )
 
-// TODO * INPUT limits on string length.
-
 // User is a user that may own or read Nodes.
 type User struct {
 	// ID is the internal blobstore ID for the user.
@@ -118,8 +116,8 @@ func (bs *BlobStore) Store(
 	user auth.User,
 	data io.Reader,
 	size int64,
-	filename string, // TODO OPS make filename and format optional
-	format string,
+	filename values.FileName, // TODO OPS make filename and format optional
+	format values.FileFormat,
 ) (*BlobNode, error) {
 	if size < 1 {
 		return nil, errors.New("size must be > 0")
@@ -130,14 +128,14 @@ func (bs *BlobStore) Store(
 	if err != nil {
 		return nil, err // errors should only occur for unusual situations here
 	}
-	p, _ := filestore.NewStoreFileParams(
-		uuidToFilePath(uid), size, data, filestore.FileName(filename), filestore.Format(format))
+	p, _ := filestore.NewStoreFileParams(uuidToFilePath(uid), size, data,
+		filestore.FileName(filename.GetFileName()), filestore.Format(format.GetFileFormat()))
 	f, err := bs.fileStore.StoreFile(p)
 	if err != nil {
 		return nil, err // errors should only occur for unusual situations here
 	}
 	node, _ := nodestore.NewNode(uid, *nodeuser, size, f.MD5, f.Stored,
-		nodestore.FileName(filename), nodestore.Format(format))
+		nodestore.FileName(filename.GetFileName()), nodestore.Format(format.GetFileFormat()))
 	err = bs.nodeStore.StoreNode(node)
 	if err != nil {
 		return nil, err // errors should only occur for unusual situations here
