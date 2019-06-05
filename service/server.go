@@ -29,9 +29,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO LOG log or ignore X-IP headers
-// TODO LOG insecure urls
-// TODO TIMING vs shock & experimental server
+// TODO * LOG log or ignore X-IP headers
+// TODO * LOG insecure urls
+// TODO * TIMING vs shock & experimental server
 
 const (
 	service      = "BlobStore"
@@ -119,7 +119,7 @@ func notAllowedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func initLogger(r *http.Request) *logrus.Entry {
-	//TODO LOG get correct ip taking X-* headers into account
+	//TODO * LOG get correct ip taking X-* headers into account
 	return logrus.WithFields(logrus.Fields{
 		"ip": r.RemoteAddr,
 		// at some point return rid to the user
@@ -235,7 +235,7 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"version":            s.staticconf.ServerVersionCompat,
 		"deprecationwarning": s.staticconf.DeprecationWarning,
 		"servertime":         time.Now().UnixNano() / 1000000,
-		//TODO SERV git commit hash
+		//TODO * SERV git commit hash
 	}
 	encodeToJSON(w, 200, &ret)
 }

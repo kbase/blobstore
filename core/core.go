@@ -14,6 +14,9 @@ import (
 	"github.com/kbase/blobstore/nodestore"
 )
 
+// TODO * MD5 make and use md5 class to catch s3hashes.
+// TODO * INPUT limits on string length.
+
 // User is a user that may own or read Nodes.
 type User struct {
 	// ID is the internal blobstore ID for the user.

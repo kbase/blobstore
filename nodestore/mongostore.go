@@ -17,22 +17,30 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-//TODO SCHEMA schema version doc
-
 const (
-	colUsers              = "users"
-	keyUserUser           = "user"
-	keyUserUUID           = "id"
-	colNodes              = "nodes"
-	keyNodesID            = "id"
-	keyNodesOwner         = "own"
-	keyNodesReaders       = "read"
-	keyNodesFileName      = "fname"
-	keyNodesFormat        = "fmt"
-	keyNodesSize          = "size"
-	keyNodesMD5           = "md5"
-	keyNodesStored        = "time"
-	keyNodesPublic        = "pub"
+	schemaVersion = 1
+
+	colConfig              = "config"
+	keyConfigSchema        = "schema"
+	valueConfigSchema      = "schema"
+	keyConfigSchemaUpdate  = "inupdate"
+	keyConfigSchemaVersion = "schemaver"
+
+	colUsers    = "users"
+	keyUserUser = "user"
+	keyUserUUID = "id"
+
+	colNodes         = "nodes"
+	keyNodesID       = "id"
+	keyNodesOwner    = "own"
+	keyNodesReaders  = "read"
+	keyNodesFileName = "fname"
+	keyNodesFormat   = "fmt"
+	keyNodesSize     = "size"
+	keyNodesMD5      = "md5"
+	keyNodesStored   = "time"
+	keyNodesPublic   = "pub"
+
 	mongoDuplicateKeyCode = 11000
 )
 
@@ -47,6 +55,10 @@ func NewMongoNodeStore(db *mongo.Database) (*MongoNodeStore, error) {
 		return nil, errors.New("db cannot be nil")
 	}
 	err := createIndexes(db)
+	if err != nil {
+		return nil, err
+	}
+	err = checkConfig(db) // checkConfig MUST come after createIndexes
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +78,10 @@ func createIndexes(db *mongo.Database) error {
 	if err != nil {
 		return err // hard to test
 	}
+	err = addIndex(db.Collection(colConfig), keyConfigSchema, 1, true)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -75,7 +91,51 @@ func addIndex(col *mongo.Collection, key string, asc int, unique bool) error {
 		Keys:    map[string]int{key: asc},
 		Options: &options.IndexOptions{Unique: &unique}}
 	_, err := idx.CreateOne(context.Background(), mdl, nil) // first ret arg is undocumented
-	return err
+	if err != nil {
+		return errors.New("mongo create index: " + err.Error())
+	}
+	return nil
+}
+
+func checkConfig(db *mongo.Database) error {
+	col := db.Collection(colConfig)
+	doc := map[string]interface{}{
+		keyConfigSchema:        valueConfigSchema,
+		keyConfigSchemaUpdate:  false,
+		keyConfigSchemaVersion: schemaVersion}
+	_, err := col.InsertOne(context.Background(), doc)
+	if err != nil {
+		if !isMongoDuplicateKey(err) {
+			return errors.New("mongo check config insert: " + err.Error()) // dunno how to test
+		}
+		// ok, version doc already exists. Check it
+		n, err := col.CountDocuments(nil, map[string]interface{}{})
+		if err != nil {
+			return errors.New("mongo check config count: " + err.Error()) // dunno how to test
+		}
+		if n != 1 {
+			return errors.New("Multiple config documents found in the mongo database. " +
+				"Something is very wrong")
+		}
+		res := col.FindOne(context.Background(),
+			map[string]string{keyConfigSchema: valueConfigSchema})
+		var m map[string]interface{}
+		err = res.Decode(&m)
+		if err != nil {
+			// dunno how to test this either
+			return errors.New("mongostore check config decode: " + err.Error())
+		}
+		sver := int(m[keyConfigSchemaVersion].(int32))
+		if sver != schemaVersion {
+			return fmt.Errorf("Incompatible mongo database schema. Server is %d, DB is %d",
+				schemaVersion, sver)
+		}
+		if m[keyConfigSchemaUpdate].(bool) {
+			return fmt.Errorf("The database is in the middle of an update from v%d of "+
+				"the schema. Aborting startup.", sver)
+		}
+	}
+	return nil
 }
 
 // GetUser gets a user. If the user does not exist in the system, a new ID will be assigned to
@@ -344,7 +404,7 @@ func (s *MongoNodeStore) RemoveReader(id uuid.UUID, user User) error {
 func (s *MongoNodeStore) ChangeOwner(id uuid.UUID, user User) error {
 	userdoc := toUserDoc(user)
 	updatedoc := map[string]interface{}{
-		"$set":  map[string]interface{}{keyNodesOwner: userdoc},
+		"$set":      map[string]interface{}{keyNodesOwner: userdoc},
 		"$addToSet": map[string]interface{}{keyNodesReaders: userdoc},
 	}
 	return s.updateNode(id, updatedoc, "change owner")
