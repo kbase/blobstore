@@ -46,7 +46,7 @@ func NewStoreFileParams(
 	data io.Reader,
 	options ...func(*StoreFileParams) error) (*StoreFileParams, error) {
 
-	//TODO INPUT check for valid object names https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+	//TODO INPUT check for valid object names https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html. Also minio objects can't have a leading slash
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")

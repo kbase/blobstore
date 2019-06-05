@@ -86,14 +86,73 @@ func (t *TestSuite) TestConstructFail() {
 	copts := options.ClientOptions{Hosts: []string{
 		"localhost:" + strconv.Itoa(t.mongo.GetPort())}}
 	client, _ := mongo.NewClient(&copts)
-	t.failConstruct(client.Database(testDB), errors.New("topology is closed"))
+	t.failConstruct(client.Database(testDB), errors.New("mongo create index: topology is closed"))
 }
 
-func (t *TestSuite) failConstruct(client *mongo.Database, expected error) {
-	cli, err := NewMongoNodeStore(client)
+func (t *TestSuite) TestConstructFailAddConfigIndex() {
+	col := t.client.Database(testDB).Collection("config")
+	_, err := col.InsertOne(nil, map[string]interface{}{"schema": "schema"})
+	t.Nil(err, "unexpected error")
+	_, err = col.InsertOne(nil, map[string]interface{}{"schema": "schema"})
+	t.Nil(err, "unexpected error")
+
+	e := "mongo create index: E11000 duplicate key error index: " +
+		"test_mongostore.config.$schema_1  dup key: { : \"schema\" }"
+	t.failConstruct(t.client.Database(testDB), errors.New(e))
+}
+
+func (t *TestSuite) TestConstructFailTwoConfigDocs() {
+	col := t.client.Database(testDB).Collection("config")
+	_, err := col.InsertOne(nil, map[string]interface{}{"schema": "schema"})
+	t.Nil(err, "unexpected error")
+	_, err = col.InsertOne(nil, map[string]interface{}{"schema": "schema1"})
+	t.Nil(err, "unexpected error")
+
+	e := "Multiple config documents found in the mongo database. Something is very wrong"
+	t.failConstruct(t.client.Database(testDB), errors.New(e))
+}
+
+func (t *TestSuite) TestConstructFailBadSchemaVer() {
+	col := t.client.Database(testDB).Collection("config")
+	_, err := col.InsertOne(nil, map[string]interface{}{
+		"schema": "schema",
+		"inupdate": false,
+		"schemaver": 82})
+	t.Nil(err, "unexpected error")
+
+	e := "Incompatible mongo database schema. Server is 1, DB is 82"
+	t.failConstruct(t.client.Database(testDB), errors.New(e))
+}
+
+
+func (t *TestSuite) TestConstructFailInUpdate() {
+	col := t.client.Database(testDB).Collection("config")
+	_, err := col.InsertOne(nil, map[string]interface{}{
+		"schema": "schema",
+		"inupdate": true,
+		"schemaver": 1})
+	t.Nil(err, "unexpected error")
+
+	e := "The database is in the middle of an update from v1 of the schema. Aborting startup."
+	t.failConstruct(t.client.Database(testDB), errors.New(e))
+}
+func (t *TestSuite) failConstruct(db *mongo.Database, expected error) {
+	cli, err := NewMongoNodeStore(db)
 	t.Nil(cli, "expected nil result")
 	t.Equal(expected, err, "incorrect error")
-} 
+}
+
+func (t *TestSuite) TestConstructWithPreexistingSchemaDoc() {
+	col := t.client.Database(testDB).Collection("config")
+	_, err := col.InsertOne(nil, map[string]interface{}{
+		"schema": "schema",
+		"inupdate": false,
+		"schemaver": 1})
+	t.Nil(err, "unexpected error")
+	cli, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(err, "unexpected error")
+	t.NotNil(cli, "expected non-nil client") // going to test using the client later
+}
 
 func (t *TestSuite) TestGetUser() {
 	ns, err := NewMongoNodeStore(t.client.Database(testDB))
@@ -661,16 +720,28 @@ func (t *TestSuite) TestCollections() {
 			"nodes": struct{}{},
 			"nodes.$_id_": struct{}{},
 			"nodes.$id_1": struct{}{},
+			"config": struct{}{},
+			"config.$_id_": struct{}{},
+			"config.$schema_1": struct{}{},
 		}
 		expected = e
 	} else {
 		e := map[string]struct{}{
 			"users": struct{}{},
 			"nodes": struct{}{},
+			"config": struct{}{},
 		}
 		expected = e
 	}
 	t.Equal(expected, names, "incorrect collection and index names")
+}
+
+func (t *TestSuite) TestConfigIndexes() {
+	expected := map[string]bool{
+		"_id_": false,
+		"schema_1": true,
+	}
+	t.checkIndexes("config", testDB + ".config", expected)
 }
 
 func (t *TestSuite) TestUserIndexes() {
