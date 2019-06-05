@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kbase/blobstore/core/values"
+
 	"go.mongodb.org/mongo-driver/bson"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -253,7 +255,7 @@ func (s *MongoNodeStore) StoreNode(node *Node) error {
 		keyNodesOwner:    toUserDoc(node.owner),
 		keyNodesFileName: node.filename,
 		keyNodesFormat:   node.format,
-		keyNodesMD5:      node.md5,
+		keyNodesMD5:      node.md5.GetMD5(),
 		keyNodesPublic:   node.public,
 		keyNodesSize:     node.size,
 		keyNodesStored:   node.stored,
@@ -299,15 +301,16 @@ func (s *MongoNodeStore) GetNode(id uuid.UUID) (*Node, error) {
 		nu, _ := NewUser(uid, u[keyUserUser].(string)) // same
 		opts = append(opts, Reader(*nu))
 	}
-	nid, _ := uuid.Parse(ndoc[keyNodesID].(string)) // err should always be nil unles db is corrupt
+	nid, _ := uuid.Parse(ndoc[keyNodesID].(string)) // err must be nil unless db is corrupt
 	odoc := ndoc[keyNodesOwner].(map[string]interface{})
-	oid, _ := uuid.Parse(odoc[keyUserUUID].(string)) // err must be nil unles db is corrupt
+	oid, _ := uuid.Parse(odoc[keyUserUUID].(string)) // err must be nil unless db is corrupt
 	owner, _ := NewUser(oid, odoc[keyUserUser].(string))
+	md5, _ := values.NewMD5(ndoc[keyNodesMD5].(string)) // err must be nil unless db is corrupt
 	return NewNode(
 		nid,
 		*owner,
 		ndoc[keyNodesSize].(int64),
-		ndoc[keyNodesMD5].(string),
+		*md5,
 		toTime(ndoc[keyNodesStored].(primitive.DateTime)),
 		opts...,
 	)

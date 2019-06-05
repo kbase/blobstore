@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/kbase/blobstore/core/values"
 )
 
 // TODO INPUT may need limits for strings.
@@ -79,7 +81,7 @@ type FileInfo struct {
 	// The filename.
 	Filename string
 	// The MD5 of the file.
-	MD5 string
+	MD5 values.MD5
 	// The time the file was stored.
 	Stored time.Time
 }
@@ -95,7 +97,7 @@ type GetFileOutput struct {
 	// The filename.
 	Filename string
 	// The MD5 of the file.
-	MD5 string
+	MD5 values.MD5
 	// The time the file was stored.
 	Stored time.Time
 	// The file's contents.

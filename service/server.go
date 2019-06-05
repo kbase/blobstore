@@ -412,7 +412,7 @@ func fromNodeToNode(node *core.BlobNode) map[string]interface{} {
 		"file": map[string]interface{}{
 			"name":     node.Filename,
 			"size":     node.Size,
-			"checksum": map[string]string{"md5": node.MD5},
+			"checksum": map[string]string{"md5": node.MD5.GetMD5()},
 		},
 	}
 }

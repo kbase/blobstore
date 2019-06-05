@@ -1,6 +1,7 @@
 package nodestore
 
 import (
+	"github.com/kbase/blobstore/core/values"
 	"fmt"
 	"time"
 	"github.com/google/uuid"
@@ -271,7 +272,8 @@ func (t *TestSuite) TestStoreAndGetNodeMinimal() {
 	oid := uuid.New()
 	own, _ := NewUser(oid, "owner")
 	tme := time.Now()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, tme)
 	err = mns.StoreNode(n)
 	if err != nil {
 		t.Fail(err.Error())
@@ -282,7 +284,7 @@ func (t *TestSuite) TestStoreAndGetNodeMinimal() {
 	}
 	// time loses precision when stored in mongo
 	testhelpers.AssertWithin1MS(t.T(), tme, ngot.GetStoredTime())
-	nexpected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", ngot.GetStoredTime())
+	nexpected, _ := NewNode(nid, *own, 78, *md5, ngot.GetStoredTime())
 	t.Equal(nexpected, ngot, "incorrect node")
 }
 
@@ -300,11 +302,12 @@ func (t *TestSuite) TestStoreAndGetNodeMaximal() {
 	r1, _ := NewUser(rid1, "reader1")
 	r2, _ := NewUser(rid2, "reader2")
 	tme := time.Now()
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
 	n, _ := NewNode(
 		nid,
 		*own,
 		78,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		tme,
 		Format("json"),
 		FileName("fn.txt"),
@@ -326,7 +329,7 @@ func (t *TestSuite) TestStoreAndGetNodeMaximal() {
 		nid,
 		*own,
 		78,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		ngot.GetStoredTime(),
 		Format("json"),
 		FileName("fn.txt"),
@@ -355,12 +358,13 @@ func (t *TestSuite) TestStoreNodeFailWithSameID() {
 	oid := uuid.New()
 	own, _ := NewUser(oid, "owner")
 	tme := time.Now()
-	n1, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n1, _ := NewNode(nid, *own, 78, *md5, tme)
 	err = mns.StoreNode(n1)
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	n2, _ := NewNode(nid, *own, 82, "189e725f4587b679740f0f7783745056", time.Now())
+	n2, _ := NewNode(nid, *own, 82, *md5, time.Now())
 	err = mns.StoreNode(n2)
 	t.Equal(fmt.Errorf("Node %v already exists", nid.String()), err, "incorrect error")
 }
@@ -372,7 +376,8 @@ func (t *TestSuite) TestGetNodeFailNoNode() {
 	oid := uuid.New()
 	own, _ := NewUser(oid, "owner")
 	tme := time.Now()
-	n1, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n1, _ := NewNode(nid, *own, 78, *md5, tme)
 	err = mns.StoreNode(n1)
 	t.Nil(err, "expected no error")
 
@@ -387,7 +392,8 @@ func (t *TestSuite) TestDeleteNode() {
 	t.Nil(err, "expected no error")
 	nid := uuid.New()
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
 
@@ -403,7 +409,8 @@ func (t *TestSuite) TestDeleteNodeFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(uuid.New(), *own, 78, *md5, time.Now())
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
 
@@ -417,7 +424,8 @@ func (t *TestSuite) TestSetNodePublic() {
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
 
@@ -431,7 +439,7 @@ func (t *TestSuite) TestSetNodePublic() {
 		nid,
 		*own,
 		78,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		ngot.GetStoredTime(),
 		Public(true),
 		)
@@ -447,7 +455,7 @@ func (t *TestSuite) TestSetNodePublic() {
 		nid,
 		*own,
 		78,
-		"1b9554867d35f0d59e4705f6b2712cd1",
+		*md5,
 		ngot.GetStoredTime(),
 		Public(false),
 		)
@@ -458,7 +466,8 @@ func (t *TestSuite) TestSetNodePublicFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(uuid.New(), *own, 78, *md5, time.Now())
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
 
@@ -472,7 +481,8 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -487,7 +497,7 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 
 	tme := node.GetStoredTime()
 	
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*r1))
+	expected, _ := NewNode(nid, *own, 78, *md5, tme, Reader(*r1))
 	t.Equal(expected, node, "incorrect node")
 	
 	err = mns.AddReader(nid, *r2)
@@ -495,7 +505,7 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	
-	expected, _= NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme,
+	expected, _= NewNode(nid, *own, 78, *md5, tme,
 		Reader(*r1), Reader(*r2))
 	t.Equal(expected, node, "incorrect node")
 	
@@ -504,7 +514,7 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	
-	expected, _ = NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*r2))
+	expected, _ = NewNode(nid, *own, 78, *md5, tme, Reader(*r2))
 	t.Equal(expected, node, "incorrect node")
 
 	err = mns.RemoveReader(nid, *r2)
@@ -512,7 +522,7 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	
-	expected, _ = NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	expected, _ = NewNode(nid, *own, 78, *md5, tme)
 	t.Equal(expected, node, "incorrect node")
 }
 
@@ -522,7 +532,8 @@ func (t *TestSuite) TestAddOwnerAsReader() {
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -533,7 +544,7 @@ func (t *TestSuite) TestAddOwnerAsReader() {
 	node, err := mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", node.GetStoredTime())
+	expected, _ := NewNode(nid, *own, 78, *md5, node.GetStoredTime())
 	t.Equal(expected, node, "incorrect node")
 }
 
@@ -543,7 +554,8 @@ func (t *TestSuite) TestRemoveOwnerAsReader() {
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -554,7 +566,7 @@ func (t *TestSuite) TestRemoveOwnerAsReader() {
 	node, err := mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", node.GetStoredTime())
+	expected, _ := NewNode(nid, *own, 78, *md5, node.GetStoredTime())
 	t.Equal(expected, node, "incorrect node")
 }
 
@@ -564,7 +576,8 @@ func (t *TestSuite) TestAddReaderTwice() {
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -575,7 +588,7 @@ func (t *TestSuite) TestAddReaderTwice() {
 	t.Nil(err, "expected no error")
 	
 	node, err := mns.GetNode(nid)
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", node.GetStoredTime(),
+	expected, _ := NewNode(nid, *own, 78, *md5, node.GetStoredTime(),
 		Reader(*r))
 	t.Nil(err, "expected no error")
 	t.Equal(expected, node, "incorrect node")
@@ -595,7 +608,8 @@ func (t *TestSuite) TestRemoveNonReader() {
 	own, _ := NewUser(uuid.New(), "owner")
 	r1, _ := NewUser(uuid.New(), "r1")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now(), Reader(*r1))
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now(), Reader(*r1))
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -606,7 +620,7 @@ func (t *TestSuite) TestRemoveNonReader() {
 
 	node, err := mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", node.GetStoredTime(),
+	expected, _ := NewNode(nid, *own, 78, *md5, node.GetStoredTime(),
 		Reader(*r1))
 	t.Equal(expected, node, "incorrect node")
 
@@ -623,7 +637,8 @@ func (t *TestSuite) TestAddReaderFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(uuid.New(), *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -637,7 +652,8 @@ func (t *TestSuite) TestRemoveReaderFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(uuid.New(), *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -654,7 +670,8 @@ func (t *TestSuite) TestChangeOwner() {
 	own, _ := NewUser(uuid.New(), "owner")
 	newown, _ := NewUser(uuid.New(), "newowner")
 	nid := uuid.New()
-	n, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(nid, *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")
@@ -664,7 +681,7 @@ func (t *TestSuite) TestChangeOwner() {
 
 	tme := node.GetStoredTime()
 	
-	expected, _ := NewNode(nid, *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme)
+	expected, _ := NewNode(nid, *own, 78, *md5, tme)
 	t.Equal(expected, node, "incorrect node")
 
 	// test that changing to the current owner has no effect
@@ -679,7 +696,7 @@ func (t *TestSuite) TestChangeOwner() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	
-	expected, _= NewNode(nid, *newown, 78, "1b9554867d35f0d59e4705f6b2712cd1", tme, Reader(*own))
+	expected, _= NewNode(nid, *newown, 78, *md5, tme, Reader(*own))
 	t.Equal(expected, node, "incorrect node")
 }
 
@@ -687,7 +704,8 @@ func (t *TestSuite) TestChangeOwnerFailNoNode() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
 	t.Nil(err, "expected no error")
 	own, _ := NewUser(uuid.New(), "owner")
-	n, _ := NewNode(uuid.New(), *own, 78, "1b9554867d35f0d59e4705f6b2712cd1", time.Now())
+	md5, _ := values.NewMD5("1b9554867d35f0d59e4705f6b2712cd1")
+	n, _ := NewNode(uuid.New(), *own, 78, *md5, time.Now())
 
 	err = mns.StoreNode(n)
 	t.Nil(err, "expected no error")

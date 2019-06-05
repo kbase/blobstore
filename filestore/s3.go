@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kbase/blobstore/core/values"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -122,6 +124,12 @@ func (fs *S3FileStore) getFileInfo(id string) (*FileInfo, error) {
 	if err != nil {
 		return nil, errors.New("s3 store head: " + err.Error()) // not sure how to test this
 	}
+	md5str := strings.Trim(*headObj.ETag, `"`)
+	md5, err := values.NewMD5(md5str)
+	if err != nil {
+		// this is a real pain to test, need to start minio in s3 incompatibility mode
+		return nil, errors.New("s3 store returned invalid MD5: " + md5str)
+	}
 	return &FileInfo{
 			ID:       id,
 			Filename: getMeta(headObj.Metadata, "Filename"),
@@ -129,7 +137,7 @@ func (fs *S3FileStore) getFileInfo(id string) (*FileInfo, error) {
 			// theoretically, the Etag is opaque. In practice, it's the md5
 			// If that changes, MultiWrite the file to an md5 writer.
 			// That means that we can't return the md5 in get file though.
-			MD5:    strings.Trim(*headObj.ETag, `"`),
+			MD5:    *md5,
 			Size:   *headObj.ContentLength,
 			Stored: headObj.LastModified.UTC(),
 		},
@@ -153,12 +161,18 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 		}
 		return nil, errors.New("s3 store get: " + err.Error())
 	}
+	md5str := strings.Trim(*res.ETag, `"`)
+	md5, err := values.NewMD5(md5str)
+	if err != nil {
+		// this is a real pain to test, need to start minio in s3 incompatibility mode
+		return nil, errors.New("s3 store returned invalid MD5: " + md5str)
+	}
 	return &GetFileOutput{
 			ID:       id,
 			Size:     *res.ContentLength,
 			Filename: getMeta(res.Metadata, "Filename"),
 			Format:   getMeta(res.Metadata, "Format"),
-			MD5:      strings.Trim(*res.ETag, `"`),
+			MD5:      *md5,
 			Data:     res.Body,
 			Stored:   res.LastModified.UTC(),
 		},
