@@ -53,6 +53,8 @@ type ServerStaticConf struct {
 	// DeprecationWarning A deprecation warning for users regarding the ID and ServerVersionCompat
 	// fields.
 	DeprecationWarning string
+	// GitCommit is the git commit from which the server was built.
+	GitCommit string
 }
 
 // Server the blobstore server
@@ -235,7 +237,7 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"version":            s.staticconf.ServerVersionCompat,
 		"deprecationwarning": s.staticconf.DeprecationWarning,
 		"servertime":         time.Now().UnixNano() / 1000000,
-		//TODO * SERV git commit hash
+		"gitcommit":          s.staticconf.GitCommit,
 	}
 	encodeToJSON(w, 200, &ret)
 }

@@ -5,7 +5,8 @@ RUN apk add git
 
 COPY . /tmp/blobstore
 RUN cd /tmp/blobstore \
-    && go build app/blobstore.go
+    && export GIT_COMMIT=$(git rev-list -1 HEAD) \
+    && go build -ldflags "-X main.gitCommit=$GIT_COMMIT" app/blobstore.go
 
 FROM alpine:3.9.4
 

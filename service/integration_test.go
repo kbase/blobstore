@@ -95,6 +95,7 @@ func (t *TestSuite) SetupSuite() {
 			ID:                  "shockyshock",
 			ServerVersionCompat: "sver",
 			DeprecationWarning:  "I shall deprecate the whold world! MuhahahahHAHA",
+			GitCommit:           "Fake git commit here",
 	})
 	if err != nil {
 		t.FailNow(err.Error())
@@ -328,7 +329,7 @@ func (t *TestSuite) TestRoot() {
 	dec := json.NewDecoder(ret.Body)
 	var root map[string]interface{}
 	dec.Decode(&root)
-	t.checkHeaders(ret, "application/json", 209, 211, root) // allow space for timestamp expansion
+	t.checkHeaders(ret, "application/json", 248, 250, root) // allow space for timestamp expansion
 
 	// ugh. go isn't smart enough to use an int where possible
 	servertime := root["servertime"].(float64)
@@ -340,6 +341,7 @@ func (t *TestSuite) TestRoot() {
 		"id":                 "shockyshock",
 		"version":            "sver",
 		"deprecationwarning": "I shall deprecate the whold world! MuhahahahHAHA",
+		"gitcommit":		  "Fake git commit here",
 	}
 
 	t.Equal(expected, root, "incorrect root return")
