@@ -54,7 +54,7 @@ func NewS3FileStore(
 		// Ignore for now.
 		return nil, err
 	}
-	//TODO INPUT check bucket name for illegal chars and max length
+	//TODO * INPUT check bucket name for illegal chars and max length
 
 	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket}, nil
 }
@@ -109,7 +109,7 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *FileInfo, err error) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
-		// TODO LOG body
+		// TODO * LOG body
 		return nil, fmt.Errorf("s3 store request unexpected status code: %v", resp.StatusCode)
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's

@@ -96,9 +96,14 @@ func (t *TestSuite) TestConstructFailAddConfigIndex() {
 	_, err = col.InsertOne(nil, map[string]interface{}{"schema": "schema"})
 	t.Nil(err, "unexpected error")
 
-	e := "mongo create index: E11000 duplicate key error index: " +
-		"test_mongostore.config.$schema_1  dup key: { : \"schema\" }"
-	t.failConstruct(t.client.Database(testDB), errors.New(e))
+	cli, err := NewMongoNodeStore(t.client.Database(testDB))
+	t.Nil(cli, "expected nil result")
+	// error strings are different for different versions, but have common sub strings
+	t.Contains(err.Error(), "mongo create index", "incorrect error")
+	t.Contains(err.Error(), "E11000 duplicate key error", "incorrect error")
+	t.Contains(err.Error(), testDB + ".config", "incorrect error")
+	t.Contains(err.Error(), "schema_1  dup key: { : \"schema\" }", "incorrect error")
+
 }
 
 func (t *TestSuite) TestConstructFailTwoConfigDocs() {

@@ -143,13 +143,13 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 		return nil, errors.New("kbase auth read: " + err.Error()) // dunno how to test this easily
 	}
 	if _, err = resp.Body.Read(make([]byte, 1, 1)); err != io.EOF {
-		// TODO LOG b
+		// TODO * LOG b
 		return nil, errors.New("kbase auth: Unexpectedly long body from auth service")
 	}
 	var authresp map[string]interface{}
 	err = json.Unmarshal(b, &authresp)
 	if err != nil {
-		// TODO LOG b.
+		// TODO * LOG b.
 		return nil, errors.New("kbase auth: Non-JSON response from KBase auth server, " +
 			"status code: " + strconv.Itoa(resp.StatusCode))
 	}
