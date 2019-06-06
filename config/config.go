@@ -42,6 +42,9 @@ const (
 	// KeyAuthAdminRoles is the configuration key where the value is comma-delimited auth server
 	// roles that denote that a user is a blobstore admin
 	KeyAuthAdminRoles = "kbase-auth-admin-roles"
+	// KeyDontTrustXIPHeaders is the configuration key where the value determines whether to
+	// distrust the X-Forwarded-For and X-Real-IP headers (true) or not (anything else).
+	KeyDontTrustXIPHeaders = "dont-trust-x-ip-headers"
 )
 
 // Config contains the server configuration.
@@ -73,6 +76,9 @@ type Config struct {
 	// AuthAdminRoles are the auth server roles that denote that a user is a blobstore admin.
 	// It is never nil but may be empty.
 	AuthAdminRoles *[]string
+	// DontTrustXIPHeaders determines whether to distrust the X-Forwarded-For and X-Real-IP
+	// headers.
+	DontTrustXIPHeaders bool
 }
 
 // New creates a new config struct from the given config file.
@@ -99,6 +105,7 @@ func New(configFilePath string) (*Config, error) {
 	s3region, err := getString(err, configFilePath, sec, KeyS3Region, true)
 	authurl, err := getURL(err, configFilePath, sec, KeyAuthURL)
 	roles, err := getStringList(err, configFilePath, sec, KeyAuthAdminRoles)
+	xip, err := getString(err, configFilePath, sec, KeyDontTrustXIPHeaders, false)
 	if err != nil {
 		return nil, err
 	}
@@ -109,19 +116,20 @@ func New(configFilePath string) (*Config, error) {
 	}
 
 	return &Config{
-			Host:           host,
-			MongoHost:      mongohost,
-			MongoDatabase:  mongodb,
-			MongoUser:      mongouser,
-			MongoPwd:       mongopwd,
-			S3Host:         s3host,
-			S3Bucket:       s3bucket,
-			S3AccessKey:    s3key,
-			S3AccessSecret: s3secret,
-			S3DisableSSL:   "true" == s3disableSSL,
-			S3Region:       s3region,
-			AuthURL:        authurl,
-			AuthAdminRoles: roles,
+			Host:                host,
+			MongoHost:           mongohost,
+			MongoDatabase:       mongodb,
+			MongoUser:           mongouser,
+			MongoPwd:            mongopwd,
+			S3Host:              s3host,
+			S3Bucket:            s3bucket,
+			S3AccessKey:         s3key,
+			S3AccessSecret:      s3secret,
+			S3DisableSSL:        "true" == s3disableSSL,
+			S3Region:            s3region,
+			AuthURL:             authurl,
+			AuthAdminRoles:      roles,
+			DontTrustXIPHeaders: "true" == xip,
 		},
 		nil
 }

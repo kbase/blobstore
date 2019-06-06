@@ -91,6 +91,7 @@ func (t *TestSuite) TestMinimalConfig() {
 		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
+		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
 }
@@ -110,6 +111,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		"s3-region =       us-west-1    \t   ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ",
+		"dont-trust-x-ip-headers =      \t     ",
 	)
 	cfg, err := New(filePath)
 	t.Nil(err, "unexpected error")
@@ -126,6 +128,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		S3DisableSSL: false,
 		AuthURL: u,
 		AuthAdminRoles: &[]string{},
+		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
 }
@@ -145,6 +148,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		"s3-disable-ssl=     true    ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ,    foo   , \tbar\t , ,  baz ,,",
+		"dont-trust-x-ip-headers =     true   \t  ",
 	)
 	cfg, err := New(filePath)
 	t.Nil(err, "unexpected error")
@@ -163,6 +167,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		S3Region: "us-west-1",
 		AuthURL: u,
 		AuthAdminRoles: &[]string{"foo", "bar", "baz"},
+		DontTrustXIPHeaders: true,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
 }

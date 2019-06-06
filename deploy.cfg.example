@@ -27,3 +27,8 @@ s3-region = us-west-1
 kbase-auth-url = https://kbase.us/services/auth
 # KBase auth server custom roles that denote the user is a blobstore admin. Comma delimited.
 kbase-auth-admin-roles = KBASE_ADMIN, BLOBSTORE_ADMIN
+
+# If "true", make the server ignore the X-Forwarded-For and X-Real-IP headers. Otherwise
+# (the default behavior), the logged IP address for a request, in order of precedence, is
+# 1) the first address in X-Forwarded-For, 2) X-Real-IP, and 3) the address of the client.
+dont-trust-x-ip-headers = false
