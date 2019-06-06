@@ -52,6 +52,7 @@ type TestSuite struct {
 	mongoclient *mongo.Client
 	minio *miniocontroller.Controller
 	auth *kbaseauthcontroller.Controller
+	authurl url.URL
 	loggerhook *logrust.Hook
 	noRole User
 	noRole2 User
@@ -71,8 +72,12 @@ func (t *TestSuite) SetupSuite() {
 	t.minio = t.setupMinio(tcfg)
 	auth, authurl := t.setupAuth(tcfg)
 	t.auth = auth
+	t.authurl = authurl
 	t.setUpUsersAndRoles()
 
+	logrus.SetOutput(ioutil.Discard)
+	t.loggerhook = logrust.NewGlobal()
+	
 	roles := []string{adminRole, blobstoreRole}
 	serv, err := New(
 		&config.Config{
@@ -112,7 +117,7 @@ func (t *TestSuite) SetupSuite() {
 		Addr:    "localhost:" + strconv.Itoa(port),
 		Handler: serv,
 	}
-
+	
 	go func() {
 
 		if err := t.s.ListenAndServe(); err != nil {
@@ -121,7 +126,18 @@ func (t *TestSuite) SetupSuite() {
 	}()
 	time.Sleep(50 * time.Millisecond) // wait for the server to start
 	logrus.SetOutput(ioutil.Discard)
-	t.loggerhook = logrust.NewGlobal()
+	t.checkURLWarnLog() // this is really a test, but the log gets blown away unless we do it here
+}
+
+func (t *TestSuite) checkURLWarnLog() {
+	t.Equal(1, len(t.loggerhook.AllEntries()), "incorrect number of log events")
+
+	got := t.loggerhook.AllEntries()[0]
+	t.Equal(logrus.WarnLevel, got.Level, "incorrect level")
+	t.Equal("Insecure auth url " + t.authurl.String(), got.Message, "incorrect message")
+	fields := map[string]interface{}(got.Data)
+	expectedfields := map[string]interface{}{}
+	t.Equal(expectedfields, fields, "incorrect fields")
 }
 
 func (t *TestSuite) setUpUsersAndRoles() {

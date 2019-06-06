@@ -31,7 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO * LOG insecure urls
 // TODO * TIMING vs shock & experimental server
 
 const (
@@ -71,6 +70,9 @@ type Server struct {
 func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	logrus.SetOutput(os.Stdout)
+	if cfg.AuthURL.Scheme != "https" {
+		logrus.Warnf("Insecure auth url " + cfg.AuthURL.String())
+	}
 	deps, err := constructDependencies(cfg)
 	if err != nil {
 		return nil, err // this is a pain to test
