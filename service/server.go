@@ -31,7 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO * LOG log or ignore X-IP headers
 // TODO * LOG insecure urls
 // TODO * TIMING vs shock & experimental server
 
@@ -61,10 +60,11 @@ type ServerStaticConf struct {
 
 // Server the blobstore server
 type Server struct {
-	mux        *mux.Router
-	staticconf ServerStaticConf
-	auth       *authcache.Cache
-	store      *core.BlobStore
+	mux              *mux.Router
+	staticconf       ServerStaticConf
+	auth             *authcache.Cache
+	store            *core.BlobStore
+	ignoreXIPheaders bool
 }
 
 // New create a new server.
@@ -76,10 +76,16 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 		return nil, err // this is a pain to test
 	}
 	router := mux.NewRouter()
-	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
-	router.MethodNotAllowedHandler = http.HandlerFunc(notAllowedHandler)
+	s := &Server{
+		mux:              router,
+		staticconf:       sconf,
+		auth:             deps.AuthCache,
+		store:            deps.BlobStore,
+		ignoreXIPheaders: cfg.DontTrustXIPHeaders,
+	}
+	router.NotFoundHandler = http.HandlerFunc(s.notFoundHandler)
+	router.MethodNotAllowedHandler = http.HandlerFunc(s.notAllowedHandler)
 	// router.StrictSlash(true) // doesn't seem to have an effect...?
-	s := &Server{mux: router, staticconf: sconf, auth: deps.AuthCache, store: deps.BlobStore}
 	router.Use(s.authLogMiddleWare)
 
 	router.HandleFunc("/", s.rootHandler).Methods(http.MethodGet)
@@ -114,18 +120,16 @@ type servkey struct {
 	k string
 }
 
-func notFoundHandler(w http.ResponseWriter, r *http.Request) {
-	writeErrorWithCode(initLogger(r), "Not Found", 404, w)
+func (s *Server) notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	writeErrorWithCode(s.initLogger(r), "Not Found", 404, w)
 }
 
-func notAllowedHandler(w http.ResponseWriter, r *http.Request) {
-	writeErrorWithCode(initLogger(r), "Method Not Allowed", 405, w)
+func (s *Server) notAllowedHandler(w http.ResponseWriter, r *http.Request) {
+	writeErrorWithCode(s.initLogger(r), "Method Not Allowed", 405, w)
 }
 
-func initLogger(r *http.Request) *logrus.Entry {
-	//TODO * LOG get correct ip taking X-* headers into account
-	return logrus.WithFields(logrus.Fields{
-		"ip": r.RemoteAddr,
+func (s *Server) initLogger(r *http.Request) *logrus.Entry {
+	le := logrus.WithFields(logrus.Fields{
 		// at some point return rid to the user
 		"requestid": fmt.Sprintf("%016d", rand.Intn(10000000000000000)),
 		"service":   service,
@@ -133,6 +137,36 @@ func initLogger(r *http.Request) *logrus.Entry {
 		"method":    r.Method,
 		"user":      nil,
 	})
+	return le.WithField("ip", getIP(le, r, s.ignoreXIPheaders))
+}
+
+func getIP(le *logrus.Entry, r *http.Request, ignoreXIPHeaders bool) string {
+	if ignoreXIPHeaders {
+		return r.RemoteAddr
+	}
+	xFFs := r.Header.Get("X-Forwarded-For")
+	i := strings.Index(xFFs, ",")
+	if i == -1 {
+		i = len(xFFs)
+	}
+	xFF := strings.TrimSpace(xFFs[:i])
+	xRIP := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+	var ip string
+	if xFF != "" {
+		ip = xFF
+	} else if xRIP != "" {
+		ip = xRIP
+	}
+	if ip != "" {
+		le.WithFields(logrus.Fields{
+			"X-Forwarded-For": r.Header.Get("X-Forwarded-For"),
+			"X-Real-IP":       r.Header.Get("X-Real-IP"),
+			"RemoteAddr":      r.RemoteAddr,
+			"ip":              ip,
+		}).Info("logging ip information")
+		return ip
+	}
+	return r.RemoteAddr
 }
 
 func getUser(r *http.Request) *auth.User {
@@ -169,7 +203,7 @@ func getTokenFromHeader(r *http.Request) (string, error) {
 func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// would like to split out the log middleware, but no way to pass the user up the stack
-		le := initLogger(r)
+		le := s.initLogger(r)
 
 		token, err := getTokenFromHeader(r)
 		if err != nil {
