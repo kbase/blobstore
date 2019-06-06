@@ -68,7 +68,7 @@ type Server struct {
 
 // New create a new server.
 func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetFormatter(&logrus.JSONFormatter{TimestampFormat: "2006-01-02T15:04:05.000Z07:00"})
 	logrus.SetOutput(os.Stdout)
 	if cfg.AuthURL.Scheme != "https" {
 		logrus.Warnf("Insecure auth url " + cfg.AuthURL.String())
