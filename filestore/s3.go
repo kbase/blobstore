@@ -3,11 +3,14 @@ package filestore
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/kbase/blobstore/core/values"
 
@@ -103,9 +106,12 @@ func (fs *S3FileStore) GetBucket() string {
 }
 
 // StoreFile stores a file.
-func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *FileInfo, err error) {
+func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *FileInfo, err error) {
 	if p == nil {
 		return nil, errors.New("Params cannot be nil")
+	}
+	if le == nil {
+		return nil, errors.New("logger cannot be nil")
 	}
 	putObj, _ := fs.s3client.PutObjectRequest(&s3.PutObjectInput{ // PutObjectOutput is never filled
 		Bucket: &fs.bucket,
@@ -130,8 +136,14 @@ func (fs *S3FileStore) StoreFile(p *StoreFileParams) (out *FileInfo, err error) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
-		// TODO * LOG body
-		return nil, fmt.Errorf("s3 store request unexpected status code: %v", resp.StatusCode)
+		buffer := make([]byte, 1000)
+		n, err := resp.Body.Read(buffer)
+		if err != nil && err != io.EOF {
+			return nil, err // dunno how to test this
+		}
+		er := fmt.Sprintf("s3 store request unexpected status code: %v", resp.StatusCode)
+		le.WithField("truncated_response_body", string(buffer[:n])).Error(er)
+		return nil, errors.New(er)
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
 	// returned by head. Head should be cheap compared to a write

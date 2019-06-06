@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kbase/blobstore/core/values"
+	"github.com/sirupsen/logrus"
 )
 
 // TODO INPUT may need limits for strings.
@@ -121,7 +122,7 @@ func (e *NoFileError) Error() string {
 // by ID.
 type FileStore interface {
 	// Store a file.
-	StoreFile(p *StoreFileParams) (*FileInfo, error)
+	StoreFile(le *logrus.Entry, p *StoreFileParams) (*FileInfo, error)
 	// Get a file by the ID of the file.
 	// Returns NoFileError if there is no file by the given ID.
 	GetFile(id string) (*GetFileOutput, error)

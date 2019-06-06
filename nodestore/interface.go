@@ -93,10 +93,10 @@ func NewNode(
 	stored time.Time,
 	options ...func(*Node) error) (*Node, error) {
 
+	// TODO * NOW test with empty file and do something not stupid
 	if size < 1 {
 		return nil, errors.New("size must be > 0")
 	}
-	//TODO INPUT check valid MD5
 	r := []User{}
 	n := &Node{id: id, owner: owner, size: size, md5: md5, stored: stored, readers: &r}
 

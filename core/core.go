@@ -6,6 +6,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/google/uuid"
 
 	"github.com/kbase/blobstore/auth"
@@ -113,12 +115,16 @@ func NewWithUUIDGen(filestore filestore.FileStore, nodestore nodestore.NodeStore
 
 // Store stores a blob. The caller is responsible for closing the reader.
 func (bs *BlobStore) Store(
+	le *logrus.Entry,
 	user auth.User,
 	data io.Reader,
 	size int64,
 	filename values.FileName, // TODO OPS make filename and format optional
 	format values.FileFormat,
 ) (*BlobNode, error) {
+	if le == nil {
+		return nil, errors.New("logger cannot be nil")
+	}
 	if size < 1 {
 		return nil, errors.New("size must be > 0")
 	}
@@ -130,7 +136,7 @@ func (bs *BlobStore) Store(
 	}
 	p, _ := filestore.NewStoreFileParams(uuidToFilePath(uid), size, data,
 		filestore.FileName(filename.GetFileName()), filestore.Format(format.GetFileFormat()))
-	f, err := bs.fileStore.StoreFile(p)
+	f, err := bs.fileStore.StoreFile(le, p)
 	if err != nil {
 		return nil, err // errors should only occur for unusual situations here
 	}
