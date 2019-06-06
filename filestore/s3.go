@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/kbase/blobstore/core/values"
 
@@ -38,7 +39,8 @@ type S3FileStore struct {
 func NewS3FileStore(
 	s3client *s3.S3,
 	minioClient *minio.Client,
-	bucket string) (*S3FileStore, error) {
+	bucket string,
+) (*S3FileStore, error) {
 
 	if s3client == nil {
 		return nil, errors.New("s3client cannot be nil")
@@ -46,19 +48,36 @@ func NewS3FileStore(
 	if minioClient == nil {
 		return nil, errors.New("minioClient cannot be nil")
 	}
-	bucket = strings.TrimSpace(bucket)
-	if bucket == "" {
-		return nil, errors.New("bucket cannot be empty or whitespace only")
+	bucket, err := checkBucketName(bucket)
+	if err != nil {
+		return nil, err
 	}
-	err := createBucket(s3client, bucket)
+	err = createBucket(s3client, bucket)
 	if err != nil {
 		// this case is hard to test without adding minio accounts which is a chunk of work.
 		// Ignore for now.
 		return nil, err
 	}
-	//TODO * INPUT check bucket name for illegal chars and max length
-
 	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket}, nil
+}
+
+func checkBucketName(bucket string) (string, error) {
+	bucket = strings.TrimSpace(bucket)
+	if len(bucket) < 3 || len(bucket) > 63 {
+		return "", errors.New("bucket length must be between 3 and 63 characters")
+	}
+	for i, r := range bucket {
+		if r > unicode.MaxASCII {
+			return "", errors.New("bucket contains an illegal character: " + string(r))
+		}
+		if i == 0 && r == '-' {
+			return "", errors.New("bucket must start with a letter or number")
+		}
+		if !unicode.IsLower(r) && !unicode.IsDigit(r) && r != '-' {
+			return "", errors.New("bucket contains an illegal character: " + string(r))
+		}
+	}
+	return bucket, nil
 }
 
 func createBucket(s3Client *s3.S3, bucket string) error {
