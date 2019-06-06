@@ -14,6 +14,8 @@ mongodb-database = blobstore
 # S3 API parameters. All are required other than disable-ssl.
 # disable-ssl treats any value other than 'true' as false.
 s3-host = localhost:9000
+# The bucket name must obey https://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
+# with the extra restriction that periods are not allowed.
 s3-bucket = blobstore
 s3-access-key = [access key goes here]
 s3-access-secret = [access secret goes here]

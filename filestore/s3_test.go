@@ -64,14 +64,55 @@ func ptr(s string) *string {
 	return &s
 }
 
+func (t *TestSuite) TestConstructWithGoodBucketNames() {
+	min, _ := t.minio.CreateMinioClient()
+	cli := t.minio.CreateS3Client()
+
+	b := strings.Builder{}
+	b.Write([]byte("abcefghijklmnopqrstuvwxyz-0123456789-012456"))
+	for i := 0; i < 2; i++ {
+		b.Write([]byte("0123456789"))
+	}
+	ls := b.String()
+	t.Equal(63, len(ls), "incorrect string length")
+	for _, bucket := range []string{"foo", ls} {
+		fstore, err := NewS3FileStore(cli, min, bucket)
+		t.NotNil(fstore, "expected filestore client")
+		t.Nil(err, "unexpected error")
+	}
+}
+
 func (t *TestSuite) TestConstructFail() {
 	min, _ := t.minio.CreateMinioClient()
 	cli := t.minio.CreateS3Client()
 	constructFail(t, nil, min, "s", errors.New("s3client cannot be nil"))
 	constructFail(t, cli, nil, "s", errors.New("minioClient cannot be nil"))
-	constructFail(t, cli, min, "   \t   \n   ",
-		errors.New("bucket cannot be empty or whitespace only"))
+}
 
+func (t *TestSuite) TestConstructFailBadBucketName() {
+	min, _ := t.minio.CreateMinioClient()
+	cli := t.minio.CreateS3Client()
+
+	b := strings.Builder{}
+	for i := 0; i < 6; i++ {
+		b.Write([]byte("a123456789"))
+	}
+	ls := b.String() + "123"
+	t.Equal(63, len(ls), "incorrect string length")
+	testcases := map[string]string{
+		"": "bucket length must be between 3 and 63 characters",
+		"  \t     ": "bucket length must be between 3 and 63 characters",
+		"     fo    ": "bucket length must be between 3 and 63 characters",
+		ls + "a": "bucket length must be between 3 and 63 characters",
+		"-ab": "bucket must start with a letter or number",
+		"a𐤈b": "bucket contains an illegal character: 𐤈",
+		"aCb": "bucket contains an illegal character: C",
+		"a#b": "bucket contains an illegal character: #",
+	}
+
+	for bucket, er := range testcases {
+		constructFail(t, cli, min, bucket, errors.New(er))
+	}
 }
 
 func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, bucket string, expected error) {
