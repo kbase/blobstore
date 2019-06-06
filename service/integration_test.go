@@ -320,6 +320,15 @@ body map[string]interface{}) {
 	t.True(lmax >= cl, fmt.Sprintf("content-length %v > %v for body\n%v\n", cl, lmax, body))
 }
 
+var rootExpected = map[string]interface{}{
+	"servername":         "servn",
+	"serverversion":      "servver",
+	"id":                 "shockyshock",
+	"version":            "sver",
+	"deprecationwarning": "I shall deprecate the whold world! MuhahahahHAHA",
+	"gitcommit":		  "Fake git commit here",
+}
+
 func (t *TestSuite) TestRoot() {
 	ret, err := http.Get(t.url)
 	t.Equal(200, ret.StatusCode, "incorrect status")
@@ -335,16 +344,7 @@ func (t *TestSuite) TestRoot() {
 	servertime := root["servertime"].(float64)
 	delete(root, "servertime")
 
-	expected := map[string]interface{}{
-		"servername":         "servn",
-		"serverversion":      "servver",
-		"id":                 "shockyshock",
-		"version":            "sver",
-		"deprecationwarning": "I shall deprecate the whold world! MuhahahahHAHA",
-		"gitcommit":		  "Fake git commit here",
-	}
-
-	t.Equal(expected, root, "incorrect root return")
+	t.Equal(rootExpected, root, "incorrect root return")
 
 	expectedtime := time.Now().UnixNano() / 1000000
 
@@ -355,6 +355,75 @@ func (t *TestSuite) TestRoot() {
 	t.checkLogs(
 		logEvent{logrus.InfoLevel, "GET", "/", 200, nil, "request complete", mtmap(), false},
 	)
+}
+
+func (t *TestSuite) TestXIPHeaders() {
+	//xFF
+	req, err := http.NewRequest("GET", t.url, nil)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("X-forwarded-for", " 123.456.789.123  , 456.789.123.456")
+	req.Header.Set("x-Real-IP", "  789.123.456.789")
+	root := t.requestToJSON(req, 248, 200)
+	delete(root, "servertime")
+	t.Equal(rootExpected, root, "incorrect root return")
+
+	t.checkXIPLogs("123.456.789.123  , 456.789.123.456", "789.123.456.789", "123.456.789.123")
+
+	//xRIP
+	req, err = http.NewRequest("GET", t.url, nil)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("X-forwarded-for", "  , 456.789.123.456")
+	req.Header.Set("x-Real-IP", "  789.123.456.789")
+	root = t.requestToJSON(req, 248, 200)
+	delete(root, "servertime")
+	t.Equal(rootExpected, root, "incorrect root return")
+
+	t.checkXIPLogs(", 456.789.123.456", "789.123.456.789", "789.123.456.789")
+}
+
+func (t *TestSuite) checkXIPLogs(xFF, xRIP, ip string) {
+	t.Equal(2, len(t.loggerhook.AllEntries()), "incorrect number of log events")
+
+	got1 := t.loggerhook.AllEntries()[0]
+	got2 := t.loggerhook.AllEntries()[1]
+	t.Equal(logrus.InfoLevel, got1.Level, "incorrect level")
+	t.Equal(logrus.InfoLevel, got2.Level, "incorrect level")
+	t.Equal("logging ip information", got1.Message, "incorrect message")
+	t.Equal("request complete", got2.Message, "incorrect message")
+
+	fields1 := map[string]interface{}(got1.Data)
+	fields2 := map[string]interface{}(got2.Data)
+	ra1 := fields1["RemoteAddr"].(string)
+	t.True(strings.HasPrefix(ra1, "127.0.0.1:"), "incorrect remote addr") // can't test random port
+	delete(fields1, "RemoteAddr")
+	requestid1 := fields1["requestid"].(string)
+	requestid2 := fields2["requestid"].(string)
+	t.Equal(16, len(requestid1), "incorrect request id length")
+	t.Equal(16, len(requestid2), "incorrect request id length")
+	_, err := strconv.Atoi(requestid1)
+	t.Nil(err, "unexpected error coverting requestid to int")
+	_, err = strconv.Atoi(requestid2)
+	t.Nil(err, "unexpected error coverting requestid to int")
+	delete(fields1, "requestid")
+	delete(fields2, "requestid")
+
+	expectedfields := map[string]interface{}{
+		"method": "GET",
+		"path": "/",
+		"user": nil,
+		"service": "BlobStore",
+		"X-Forwarded-For": xFF,
+		"X-Real-IP": xRIP,
+		"ip": ip,
+	}
+	t.Equal(expectedfields, fields1, "incorrect fields")
+	
+	expectedfields["status"] = 200
+	delete(expectedfields, "X-Forwarded-For")
+	delete(expectedfields, "X-Real-IP")
+	t.Equal(expectedfields, fields2, "incorrect fields")
+
+	t.loggerhook.Reset()
 }
 
 func (t *TestSuite) TestStoreAndGetWithFilename() {
