@@ -198,7 +198,7 @@ func TestStoreFailSize(t *testing.T) {
 		*ff,
 	)
 	assert.Nil(t, bnode, "expected error")
-	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect error")
+	assert.Equal(t, values.NewIllegalInputError("file size must be > 0"), err, "incorrect error")
 }
 
 func TestStoreFailGetUser(t *testing.T) {

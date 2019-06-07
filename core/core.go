@@ -126,7 +126,7 @@ func (bs *BlobStore) Store(
 		return nil, errors.New("logger cannot be nil")
 	}
 	if size < 1 {
-		return nil, errors.New("size must be > 0")
+		return nil, values.NewIllegalInputError("file size must be > 0")
 	}
 	uid := bs.uuidGen.GetUUID()
 

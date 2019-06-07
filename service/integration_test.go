@@ -732,6 +732,15 @@ func (t *TestSuite) TestStoreNoContentLength() {
 	)
 }
 
+func (t *TestSuite) TestStoreFailNoFile() {
+	body := t.req("POST", t.url + "/node", strings.NewReader(""), "oauth " + t.noRole.token,
+		87, 400)
+	t.checkError(body, 400, "file size must be > 0")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"file size must be > 0", mtmap(), false},
+	)
+}
+
 func (t *TestSuite) TestStoreNoUser() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"), "", 77, 401)
 	t.checkError(body, 401, "No Authorization")

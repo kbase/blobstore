@@ -93,7 +93,6 @@ func NewNode(
 	stored time.Time,
 	options ...func(*Node) error) (*Node, error) {
 
-	// TODO * NOW test with empty file and do something not stupid
 	if size < 1 {
 		return nil, errors.New("size must be > 0")
 	}
