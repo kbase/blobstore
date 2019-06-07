@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	bserr "github.com/kbase/blobstore/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -84,15 +85,18 @@ func (kb *KBaseProvider) GetURL() url.URL {
 
 // GetUser gets a user given a token.
 // Returns InvalidToken error.
-func (kb *KBaseProvider) GetUser(token string) (*User, int64, int, error) {
+func (kb *KBaseProvider) GetUser(le *logrus.Entry, token string) (*User, int64, int, error) {
+	if le == nil {
+		return nil, -1, -1, errors.New("logger cannot be nil")
+	}
 	if strings.TrimSpace(token) == "" {
 		return nil, -1, -1, bserr.WhiteSpaceError("token")
 	}
-	tokenjson, err := get(kb.endpointToken, token)
+	tokenjson, err := get(le, kb.endpointToken, token)
 	if err != nil {
 		return nil, -1, -1, err
 	}
-	mejson, err := get(kb.endpointMe, token)
+	mejson, err := get(le, kb.endpointMe, token)
 	if err != nil {
 		return nil, -1, -1, err // not sure how to test this given the previous passed
 	}
@@ -119,7 +123,7 @@ func (kb *KBaseProvider) isAdmin(roles *[]interface{}) bool {
 	return len(rolemap) < len(*kb.adminRoles)
 }
 
-func get(u url.URL, token string) (map[string]interface{}, error) {
+func get(le *logrus.Entry, u url.URL, token string) (map[string]interface{}, error) {
 	req, _ := http.NewRequest(http.MethodGet, u.String(), nil)
 	authenticate(&req.Header, token)
 	req.Header.Add("accept", "application/json")
@@ -127,7 +131,7 @@ func get(u url.URL, token string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, errors.New("kbase auth get: " + err.Error()) // dunno how to test this
 	}
-	return toJSON(res)
+	return toJSON(le, res)
 }
 
 // modifies header in place
@@ -136,22 +140,24 @@ func authenticate(h *http.Header, token string) {
 }
 
 // will close body
-func toJSON(resp *http.Response) (map[string]interface{}, error) {
+func toJSON(le *logrus.Entry, resp *http.Response) (map[string]interface{}, error) {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(io.LimitReader(resp.Body, 10000))
 	if err != nil {
 		return nil, errors.New("kbase auth read: " + err.Error()) // dunno how to test this easily
 	}
 	if _, err = resp.Body.Read(make([]byte, 1, 1)); err != io.EOF {
-		// TODO * LOG b
-		return nil, errors.New("kbase auth: Unexpectedly long body from auth service")
+		er := "kbase auth: Unexpectedly long body from auth service"
+		logBody(le, &b, er)
+		return nil, errors.New(er)
 	}
 	var authresp map[string]interface{}
 	err = json.Unmarshal(b, &authresp)
 	if err != nil {
-		// TODO * LOG b.
-		return nil, errors.New("kbase auth: Non-JSON response from KBase auth server, " +
-			"status code: " + strconv.Itoa(resp.StatusCode))
+		er := "kbase auth: Non-JSON response from KBase auth server, " +
+			"status code: " + strconv.Itoa(resp.StatusCode)
+		logBody(le, &b, er)
+		return nil, errors.New(er)
 	}
 	if resp.StatusCode > 399 { // should never see 100s or 300s
 		// assume that we have a valid error response from the auth server at this point
@@ -166,10 +172,22 @@ func toJSON(resp *http.Response) (map[string]interface{}, error) {
 	return authresp, nil
 }
 
+func logBody(le *logrus.Entry, body *[]byte, errstr string) {
+	if len(*body) > 1000 {
+		b := (*body)[:1000]
+		body = &b
+	}
+	le.WithField("truncated_response_body", string(*body)).Error(errstr)
+}
+
 // ValidateUserNames validates that user names exist in the auth system.
 // token can be any valid token - it's used only to look up the userNames.
 // Returns InvalidToken error and InvalidUserError.
-func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (int, error) {
+func (kb *KBaseProvider) ValidateUserNames(le *logrus.Entry, userNames *[]string, token string,
+) (int, error) {
+	if le == nil {
+		return -1, errors.New("logger cannot be nil")
+	}
 	if strings.TrimSpace(token) == "" {
 		return -1, bserr.WhiteSpaceError("token")
 	}
@@ -194,7 +212,7 @@ func (kb *KBaseProvider) ValidateUserNames(userNames *[]string, token string) (i
 		return -1, &InvalidUserError{&invalid}
 	}
 	u, _ := url.Parse(kb.endpointUser + strings.Join(names, ","))
-	userjson, err := get(*u, token)
+	userjson, err := get(le, *u, token)
 	if err != nil {
 		return -1, err
 	}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/kbase/blobstore/errors"
 )
 
@@ -63,9 +65,11 @@ func (e *InvalidTokenError) Error() string {
 type Provider interface {
 	// GetUser gets a user given a token.
 	// Returns InvalidToken error.
-	GetUser(token string) (user *User, expiresMS int64, cachetimeMS int, err error)
+	GetUser(le *logrus.Entry, token string,
+	) (user *User, expiresMS int64, cachetimeMS int, err error)
 	// ValidateUserNames validates that user names exist in the auth system.
 	// token can be any valid token - it's used only to look up the userNames.
 	// Returns InvalidToken error and InvalidUserError.
-	ValidateUserNames(userNames *[]string, token string) (cachetimeMS int, err error)
+	ValidateUserNames(le *logrus.Entry, userNames *[]string, token string,
+	) (cachetimeMS int, err error)
 }
