@@ -31,8 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO * TIMING vs shock & experimental server
-
 const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
