@@ -31,8 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO * TIMING vs shock & experimental server
-
 const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
@@ -369,9 +367,6 @@ func (s *Server) createNodeFromBody(
 	}
 	node, err := s.store.Store(le, *user, r.Body, r.ContentLength, *filename, *format)
 	if err != nil {
-		// can't figure out how to easily test this case.
-		// the only triggerable error in the blobstore code is a bad content length,
-		// but the client complains before we even get here for small data.
 		writeError(le, err, w)
 		return
 	}
