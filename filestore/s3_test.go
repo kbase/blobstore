@@ -1,6 +1,7 @@
 package filestore
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/kbase/blobstore/core/values"
 	"fmt"
 	"os"
@@ -17,12 +18,15 @@ import (
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
 	"github.com/minio/minio-go"
+
+	logrust "github.com/sirupsen/logrus/hooks/test"
 	
 )
 
 type TestSuite struct {
 	suite.Suite
 	minio         *miniocontroller.Controller
+	loggerhook *logrust.Hook
 	deleteTempDir bool
 }
 
@@ -44,6 +48,8 @@ func (t *TestSuite) SetupSuite() {
 	}
 	t.minio = minio
 	t.deleteTempDir = tcfg.DeleteTempDir
+	t.loggerhook = logrust.NewGlobal()
+	logrus.SetOutput(ioutil.Discard)
 }
 
 func (t *TestSuite) TearDownSuite() {
@@ -54,6 +60,7 @@ func (t *TestSuite) TearDownSuite() {
 
 func (t *TestSuite) SetupTest() {
 	t.minio.Clear(false)
+	t.loggerhook.Reset()
 }
 
 func TestRunSuite(t *testing.T) {
@@ -163,7 +170,8 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 		Format(format),
 		FileName(filename),
 	)
-	res, _ := fstore.StoreFile(p)
+	res, _ := fstore.StoreFile(logrus.WithField("a", "b"), p)
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 
 	stored := res.Stored
 	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
@@ -204,12 +212,15 @@ func (t *TestSuite) TestStoreWithNilInput() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+	
+	res, err := fstore.StoreFile(nil, &StoreFileParams{}) // DO NOT init SFP like this
+	t.Nil(res, "expected error")
+	t.Equal(errors.New("logger cannot be nil"), err, "incorrect error")
 
-	res, err := fstore.StoreFile(nil)
-	if res != nil {
-		t.Fail("returned object is not nil")
-	}
+	res, err = fstore.StoreFile(logrus.WithField("a", "b"), nil)
+	t.Nil(res, "expected error")
 	t.Equal(errors.New("Params cannot be nil"), err, "incorrect error")
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestStoreWithIncorrectSize() {
@@ -223,13 +234,14 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 		Format("json"),
 		FileName("fn"),
 	)
-	res, err := fstore.StoreFile(p)
+	res, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if res != nil {
 		t.Fail("returned object is not nil")
 	}
 	// might want a different error message here
 	t.Equal(errors.New("s3 store request: http: ContentLength=11 with Body length 12"), err,
 		"incorrect error")
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestStoreFailNoBucket() {
@@ -246,9 +258,20 @@ func (t *TestSuite) TestStoreFailNoBucket() {
 		Format("json"),
 		FileName("fn"),
 	)
-	res, err := fstore.StoreFile(p)
+
+	res, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	t.Nil(res, "expected error")
 	t.Equal(errors.New("s3 store request unexpected status code: 404"), err, "incorrect error")
+
+	t.Equal(1, len(t.loggerhook.AllEntries()), "incorrect log event count")
+	le := t.loggerhook.AllEntries()[0]
+	t.Equal("s3 store request unexpected status code: 404", le.Message)
+	t.Equal(logrus.ErrorLevel, le.Level, "incorrect level")
+	t.Equal("b", le.Data["a"], "incorrect field")
+	bdy := "<Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist" +
+		"</Message><Key>myid</Key><BucketName>mybucket</BucketName><Resource>/mybucket/myid" +
+		"</Resource>"
+	t.Contains(le.Data["truncated_response_body"], bdy, "incorrect body")
 }
 
 func (t *TestSuite) TestGetWithBlankID() {
@@ -272,7 +295,7 @@ func (t *TestSuite) TestGetWithNonexistentID() {
 		12,
 		strings.NewReader("012345678910"),
 	)
-	_, err := fstore.StoreFile(p)
+	_, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -342,7 +365,7 @@ func (t *TestSuite) TestDeleteObject() {
 		12,
 		strings.NewReader("012345678910"),
 	)
-	_, err := fstore.StoreFile(p)
+	_, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -362,7 +385,7 @@ func (t *TestSuite) TestDeleteObjectWrongID() {
 		12,
 		strings.NewReader("012345678910"),
 	)
-	_, err := fstore.StoreFile(p)
+	_, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -424,7 +447,7 @@ func (t *TestSuite) copy(
 		Format(format),
 		FileName(filename),
 	)
-	res, _ := fstore.StoreFile(p)
+	res, _ := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	time.Sleep(1 * time.Second) // otherwise the store times are the same
 	fi, err := fstore.CopyFile(srcobj, dstobj)
 	if err != nil {
@@ -495,7 +518,7 @@ func (t *TestSuite) TestCopyNonExistentFile() {
 		12,
 		strings.NewReader("012345678910"),
 	)
-	_, err := fstore.StoreFile(p)
+	_, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -520,7 +543,7 @@ func (t* TestSuite) testCopyLargeObject() {
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 	p, _ := NewStoreFileParams("myid", fi.Size(), reader)
 	start := time.Now()
-	obj, err := fstore.StoreFile(p)
+	obj, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
 	if err != nil {
 		t.Fail(err.Error())
 	}

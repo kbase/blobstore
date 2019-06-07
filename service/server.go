@@ -367,7 +367,7 @@ func (s *Server) createNodeFromBody(
 		writeError(le, err, w)
 		return
 	}
-	node, err := s.store.Store(*user, r.Body, r.ContentLength, *filename, *format)
+	node, err := s.store.Store(le, *user, r.Body, r.ContentLength, *filename, *format)
 	if err != nil {
 		// can't figure out how to easily test this case.
 		// the only triggerable error in the blobstore code is a bad content length,

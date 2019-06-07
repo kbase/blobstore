@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/kbase/blobstore/core/values"
 	"io/ioutil"
 	"errors"
@@ -60,7 +61,8 @@ func TestStoreBasic(t *testing.T) {
 		MD5: *md5,
 		Stored: tme,
 	}
-	fsmock.On("StoreFile", p).Return(&sto, nil)
+	le := logrus.WithField("a", "b")
+	fsmock.On("StoreFile", le, p).Return(&sto, nil)
 
 	node, _ := nodestore.NewNode(uid, *nuser, 12, *md5, tme)
 	nsmock.On("StoreNode", node).Return(nil)
@@ -69,6 +71,7 @@ func TestStoreBasic(t *testing.T) {
 	fn, _ := values.NewFileName("")
 	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
+		le,
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
@@ -120,7 +123,8 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		MD5: *md5,
 		Stored: tme,
 	}
-	fsmock.On("StoreFile", p).Return(&sto, nil)
+	le := logrus.WithField("a", "b")
+	fsmock.On("StoreFile", le, p).Return(&sto, nil)
 
 	node, _ := nodestore.NewNode(
 		uid, *nuser, 12, *md5, tme, nodestore.FileName("myfile"), nodestore.Format("excel"))
@@ -131,6 +135,7 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 	fn, _ := values.NewFileName("myfile")
 	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
+		le,
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
@@ -152,6 +157,28 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
 
+func TestStoreFailNullLogger(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("username", false)
+
+	fn, _ := values.NewFileName("myfile")
+	ff, _ := values.NewFileFormat("excel")
+	bnode, err := bs.Store(
+		nil,
+		*auser,
+		strings.NewReader("012345678910"),
+		0,
+		*fn,
+		*ff,
+	)
+	assert.Nil(t, bnode, "expected error")
+	assert.Equal(t, errors.New("logger cannot be nil"), err, "incorrect error")
+}
+
 func TestStoreFailSize(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
@@ -163,6 +190,7 @@ func TestStoreFailSize(t *testing.T) {
 	fn, _ := values.NewFileName("myfile")
 	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
+		logrus.WithField("a", "b"),
 		*auser,
 		strings.NewReader("012345678910"),
 		0,
@@ -190,6 +218,7 @@ func TestStoreFailGetUser(t *testing.T) {
 	fn, _ := values.NewFileName("myfile")
 	ff, _ := values.NewFileFormat("excel")
 	bnode, err := bs.Store(
+		logrus.WithField("a", "b"),
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
@@ -218,13 +247,15 @@ func TestStoreFailStoreFile(t *testing.T) {
 		"41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
 		12,
 		strings.NewReader("012345678910"))
-	fsmock.On("StoreFile", p).Return(nil, errors.New("even more lovely"))
+	le := logrus.WithField("a", "b")
+	fsmock.On("StoreFile", le, p).Return(nil, errors.New("even more lovely"))
 
 	auser, _ := auth.NewUser("username", false)
 
 	fn, _ := values.NewFileName("")
 	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
+		le,
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
@@ -263,7 +294,8 @@ func TestStoreFailStoreNode(t *testing.T) {
 		MD5: *md5,
 		Stored: tme,
 	}
-	fsmock.On("StoreFile", p).Return(&sto, nil)
+	le := logrus.WithField("a", "b")
+	fsmock.On("StoreFile", le, p).Return(&sto, nil)
 
 	node, _ := nodestore.NewNode(uid, *nuser, 12, *md5, tme)
 	nsmock.On("StoreNode", node).Return(errors.New("the loveliest of them all"))
@@ -273,6 +305,7 @@ func TestStoreFailStoreNode(t *testing.T) {
 	fn, _ := values.NewFileName("")
 	ff, _ := values.NewFileFormat("")
 	bnode, err := bs.Store(
+		le,
 		*auser,
 		strings.NewReader("012345678910"),
 		12,
