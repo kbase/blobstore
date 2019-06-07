@@ -1,7 +1,10 @@
 package cache
 
 import (
+	"errors"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/kbase/blobstore/auth"
 
@@ -41,13 +44,16 @@ func NewCacheWithTimeProvider(prov auth.Provider, tp TimeProvider) *Cache {
 
 // GetUser gets a user given a token.
 // Returns InvalidToken error.
-func (c *Cache) GetUser(token string) (*auth.User, error) {
+func (c *Cache) GetUser(le *logrus.Entry, token string) (*auth.User, error) {
+	if le == nil {
+		return nil, errors.New("logger cannot be nil")
+	}
 	// could cache bad tokens, but that's just incompetent client programming if they keep trying
 	// to use a bad token.
 	if u, ok := c.cache.Get(token); ok {
 		return u.(*auth.User), nil
 	}
-	u, expires, cachefor, err := c.prov.GetUser(token)
+	u, expires, cachefor, err := c.prov.GetUser(le, token)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +72,10 @@ func (c *Cache) getCacheTime(expires int64, cachefor int) time.Duration {
 // ValidateUserNames validates that user names exist in the auth system.
 // token can be any valid token - it's used only to look up the userName.
 // Returns InvalidToken error and InvalidUserError.
-func (c *Cache) ValidateUserNames(userNames *[]string, token string) error {
+func (c *Cache) ValidateUserNames(le *logrus.Entry, userNames *[]string, token string) error {
+	if le == nil {
+		return errors.New("logger cannot be nil")
+	}
 	cachemiss := []string{}
 	for _, name := range *userNames {
 		if _, found := c.cache.Get(name); !found {
@@ -74,7 +83,7 @@ func (c *Cache) ValidateUserNames(userNames *[]string, token string) error {
 		}
 	}
 	if len(cachemiss) > 0 {
-		cachefor, err := c.prov.ValidateUserNames(&cachemiss, token)
+		cachefor, err := c.prov.ValidateUserNames(le, &cachemiss, token)
 		if err != nil {
 			// could cache the good usernames here. Not worth the added complexity.
 			// could also cache bad usernames. That should be rare unless programmers are

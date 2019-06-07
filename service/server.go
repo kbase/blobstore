@@ -215,7 +215,7 @@ func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 		var user *auth.User
 		if token != "" {
 			var err error
-			user, err = s.auth.GetUser(token)
+			user, err = s.auth.GetUser(le, token)
 			if err != nil {
 				writeError(le, err, w)
 				return
@@ -637,7 +637,7 @@ func (s *Server) getUserList(
 		writeErrorWithCode(le, tooManyUsersError, 400, w)
 		return nil, errors.New(tooManyUsersError)
 	}
-	err := s.auth.ValidateUserNames(&ulst, getToken(r))
+	err := s.auth.ValidateUserNames(le, &ulst, getToken(r))
 	if err != nil {
 		writeError(le, err, w)
 		return nil, err

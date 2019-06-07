@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"io/ioutil"
+	"github.com/sirupsen/logrus"
 	"fmt"
 	"time"
 	"errors"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
+
+	logrust "github.com/sirupsen/logrus/hooks/test"
 )
 
 const (
@@ -24,6 +28,7 @@ type TestSuite struct {
 	mongo         *mongocontroller.Controller
 	auth          *kbaseauthcontroller.Controller
 	authURL *url.URL
+	loggerhook *logrust.Hook
 	deleteTempDir bool
 	tokenNoRole string
 	tokenStdRole string
@@ -63,6 +68,8 @@ func (t *TestSuite) SetupSuite() {
 	t.deleteTempDir = tcfg.DeleteTempDir
 
 	t.setUpUsersAndRoles()
+	t.loggerhook = logrust.NewGlobal()
+	logrus.SetOutput(ioutil.Discard)
 }
 
 func (t *TestSuite) setUpUsersAndRoles() {
@@ -107,6 +114,10 @@ func (t *TestSuite) addTestRole(username string, role string) {
 	if err := t.auth.SetTestUserRoles(username, &r); err != nil {
 		t.FailNow(err.Error())
 	}
+}
+
+func (t *TestSuite) SetupTest() {
+	t.loggerhook.Reset()
 }
 
 func (t *TestSuite) TearDownSuite() {
@@ -183,7 +194,7 @@ func (t *TestSuite) checkUser(tc *tgu) {
 
 	kb, err := NewKBaseProvider(*t.authURL, opts...)
 	t.Nil(err, "unexpected error")
-	u, expires, cachefor, err := kb.GetUser(tc.Token)
+	u, expires, cachefor, err := kb.GetUser(logrus.WithField("a", "b"), tc.Token)
 	t.Nil(err, "unexpected error")
 	expected := User{tc.UserName, tc.IsAdmin}
 	t.Equal(&expected, u, "incorrect user")
@@ -195,6 +206,7 @@ func (t *TestSuite) checkUser(tc *tgu) {
 		"expire time (%v) too large vs. expected (%v)", expires, expectedtime))
 	t.True(expectedtime - 1000 < expires, fmt.Sprintf(
 		"expire time (%v) too small vs. expected (%v)", expires, expectedtime))
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestGetUserFailBadInput() {
@@ -205,32 +217,74 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
 
+	u, expires, cachefor, err := kb.GetUser(nil, "t")
+	t.Nil(u, "expected error")
+	t.Equal(errors.New("logger cannot be nil"), err, "incorrect error")
+	t.Equal(int64(-1), expires, "incorrect expires")
+	t.Equal(-1, cachefor, "incorrect cachefore")
+
 	for token, expectederr := range tc {
-		u, expires, cachefor, err := kb.GetUser(token)
+		u, expires, cachefor, err := kb.GetUser(logrus.WithField("a", "b"), token)
 		t.Nil(u, "expected error")
 		t.Equal(expectederr, err, "incorrect error")
 		t.Equal(int64(-1), expires, "incorrect expires")
 		t.Equal(-1, cachefor, "incorrect cachefore")
 	}
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestGetUserFailBadURL() {
-	tc := map[string]string{
-		"https://ci.kbase.us/services":
-			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
-		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
-			"kbase auth: Unexpectedly long body from auth service",
+	// this test goes against outside resources and so is delicate
+	type testcase struct {
+		url string
+		errstr string
+		contents []string
+		bodylen int
 	}
-	
-	for ur, errstr := range tc {
-		urp, _ := url.Parse(ur)
+	testcases := []testcase{
+		testcase{
+			"https://ci.kbase.us/services",
+			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
+			[]string{
+				"<html>",
+				"<head><title>404 Not Found</title></head>",
+				"<center><h1>404 Not Found</h1></center>",
+			},
+			169,
+		},
+		testcase{
+			"https://en.wikipedia.org/wiki/1944_Birthday_Honours",
+			"kbase auth: Unexpectedly long body from auth service",
+			[]string{
+				"<!DOCTYPE html>",
+				"<head>",
+				"<title>1944 Birthday Honours/api/V2/token - Wikipedia</title>",
+				"February",
+			},
+			1000,
+		},
+	}
+	for _, tc := range testcases {
+		urp, _ := url.Parse(tc.url)
 		kb, err := NewKBaseProvider(*urp)
 		t.Nil(err, "unexpected error")
-		u, expires, cachefor, err := kb.GetUser("fake")
+		u, expires, cachefor, err := kb.GetUser(logrus.WithField("a", "b"), "fake")
 		t.Nil(u, "expected error")
-		t.Equal(errors.New(errstr), err, "incorrect error")
+		t.Equal(errors.New(tc.errstr), err, "incorrect error")
 		t.Equal(int64(-1), expires, "incorrect expires")
 		t.Equal(-1, cachefor, "incorrect cachefore")
+
+		t.Equal(1, len(t.loggerhook.AllEntries()), "incorrect log event count")
+		le := t.loggerhook.AllEntries()[0]
+		t.Equal(tc.errstr, le.Message)
+		t.Equal(logrus.ErrorLevel, le.Level, "incorrect level")
+		t.Equal("b", le.Data["a"], "incorrect field")
+		t.Equal(tc.bodylen, len(le.Data["truncated_response_body"].(string)),
+		 	"incorrect body length")
+		for _, c := range tc.contents {
+			t.Contains(le.Data["truncated_response_body"], c, "incorrect body")
+		}
+		t.loggerhook.Reset()
 	}
 }
 
@@ -243,10 +297,11 @@ func (t *TestSuite) TestValidateUserName() {
 	t.Nil(err, "unexpected error")
 
 	for _, names := range tc {
-		cachefor, err := kb.ValidateUserNames(&names, t.tokenNoRole)
+		cachefor, err := kb.ValidateUserNames(logrus.WithField("a", "b"), &names, t.tokenNoRole)
 		t.Nil(err, "unexpected error")
 		t.Equal(30 * 60 * 1000, cachefor, "incorrect cachefor")
 	}
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestValidateUserNamesBadNameInput() {
@@ -269,11 +324,17 @@ func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
 
+	cachefor, err := kb.ValidateUserNames(nil, &[]string{"foo"}, "t")
+	t.Equal(errors.New("logger cannot be nil"), err, "incorrect error")
+	t.Equal(-1, cachefor, "incorrect cachefore")
+
 	for _, tcase := range tc {
-		cachefor, err := kb.ValidateUserNames(tcase.names, t.tokenNoRole)
+		cachefor, err := kb.ValidateUserNames(
+			logrus.WithField("a", "b"), tcase.names, t.tokenNoRole)
 		t.Equal(tcase.err, err, "incorrect error")
 		t.Equal(-1, cachefor, "incorrect cachefor")
 	}
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestValidateUserNameFailBadToken() {
@@ -286,26 +347,64 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 	t.Nil(err, "unexpected error")
 	
 	for token, expectederr := range tc {
-		cachefor, err := kb.ValidateUserNames(&[]string{"noroles"}, token)
+		cachefor, err := kb.ValidateUserNames(
+			logrus.WithField("a", "b"), &[]string{"noroles"}, token)
 		t.Equal(expectederr, err, "incorrect error")
 		t.Equal(-1, cachefor, "incorrect cachefor")
 	}
+	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
 
 func (t *TestSuite) TestValidateUserNameFailBadURL() {
-	tc := map[string]string{
-		"https://ci.kbase.us/services":
-			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
-		"https://en.wikipedia.org/wiki/1944_Birthday_Honours":
-			"kbase auth: Unexpectedly long body from auth service",
+	// this test goes against outside resources and so is delicate
+	type testcase struct {
+		url string
+		errstr string
+		contents []string
+		bodylen int
 	}
-	
-	for ur, errstr := range tc {
-		urp, _ := url.Parse(ur)
+	testcases := []testcase{
+		testcase{
+			"https://ci.kbase.us/services",
+			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
+			[]string{
+				"<html>",
+				"<head><title>404 Not Found</title></head>",
+				"<center><h1>404 Not Found</h1></center>",
+			},
+			169,
+		},
+		testcase{
+			"https://en.wikipedia.org/wiki/1944_Birthday_Honours",
+			"kbase auth: Unexpectedly long body from auth service",
+			[]string{
+				"<!DOCTYPE html>",
+				"<head>",
+				"<title>1944 Birthday Honours/api/V2/users - Wikipedia</title>",
+				"February",
+			},
+			1000,
+		},
+	}
+	for _, tc := range testcases {
+		urp, _ := url.Parse(tc.url)
 		kb, err := NewKBaseProvider(*urp)
 		t.Nil(err, "unexpected error")
-		cachefor, err := kb.ValidateUserNames(&[]string{"noroles"}, "fake")
-		t.Equal(errors.New(errstr), err, "incorrect error")
+		cachefor, err := kb.ValidateUserNames(
+			logrus.WithField("a", "b"), &[]string{"noroles"}, "fake")
+		t.Equal(errors.New(tc.errstr), err, "incorrect error")
 		t.Equal(-1, cachefor, "incorrect cachefor")
+
+		t.Equal(1, len(t.loggerhook.AllEntries()), "incorrect log event count")
+		le := t.loggerhook.AllEntries()[0]
+		t.Equal(tc.errstr, le.Message)
+		t.Equal(logrus.ErrorLevel, le.Level, "incorrect level")
+		t.Equal("b", le.Data["a"], "incorrect field")
+		t.Equal(tc.bodylen, len(le.Data["truncated_response_body"].(string)),
+		 	"incorrect body length")
+		for _, c := range tc.contents {
+			t.Contains(le.Data["truncated_response_body"], c, "incorrect body")
+		}
+		t.loggerhook.Reset()
 	}
 }
