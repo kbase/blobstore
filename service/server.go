@@ -282,11 +282,6 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	le := getLogger(r)
-	// TODO NOW only do this check when needed
-	if r.ContentLength < 0 {
-		writeErrorWithCode(le, "Length Required", http.StatusLengthRequired, w)
-		return
-	}
 	user, err := getUserRequired(le, w, r)
 	if err != nil {
 		return
@@ -407,6 +402,10 @@ func (s *Server) createNodeFromBody(
 	r *http.Request,
 	user auth.User,
 ) {
+	if r.ContentLength < 0 {
+		writeErrorWithCode(le, "Length Required", http.StatusLengthRequired, w)
+		return
+	}
 	filename, format, err := s.getFileNameAndFormat(r)
 	if err != nil {
 		writeError(le, err, w)
