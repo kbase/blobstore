@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/textproto"
 	"mime/multipart"
 	"bytes"
 	"github.com/sirupsen/logrus"
@@ -447,7 +448,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	body := t.req("POST", t.url + "/node?filename=%20%20myfile%20%20",
 		strings.NewReader("foobarbaz"), "     OAuth    " + t.noRole.token + "      ", 380, 200)
 
-	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, ptr("noroles"),
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.noRole.user,
 		"request complete", mtmap(), false},
 	)
 
@@ -501,7 +502,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestGetNodeAsAdminWithFormatAndTrailingSlash() {
+func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlash() {
 	body := t.req("POST", t.url + "/node/?format=JSON", strings.NewReader("foobarbaz"),
 		"oauth " + t.noRole.token, 378, 200)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
@@ -535,6 +536,180 @@ func (t *TestSuite) TestGetNodeAsAdminWithFormatAndTrailingSlash() {
 	t.checkNode(id, &t.kBaseAdmin, 378, expected)
 	t.checkFile(t.url + path + "?download", path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
 	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFilenameFormatFromQuery() {
+	q := "?filename=whoo.txt&format=gasbomb"
+	partsuffix := ` filename="myfile.txt"`
+	t.storeMIMEMultipart(q, partsuffix, "gasbomb", "whoo.txt", 390)
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFilenameFromPart() {
+	partsuffix := ` filename="myfile.txt"`
+	t.storeMIMEMultipart("", partsuffix, "", "myfile.txt", 385)
+}
+
+// don't load MIME this way, sticks everything in memory
+func createMultipartUpload(partcdsuffix, filecontents, contentlength string,
+) (*bytes.Buffer, string) {
+	b := bytes.NewBuffer([]byte{})
+	mpw := multipart.NewWriter(b)
+
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Length", contentlength)
+	h.Set("Content-Disposition", `form-data; name="upload";` + partcdsuffix)
+
+	w, _ := mpw.CreatePart(h)
+
+	io.Copy(w, strings.NewReader("foobarbazba"))
+	_ = mpw.Close()
+
+	return b, mpw.FormDataContentType()
+}
+
+func (t *TestSuite) storeMIMEMultipart(
+	query, partcdsuffix, format, filename string, bodylen int64) {
+	// don't load MIME this way, sticks everything in memory
+	b, contenttype := createMultipartUpload(partcdsuffix, "foobarbazba", "11")
+	
+	req, err := http.NewRequest("POST", t.url + "/node" + query, b)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	req.Header.Set("content-type", contenttype)
+	body := t.requestToJSON(req, bodylen, 200)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.noRole.user,
+		"request complete", mtmap(), false},
+	)
+
+	data := body["data"].(map[string]interface{})
+	time := data["created_on"].(string)
+	t.Equal(time, data["last_modified"], "incorrect last mod")
+	delete(data, "created_on")
+	delete(data, "last_modified")
+
+	id := data["id"].(string)
+	delete(data, "id")
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"format": format,
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "f681bb7c4fe38d8917e96518e10d760c"},
+				"name": filename,
+				"size": float64(11),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+	t.Equal(expected, body, "incorrect return")
+
+	expected2 := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": nil,
+			"created_on": time,
+			"last_modified": time,
+			"id": id,
+			"format": format,
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "f681bb7c4fe38d8917e96518e10d760c"},
+				"name": filename,
+				"size": float64(11),
+			},
+		},
+		"error": nil,
+		"status": float64(200),
+	}
+	t.checkNode(id, &t.noRole, bodylen, expected2)
+
+	path1 := "/node/" + id
+	path2 := path1 + "/"
+	t.checkFile(t.url + path1 + "?download", path1, &t.noRole, 11, filename, []byte("foobarbazba"))
+	t.checkFile(t.url + path2 + "?download", path2, &t.noRole, 11, filename, []byte("foobarbazba"))
+	t.checkFile(t.url + path1 + "?download_raw", path1, &t.noRole, 11, "", []byte("foobarbazba"))
+	t.checkFile(t.url + path2 + "?download_raw", path2, &t.noRole, 11, "", []byte("foobarbazba"))
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
+	// don't load MIME this way, sticks everything in memory
+	for _, cl := range []string{"", "not a number", "-1"} {
+		b, contenttype := createMultipartUpload("", "foobarbazba", cl)
+		
+		req, err := http.NewRequest("POST", t.url + "/node", b)
+		t.Nil(err, "unexpected error")
+		req.Header.Set("authorization", "oauth " + t.noRole.token)
+		req.Header.Set("content-type", contenttype)
+
+		body := t.requestToJSON(req, 128, 400)
+
+		er := "Valid Content-Length header >= 0 required for upload form part"
+		t.checkError(body, 400, er)
+		t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user, er, mtmap(),
+			false},
+		)
+	}
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFailBadQueryFilenameFormat() {
+	testcases := map[string][]interface{}{
+		"?filename=foo%07bar": []interface{}{"File name contains control characters", int64(98)},
+		"?format=whee%07whoo": []interface{}{"File format contains control characters", int64(100)},
+	}
+	for q, e := range testcases {
+		// don't load MIME this way, sticks everything in memory
+		b, contenttype := createMultipartUpload("", "foobarbazba", "11")
+		req, err := http.NewRequest("POST", t.url + "/node" + q, b)
+		t.Nil(err, "unexpected error")
+		req.Header.Set("authorization", "oauth " + t.noRole.token)
+		req.Header.Set("content-type", contenttype)
+
+		body := t.requestToJSON(req, e[1].(int64), 400)
+
+		t.checkError(body, 400, e[0].(string))
+		t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+			e[0].(string), mtmap(), false},
+		)
+	}
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFilename() {
+	s := "0123456789"
+	for i := 0; i < 5; i++ {
+		s += s
+	}
+	t.Equal(320, len(s), "incorrect s len")
+	// don't load MIME this way, sticks everything in memory
+	// putting a control char here does weird stuff
+	b, contenttype := createMultipartUpload(" filename=" + s, "foobarbazba", "11")
+	req, err := http.NewRequest("POST", t.url + "/node", b)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	req.Header.Set("content-type", contenttype)
+
+	body := t.requestToJSON(req, 90, 400)
+
+	t.checkError(body, 400, "File name is > 256 bytes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File name is > 256 bytes", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestStoreMIMEMultipartFailNoFile() {
+	// don't load MIME this way, sticks everything in memory
+	b, contenttype := createMultipartUpload("", "", "0")
+	req, err := http.NewRequest("POST", t.url + "/node", b)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	req.Header.Set("content-type", contenttype)
+
+	body := t.requestToJSON(req, 87, 400)
+
+	t.checkError(body, 400, "file size must be > 0")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"file size must be > 0", mtmap(), false},
+	)
 }
 
 func (t *TestSuite) TestGetNodeFileACLPublic() {
@@ -1026,10 +1201,10 @@ func (t *TestSuite) TestCopyNodeFailEmptyForm() {
 	t.Nil(err, "unexpected error")
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
-	body2 := t.requestToJSON(req, 89, 400)
-	t.checkError(body2, 400, "Expected copy_data form name")
+	body2 := t.requestToJSON(req, 90, 400)
+	t.checkError(body2, 400, "Expected form part, early EOF")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
-		"Expected copy_data form name", mtmap(), false},
+		"Expected form part, early EOF", mtmap(), false},
 	)
 }
 

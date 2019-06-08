@@ -34,6 +34,7 @@ import (
 const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
+	formUpload   = "upload"
 )
 
 // ServerStaticConf Static configuration items for the Server.
@@ -292,7 +293,7 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 	form, err := r.MultipartReader()
 	if err != nil {
 		if err == http.ErrNotMultipart {
-			s.createNodeFromBody(le, w, r, user)
+			s.createNodeFromBody(le, w, r, *user)
 			return
 		}
 		writeErrorWithCode(le, err.Error(), 400, w)
@@ -302,7 +303,20 @@ func (s *Server) createNode(w http.ResponseWriter, r *http.Request) {
 		writeErrorWithCode(le, http.StatusText(405), 405, w)
 		return
 	}
-	s.createNodeFromForm(le, w, r, form, user)
+	s.createNodeFromForm(le, w, r, form, *user)
+}
+
+func (s *Server) getFileNameAndFormat(r *http.Request,
+) (*values.FileName, *values.FileFormat, error) {
+	filename, err := values.NewFileName(getQuery(r.URL, "filename"))
+	if err != nil {
+		return nil, nil, err
+	}
+	format, err := values.NewFileFormat(getQuery(r.URL, "format"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return filename, format, err
 }
 
 // caller is expected to close the reader
@@ -311,22 +325,59 @@ func (s *Server) createNodeFromForm(
 	w http.ResponseWriter,
 	r *http.Request,
 	form *multipart.Reader,
-	user *auth.User,
+	user auth.User,
 ) {
 	part, err := form.NextPart()
 	if err != nil {
 		errstr := err.Error()
 		if err == io.EOF {
-			errstr = "Expected " + formCopyData + " form name"
+			errstr = "Expected form part, early EOF"
 		}
 		writeErrorWithCode(le, errstr, 400, w)
 		return
 	}
 	defer part.Close()
-	if part.FormName() != formCopyData {
+	if part.FormName() == formCopyData {
+		s.copyNode(le, user, part, w)
+		return
+	} else if part.FormName() == formUpload {
+		cl, err := strconv.ParseInt(part.Header.Get("Content-Length"), 10, 64)
+		if err != nil || cl < 0 {
+			writeErrorWithCode(
+				le, "Valid Content-Length header >= 0 required for upload form part", 400, w)
+			return
+		}
+		filename, format, err := s.getFileNameAndFormat(r)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+		if filename.GetFileName() == "" {
+			filename, err = values.NewFileName(part.FileName())
+			if err != nil {
+				writeError(le, err, w)
+				return
+			}
+		}
+		node, err := s.store.Store(le, user, part, cl, *filename, *format)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+		writeNode(w, node)
+		return
+	} else {
 		writeErrorWithCode(le, "Unexpected form name: "+part.FormName(), 400, w)
 		return
 	}
+}
+
+// caller must close part
+func (s *Server) copyNode(
+	le *logrus.Entry,
+	user auth.User,
+	part *multipart.Part,
+	w http.ResponseWriter) {
 	// uuid is 36 ascii chars. We leave a few extra to throw errors if the submitted uuid is
 	// too long, rather than ignoring the extra chars.
 	buffer := make([]byte, 40)
@@ -341,7 +392,7 @@ func (s *Server) createNodeFromForm(
 		writeErrorWithCode(le, "Invalid "+formCopyData+": "+err.Error(), 400, w)
 		return
 	}
-	node, err := s.store.CopyNode(*user, cid)
+	node, err := s.store.CopyNode(user, cid)
 	if err != nil {
 		writeError(le, err, w)
 		return
@@ -353,19 +404,14 @@ func (s *Server) createNodeFromBody(
 	le *logrus.Entry,
 	w http.ResponseWriter,
 	r *http.Request,
-	user *auth.User,
+	user auth.User,
 ) {
-	filename, err := values.NewFileName(getQuery(r.URL, "filename"))
+	filename, format, err := s.getFileNameAndFormat(r)
 	if err != nil {
 		writeError(le, err, w)
 		return
 	}
-	format, err := values.NewFileFormat(getQuery(r.URL, "format"))
-	if err != nil {
-		writeError(le, err, w)
-		return
-	}
-	node, err := s.store.Store(le, *user, r.Body, r.ContentLength, *filename, *format)
+	node, err := s.store.Store(le, user, r.Body, r.ContentLength, *filename, *format)
 	if err != nil {
 		writeError(le, err, w)
 		return
