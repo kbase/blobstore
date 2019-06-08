@@ -227,6 +227,57 @@ RETURNS: an ACL.
 
 The `users` parameter must contain a single user name.
 
+## Upload a file / create a node via a MIME multipart form
+
+This upload method is provided for Shock compatibilty. It is recommended that the prior upload
+method is used rather than this one.
+
+```
+AUTHORIZATION REQUIRED
+POST /node[?filename=<filename>&format=<file format>]
+<multipart form>
+
+RETURNS: a Node.
+```
+
+The form must contain a single part called `upload` where the part contents are the file to be
+uploaded.
+The part must have an accurate `Content-Length` header specifing the size of the file, **not**
+the entire multipart form.
+
+`filename` can be at most 256 characters with no control characters. `filename` takes precedence
+over any filename provided in the part's `Content-Disposition` header. Any filename provided in
+that header must meet the same requirements as `filename` provided in the query.  
+`format` can be at most 100 characters with no control characters.
+
+### Curl example
+
+```
+curl -H "Authorization: OAuth $KBASE_TOKEN" \
+  -F "upload=@mydata.fasta;headers=\"Content-Length: 67452\"" \
+  http://<host>/node
+```
+
+### Python example
+
+```
+import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+df = open('mydata.fasta', 'rb')
+files = {'upload': ('mydata.fasta', df, None, {'content-length': 67452})}
+
+mpe = MultipartEncoder(fields=files)
+headers = {'content-type': mpe.content_type,
+           'authorization': 'OAuth $KBASE_TOKEN'}
+res = requests.post('http://<host>/node', headers=headers, data=mpe, stream=True) 
+```
+
+### Java example
+
+Stackoverflow discusses how to
+[upload a part with a Content-Length header.](https://stackoverflow.com/questions/32998854/multipartentity-content-length-for-inputstream/33021190#33021190)
+
 # Requirements:
 * go 1.12
 * An S3 compatible storage system. The Blobstore is tested with Minio version 2019-05-23T00-29-34Z.
