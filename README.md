@@ -262,7 +262,7 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" \
 
 ### Python example
 
-```
+```python
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
@@ -277,8 +277,55 @@ res = requests.post('http://<host>/node', headers=headers, data=mpe, stream=True
 
 ### Java example
 
-Stackoverflow discusses how to
-[upload a part with a Content-Length header.](https://stackoverflow.com/questions/32998854/multipartentity-content-length-for-inputstream/33021190#33021190)
+```java
+package blobstoreclienttest;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.FormBodyPartBuilder;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.InputStreamBody;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+
+public class blobstoreclient {
+	
+	public static void main(final String[] args) throws ClientProtocolException, IOException {
+		final String fileName = args[0];
+		final String token = args[1];
+		// probably don't want to use the default client for most applications
+		final CloseableHttpClient cli = HttpClients.createDefault();
+		
+		final HttpPost htp = new HttpPost("http://<host>/node");
+		htp.setHeader("authorization", "OAuth " + token);
+
+		final Path p = Paths.get(fileName);
+		final MultipartEntityBuilder mpeb = MultipartEntityBuilder.create();
+		final InputStream in = Files.newInputStream(p);
+		
+		mpeb.addPart(FormBodyPartBuilder.create()
+				.setName("upload")
+				.addField("Content-Length", "" + Files.size(p))
+				.setBody(new InputStreamBody(in, "some damn file")).build());
+		
+		htp.setEntity(mpeb.build());
+		
+		final CloseableHttpResponse response = cli.execute(htp);
+		in.close();
+		IOUtils.copy(response.getEntity().getContent(), System.out);
+		response.close();
+	}
+}
+```
+
 
 # Requirements:
 * go 1.12
