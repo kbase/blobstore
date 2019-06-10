@@ -263,16 +263,18 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" \
 ### Python example
 
 ```python
+import os
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-df = open('mydata.fasta', 'rb')
-files = {'upload': ('mydata.fasta', df, None, {'content-length': 67452})}
-
+df = open(filename, 'rb')
+files = {'upload': (filename, df, None, {'Content-Length': os.path.getsize(filename)})}
 mpe = MultipartEncoder(fields=files)
-headers = {'content-type': mpe.content_type,
-           'authorization': 'OAuth $KBASE_TOKEN'}
-res = requests.post('http://<host>/node', headers=headers, data=mpe, stream=True) 
+headers = {'Content-Type': mpe.content_type,
+           'authorization': 'OAuth ' + token}
+
+res = requests.post('http://<host>/node', headers=headers, data=mpe, stream=True)
+res.json()
 ```
 
 ### Java example
