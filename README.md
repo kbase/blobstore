@@ -234,21 +234,23 @@ method is used rather than this one.
 
 ```
 AUTHORIZATION REQUIRED
-POST /node[?filename=<filename>&format=<file format>]
+POST /node
 <multipart form>
 
 RETURNS: a Node.
 ```
 
-The form must contain a single part called `upload` where the part contents are the file to be
+The form **MUST** contain a part called `upload` where the part contents are the file to be
 uploaded.
 The part must have an accurate `Content-Length` header specifing the size of the file, **not**
 the entire multipart form.
 
-`filename` can be at most 256 characters with no control characters. `filename` takes precedence
-over any filename provided in the part's `Content-Disposition` header. Any filename provided in
-that header must meet the same requirements as `filename` provided in the query.  
-`format` can be at most 100 characters with no control characters.
+The form **may** contain a part called `format` where the part contents are the format of the
+file, equivalent to the `format` query parameter for the standard upload method and with the same
+restrictions. The `format` part **MUST** come before the `upload` part.
+
+Any file name provided in the `Content-Disposition` header can be at most 256 characters with no
+control characters.
 
 ### Curl example
 
