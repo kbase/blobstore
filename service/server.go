@@ -33,7 +33,6 @@ import (
 
 // TODO TIMEOUT on headers - check timeout article for others
 // TODO MAXLEN on headers
-// TODO JAVA test MIME upload w/ content length
 
 const (
 	service      = "BlobStore"
