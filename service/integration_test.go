@@ -538,22 +538,30 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlash() {
 	t.checkFile(t.url + path + "?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestStoreMIMEMultipartFilenameFormatFromQuery() {
-	q := "?filename=whoo.txt&format=gasbomb"
+func (t *TestSuite) TestStoreMIMEMultipartFilenameFormat() {
 	partsuffix := ` filename="myfile.txt"`
-	t.storeMIMEMultipart(q, partsuffix, "gasbomb", "whoo.txt", 390)
+	format := "gasbomb"
+	t.storeMIMEMultipart(partsuffix, &format, "myfile.txt", 392)
 }
 
-func (t *TestSuite) TestStoreMIMEMultipartFilenameFromPart() {
-	partsuffix := ` filename="myfile.txt"`
-	t.storeMIMEMultipart("", partsuffix, "", "myfile.txt", 385)
+func (t *TestSuite) TestStoreMIMEMultipartWhitespaceFileNameFormat() {
+	partsuffix := ` filename=""`
+	format := ""
+	t.storeMIMEMultipart(partsuffix, &format, "", 375)
+}
+func (t *TestSuite) TestStoreMIMEMultipartNoFileNameOrFormat() {
+	t.storeMIMEMultipart("", nil, "", 375)
 }
 
 // don't load MIME this way, sticks everything in memory
-func createMultipartUpload(partcdsuffix, filecontents, contentlength string,
+func createMultipartUpload(partcdsuffix string, format *string, filecontents, contentlength string,
 ) (*bytes.Buffer, string) {
 	b := bytes.NewBuffer([]byte{})
 	mpw := multipart.NewWriter(b)
+
+	if format != nil {
+		_ = mpw.WriteField("format", *format)
+	}
 
 	h := make(textproto.MIMEHeader)
 	h.Set("Content-Length", contentlength)
@@ -568,11 +576,15 @@ func createMultipartUpload(partcdsuffix, filecontents, contentlength string,
 }
 
 func (t *TestSuite) storeMIMEMultipart(
-	query, partcdsuffix, format, filename string, bodylen int64) {
+	partcdsuffix string, format *string, filename string, bodylen int64) {
 	// don't load MIME this way, sticks everything in memory
-	b, contenttype := createMultipartUpload(partcdsuffix, "foobarbazba", "11")
+	b, contenttype := createMultipartUpload(partcdsuffix, format, "foobarbazba", "11")
+	f := ""
+	if format != nil {
+		f = *format
+	}
 	
-	req, err := http.NewRequest("POST", t.url + "/node" + query, b)
+	req, err := http.NewRequest("POST", t.url + "/node", b)
 	t.Nil(err, "unexpected error")
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
 	req.Header.Set("content-type", contenttype)
@@ -594,7 +606,7 @@ func (t *TestSuite) storeMIMEMultipart(
 	expected := map[string]interface{}{
 		"data": map[string]interface{}{
 			"attributes": nil,
-			"format": format,
+			"format": f,
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "f681bb7c4fe38d8917e96518e10d760c"},
 				"name": filename,
@@ -612,7 +624,7 @@ func (t *TestSuite) storeMIMEMultipart(
 			"created_on": time,
 			"last_modified": time,
 			"id": id,
-			"format": format,
+			"format": f,
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "f681bb7c4fe38d8917e96518e10d760c"},
 				"name": filename,
@@ -626,6 +638,9 @@ func (t *TestSuite) storeMIMEMultipart(
 
 	path1 := "/node/" + id
 	path2 := path1 + "/"
+	if filename == "" {
+		filename = id
+	}
 	t.checkFile(t.url + path1 + "?download", path1, &t.noRole, 11, filename, []byte("foobarbazba"))
 	t.checkFile(t.url + path2 + "?download", path2, &t.noRole, 11, filename, []byte("foobarbazba"))
 	t.checkFile(t.url + path1 + "?download_raw", path1, &t.noRole, 11, "", []byte("foobarbazba"))
@@ -635,7 +650,7 @@ func (t *TestSuite) storeMIMEMultipart(
 func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
 	// don't load MIME this way, sticks everything in memory
 	for _, cl := range []string{"", "not a number", "-1"} {
-		b, contenttype := createMultipartUpload("", "foobarbazba", cl)
+		b, contenttype := createMultipartUpload("", nil, "foobarbazba", cl)
 		
 		req, err := http.NewRequest("POST", t.url + "/node", b)
 		t.Nil(err, "unexpected error")
@@ -652,28 +667,6 @@ func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
 	}
 }
 
-func (t *TestSuite) TestStoreMIMEMultipartFailBadQueryFilenameFormat() {
-	testcases := map[string][]interface{}{
-		"?filename=foo%07bar": []interface{}{"File name contains control characters", int64(98)},
-		"?format=whee%07whoo": []interface{}{"File format contains control characters", int64(100)},
-	}
-	for q, e := range testcases {
-		// don't load MIME this way, sticks everything in memory
-		b, contenttype := createMultipartUpload("", "foobarbazba", "11")
-		req, err := http.NewRequest("POST", t.url + "/node" + q, b)
-		t.Nil(err, "unexpected error")
-		req.Header.Set("authorization", "oauth " + t.noRole.token)
-		req.Header.Set("content-type", contenttype)
-
-		body := t.requestToJSON(req, e[1].(int64), 400)
-
-		t.checkError(body, 400, e[0].(string))
-		t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
-			e[0].(string), mtmap(), false},
-		)
-	}
-}
-
 func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFilename() {
 	s := "0123456789"
 	for i := 0; i < 5; i++ {
@@ -682,7 +675,7 @@ func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFilename() {
 	t.Equal(320, len(s), "incorrect s len")
 	// don't load MIME this way, sticks everything in memory
 	// putting a control char here does weird stuff
-	b, contenttype := createMultipartUpload(" filename=" + s, "foobarbazba", "11")
+	b, contenttype := createMultipartUpload(" filename=" + s, nil, "foobarbazba", "11")
 	req, err := http.NewRequest("POST", t.url + "/node", b)
 	t.Nil(err, "unexpected error")
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
@@ -696,9 +689,71 @@ func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFilename() {
 	)
 }
 
+func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFormat() {
+	n := "0123456789"
+	s := ""
+	for i := 0; i < 11; i++ {
+		s += n
+	}
+	t.Equal(110, len(s), "incorrect s len")
+	// don't load MIME this way, sticks everything in memory
+	b, contenttype := createMultipartUpload("", &s, "foobarbazba", "11")
+	req, err := http.NewRequest("POST", t.url + "/node", b)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	req.Header.Set("content-type", contenttype)
+
+	body := t.requestToJSON(req, 92, 400)
+
+	t.checkError(body, 400, "File format is > 100 bytes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File format is > 100 bytes", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestFormNodeFailOnlyFormat() {
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	writer.WriteField("format", "JSON")
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url + "/node", form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 90, 400)
+	t.checkError(body2, 400, "Expected form part, early EOF")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"Expected form part, early EOF", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestFormNodeFailEarlyEOFAfterFormat() {
+	f := "foo"
+	_ = f
+	req, err := http.NewRequest("POST", t.url + "/node", strings.NewReader(
+		"--supahboundary\n" +
+		`Content-Disposition: form-data; name="format"` + "\n" +
+		"\n" +
+		"format here\n",
+		))
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=supahboundary")
+	req.Header.Set("authorization", "oauth " + t.noRole.token)
+	body2 := t.requestToJSON(req, 85, 400)
+	// crappy error, but really shouldn't happen. Have to check the string to ID the error,
+	// not a specific class
+	t.checkError(body2, 400, "multipart: NextPart: EOF")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"multipart: NextPart: EOF", mtmap(), false},
+	)
+}
+
 func (t *TestSuite) TestStoreMIMEMultipartFailNoFile() {
 	// don't load MIME this way, sticks everything in memory
-	b, contenttype := createMultipartUpload("", "", "0")
+	b, contenttype := createMultipartUpload("", nil, "", "0")
 	req, err := http.NewRequest("POST", t.url + "/node", b)
 	t.Nil(err, "unexpected error")
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
@@ -1167,7 +1222,7 @@ func (t *TestSuite) testCopyNode(path string) {
 		[]byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestCopyNodeFailCorruptFormHeader() {
+func (t *TestSuite) TestFormNodeFailCorruptFormHeader() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"Oauth " + t.noRole.token, 374, 200)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -1190,7 +1245,7 @@ func (t *TestSuite) TestCopyNodeFailCorruptFormHeader() {
 	)
 }
 
-func (t *TestSuite) TestCopyNodeFailEmptyForm() {
+func (t *TestSuite) TestFormNodeFailEmptyForm() {
 
 	// don't do this normally, memory hog
 	form := new(bytes.Buffer)
@@ -1208,7 +1263,7 @@ func (t *TestSuite) TestCopyNodeFailEmptyForm() {
 	)
 }
 
-func (t *TestSuite) TestCopyNodeFailEarlyEOF() {
+func (t *TestSuite) TestFormNodeFailEarlyEOF() {
 	f := "foo"
 	_ = f
 	req, err := http.NewRequest("POST", t.url + "/node", strings.NewReader("--supahboundary"))
@@ -1224,7 +1279,7 @@ func (t *TestSuite) TestCopyNodeFailEarlyEOF() {
 	)
 }
 
-func (t *TestSuite) TestCopyNodeFailBadFormName() {
+func (t *TestSuite) TestFormNodeFailBadFormName() {
 	body := t.req("POST", t.url + "/node", strings.NewReader("foobarbaz"),
 		"Oauth " + t.noRole.token, 374, 200)
 	id := (body["data"].(map[string]interface{}))["id"].(string)

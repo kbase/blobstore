@@ -31,7 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO FORMAT - for MIME upload, support format part (1st) and don't support query params
 // TODO TIMEOUT on headers - check timeout article for others
 // TODO MAXLEN on headers
 // TODO JAVA test MIME upload w/ content length
@@ -40,6 +39,7 @@ const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
 	formUpload   = "upload"
+	formFormat   = "format"
 )
 
 // ServerStaticConf Static configuration items for the Server.
@@ -328,16 +328,30 @@ func (s *Server) createNodeFromForm(
 	form *multipart.Reader,
 	user auth.User,
 ) {
-	part, err := form.NextPart()
-	if err != nil {
-		errstr := err.Error()
-		if err == io.EOF {
-			errstr = "Expected form part, early EOF"
-		}
-		writeErrorWithCode(le, errstr, 400, w)
+	part := getNextFormPart(le, form, w)
+	if part == nil {
 		return
 	}
 	defer part.Close()
+	format, _ := values.NewFileFormat("")
+	if part.FormName() == formFormat {
+		formatstr := getStringFromPart(le, part, 101, w)
+		if formatstr == nil {
+			return // dunno how to test this
+		}
+		var err error
+		format, err = values.NewFileFormat(*formatstr)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+		part.Close()
+		part = getNextFormPart(le, form, w)
+		if part == nil {
+			return
+		}
+		defer part.Close()
+	}
 	if part.FormName() == formCopyData {
 		s.copyNode(le, user, part, w)
 		return
@@ -348,17 +362,10 @@ func (s *Server) createNodeFromForm(
 				le, "Valid Content-Length header >= 0 required for upload form part", 400, w)
 			return
 		}
-		filename, format, err := s.getFileNameAndFormat(r)
+		filename, err := values.NewFileName(part.FileName())
 		if err != nil {
 			writeError(le, err, w)
 			return
-		}
-		if filename.GetFileName() == "" {
-			filename, err = values.NewFileName(part.FileName())
-			if err != nil {
-				writeError(le, err, w)
-				return
-			}
 		}
 		node, err := s.store.Store(le, user, part, cl, *filename, *format)
 		if err != nil {
@@ -373,6 +380,33 @@ func (s *Server) createNodeFromForm(
 	}
 }
 
+func getStringFromPart(le *logrus.Entry, part *multipart.Part, len int, w http.ResponseWriter,
+) *string {
+	buffer := make([]byte, len)
+	n, err := part.Read(buffer)
+	if err != nil && err != io.EOF {
+		// dunno how to test this
+		writeErrorWithCode(le, err.Error(), 400, w)
+		return nil
+	}
+	s := string(buffer[:n])
+	return &s
+}
+
+func getNextFormPart(le *logrus.Entry, form *multipart.Reader, w http.ResponseWriter,
+) *multipart.Part {
+	part, err := form.NextPart()
+	if err != nil {
+		errstr := err.Error()
+		if err == io.EOF {
+			errstr = "Expected form part, early EOF"
+		}
+		writeErrorWithCode(le, errstr, 400, w)
+		return nil
+	}
+	return part
+}
+
 // caller must close part
 func (s *Server) copyNode(
 	le *logrus.Entry,
@@ -381,14 +415,12 @@ func (s *Server) copyNode(
 	w http.ResponseWriter) {
 	// uuid is 36 ascii chars. We leave a few extra to throw errors if the submitted uuid is
 	// too long, rather than ignoring the extra chars.
-	buffer := make([]byte, 40)
-	n, err := part.Read(buffer)
-	if err != nil && err != io.EOF {
+	uuidstr := getStringFromPart(le, part, 40, w)
+	if uuidstr == nil {
 		// dunno how to test this
-		writeErrorWithCode(le, err.Error(), 400, w)
 		return
 	}
-	cid, err := uuid.Parse(string(buffer[:n]))
+	cid, err := uuid.Parse(*uuidstr)
 	if err != nil {
 		writeErrorWithCode(le, "Invalid "+formCopyData+": "+err.Error(), 400, w)
 		return
