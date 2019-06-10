@@ -31,9 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// TODO TIMEOUT on headers - check timeout article for others
-// TODO MAXLEN on headers
-
 const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
