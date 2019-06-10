@@ -31,6 +31,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// TODO FORMAT - for MIME upload, support format part (1st) and don't support query params
+// TODO TIMEOUT on headers - check timeout article for others
+// TODO MAXLEN on headers
+// TODO JAVA test MIME upload w/ content length
+
 const (
 	service      = "BlobStore"
 	formCopyData = "copy_data"
