@@ -314,7 +314,8 @@ public class blobstoreclient {
 		mpeb.addPart(FormBodyPartBuilder.create()
 				.setName("upload")
 				.addField("Content-Length", "" + Files.size(p))
-				.setBody(new InputStreamBody(in, "some damn file")).build());
+				.setBody(new InputStreamBody(in, p.getFileName().toString())).build());
+		
 		
 		htp.setEntity(mpeb.build());
 		
