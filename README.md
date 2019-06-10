@@ -246,8 +246,8 @@ The part must have an accurate `Content-Length` header specifing the size of the
 the entire multipart form.
 
 The form **may** contain a part called `format` where the part contents are the format of the
-file, equivalent to the `format` query paramter for the standard upload method and with the same
-restrictions.
+file, equivalent to the `format` query parameter for the standard upload method and with the same
+restrictions. The `format` part **MUST** come before the `upload` part.
 
 Any file name provided in the `Content-Disposition` header can be at most 256 characters with no
 control characters.
