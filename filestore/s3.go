@@ -132,6 +132,7 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	if err != nil {
 		// don't expose the presigned url in the returned error
 		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
+		// TODO ERR detect incorrect content length & respond with error that translates to a 400
 		return nil, errors.New("s3 store request: " + err.(*url.Error).Err.Error())
 	}
 	defer resp.Body.Close()
