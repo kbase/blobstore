@@ -131,9 +131,15 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// don't expose the presigned url in the returned error
-		// The wrapped error has weird behavior that I don't understand, so rewrap in a std err
-		// TODO ERR detect incorrect content length & respond with error that translates to a 400
-		return nil, errors.New("s3 store request: " + err.(*url.Error).Err.Error())
+		errstr := err.(*url.Error).Err.Error()
+		el := strings.ToLower(errstr)
+		if strings.Contains(el, "contentlength") &&
+			strings.Contains(el, "with body length") {
+			// this works for minio, hopefully error messages are stable across S3 impls
+			return nil, values.NewIllegalInputError("incorrect Content-Length: " + errstr)
+		}
+		// dunno how to test this
+		return nil, errors.New("s3 store request: " + errstr)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen

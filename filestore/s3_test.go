@@ -239,7 +239,8 @@ func (t *TestSuite) TestStoreWithIncorrectSize() {
 		t.Fail("returned object is not nil")
 	}
 	// might want a different error message here
-	t.Equal(errors.New("s3 store request: http: ContentLength=11 with Body length 12"), err,
+	t.Equal(values.NewIllegalInputError(
+		"incorrect Content-Length: http: ContentLength=11 with Body length 12"), err,
 		"incorrect error")
 	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
