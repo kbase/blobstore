@@ -263,6 +263,7 @@ func encodeToJSON(w http.ResponseWriter, code int, data *map[string]interface{})
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(code)
 	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	enc.Encode(data) // assume no errors here
 }

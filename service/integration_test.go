@@ -657,7 +657,7 @@ func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
 		req.Header.Set("authorization", "oauth " + t.noRole.token)
 		req.Header.Set("content-type", contenttype)
 
-		body := t.requestToJSON(req, 128, 400)
+		body := t.requestToJSON(req, 123, 400)
 
 		er := "Valid Content-Length header >= 0 required for upload form part"
 		t.checkError(body, 400, er)
@@ -681,7 +681,7 @@ func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFilename() {
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
 	req.Header.Set("content-type", contenttype)
 
-	body := t.requestToJSON(req, 90, 400)
+	body := t.requestToJSON(req, 85, 400)
 
 	t.checkError(body, 400, "File name is > 256 bytes")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
@@ -703,7 +703,7 @@ func (t *TestSuite) TestStoreMIMEMultipartFailBadPartFormat() {
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
 	req.Header.Set("content-type", contenttype)
 
-	body := t.requestToJSON(req, 92, 400)
+	body := t.requestToJSON(req, 87, 400)
 
 	t.checkError(body, 400, "File format is > 100 bytes")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
@@ -759,7 +759,7 @@ func (t *TestSuite) TestStoreMIMEMultipartFailNoFile() {
 	req.Header.Set("authorization", "oauth " + t.noRole.token)
 	req.Header.Set("content-type", contenttype)
 
-	body := t.requestToJSON(req, 87, 400)
+	body := t.requestToJSON(req, 82, 400)
 
 	t.checkError(body, 400, "file size must be > 0")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
@@ -964,7 +964,7 @@ func (t *TestSuite) TestStoreNoContentLength() {
 
 func (t *TestSuite) TestStoreFailNoFile() {
 	body := t.req("POST", t.url + "/node", strings.NewReader(""), "oauth " + t.noRole.token,
-		87, 400)
+		82, 400)
 	t.checkError(body, 400, "file size must be > 0")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
 		"file size must be > 0", mtmap(), false},
