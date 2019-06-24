@@ -167,7 +167,7 @@ RETURNS: a Node.
 ## Get a node's ACLs
 ```
 AUTHORIZATION OPTIONAL
-GET /node/<id>/acl
+GET /node/<id>/acl[?verbosity=full]
 
 RETURNS: an ACL.
 ```
