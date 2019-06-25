@@ -49,7 +49,7 @@ This data structure is a subset of Shock's node data structure.
 
 `attributes` is deprecated, always null and is only provided for backwards compatibility reasons.
 
-`last_modified` is always the same as `created_on` and is only inluded for backwards compatibility
+`last_modified` is always the same as `created_on` and is only included for backwards compatibility
 reasons. Unlike Shock, the blobstore does not take ACL modifications into account when setting
 the `last_modified` date.
 
