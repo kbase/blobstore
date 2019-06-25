@@ -138,7 +138,7 @@ The `Content-Length` header must be present and accurate.
 
 ```
 curl -H "Authorization: OAuth $KBASE_TOKEN" -T mylittlefile
-  "http://<host>node?filename=mylittlefile&format=text"
+  "http://<host>/node?filename=mylittlefile&format=text"
 ```
 
 `filename` can be at most 256 characters with no control characters.  
@@ -247,7 +247,7 @@ RETURNS: a Node.
 
 The form **MUST** contain a part called `upload` where the part contents are the file to be
 uploaded.
-The part must have an accurate `Content-Length` header specifing the size of the file, **not**
+The part **MUST** have an accurate `Content-Length` header specifing the size of the file, **not**
 the entire multipart form.
 
 The form **may** contain a part called `format` where the part contents are the format of the
