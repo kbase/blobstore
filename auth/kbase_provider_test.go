@@ -1,16 +1,17 @@
 package auth
 
 import (
-	"io/ioutil"
-	"github.com/sirupsen/logrus"
-	"fmt"
-	"time"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/url"
 	"strconv"
-	"github.com/kbase/blobstore/test/mongocontroller"
-	"github.com/kbase/blobstore/test/kbaseauthcontroller"
 	"testing"
+	"time"
+
+	"github.com/kbase/blobstore/test/kbaseauthcontroller"
+	"github.com/kbase/blobstore/test/mongocontroller"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
@@ -20,18 +21,18 @@ import (
 
 const (
 	blobstoreRole = "BLOBSTORE_ADMIN"
-	adminRole = "KBASE_ADMIN"
+	adminRole     = "KBASE_ADMIN"
 )
 
 type TestSuite struct {
 	suite.Suite
-	mongo         *mongocontroller.Controller
-	auth          *kbaseauthcontroller.Controller
-	authURL *url.URL
-	loggerhook *logrust.Hook
-	deleteTempDir bool
-	tokenNoRole string
-	tokenStdRole string
+	mongo           *mongocontroller.Controller
+	auth            *kbaseauthcontroller.Controller
+	authURL         *url.URL
+	loggerhook      *logrust.Hook
+	deleteTempDir   bool
+	tokenNoRole     string
+	tokenStdRole    string
 	tokenKBaseAdmin string
 }
 
@@ -43,19 +44,19 @@ func (t *TestSuite) SetupSuite() {
 
 	mongoctl, err := mongocontroller.New(mongocontroller.Params{
 		ExecutablePath: tcfg.MongoExePath,
-		UseWiredTiger: tcfg.UseWiredTiger,
-		RootTempDir: tcfg.TempDir,
+		UseWiredTiger:  tcfg.UseWiredTiger,
+		RootTempDir:    tcfg.TempDir,
 	})
 	if err != nil {
 		t.FailNow(err.Error())
 	}
 	t.mongo = mongoctl
-	
+
 	auth, err := kbaseauthcontroller.New(kbaseauthcontroller.Params{
-		JarsDir: tcfg.JarsDir,
-		MongoHost: "localhost:" + strconv.Itoa(mongoctl.GetPort()),
+		JarsDir:       tcfg.JarsDir,
+		MongoHost:     "localhost:" + strconv.Itoa(mongoctl.GetPort()),
 		MongoDatabase: "test_kb_auth_provider_authdb",
-		RootTempDir: tcfg.TempDir,
+		RootTempDir:   tcfg.TempDir,
 	})
 	if err != nil {
 		t.FailNow(err.Error())
@@ -160,10 +161,10 @@ func (t *TestSuite) TestConstructFailBadArgs() {
 }
 
 type tgu struct {
-	Token string
+	Token      string
 	AdminRoles *[]string
-	UserName string
-	IsAdmin bool
+	UserName   string
+	IsAdmin    bool
 }
 
 func (t *TestSuite) TestGetUser() {
@@ -199,12 +200,12 @@ func (t *TestSuite) checkUser(tc *tgu) {
 	expected := User{tc.UserName, tc.IsAdmin}
 	t.Equal(&expected, u, "incorrect user")
 	// testing against a local authserver, so checking more or less exact values is ok
-	t.Equal(5 * 60 * 1000, cachefor, "incorrect cachefor")
+	t.Equal(5*60*1000, cachefor, "incorrect cachefor")
 	// test tokens expire in 1 hour
-	expectedtime := (time.Now().UnixNano() / 1000000) + 60 * 60 * 1000
-	t.True(expectedtime + 1000 > expires, fmt.Sprintf(
+	expectedtime := (time.Now().UnixNano() / 1000000) + 60*60*1000
+	t.True(expectedtime+1000 > expires, fmt.Sprintf(
 		"expire time (%v) too large vs. expected (%v)", expires, expectedtime))
-	t.True(expectedtime - 1000 < expires, fmt.Sprintf(
+	t.True(expectedtime-1000 < expires, fmt.Sprintf(
 		"expire time (%v) too small vs. expected (%v)", expires, expectedtime))
 	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
@@ -236,10 +237,10 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 func (t *TestSuite) TestGetUserFailBadURL() {
 	// this test goes against outside resources and so is delicate
 	type testcase struct {
-		url string
-		errstr string
+		url      string
+		errstr   string
 		contents []string
-		bodylen int
+		bodylen  int
 	}
 	testcases := []testcase{
 		testcase{
@@ -280,7 +281,7 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 		t.Equal(logrus.ErrorLevel, le.Level, "incorrect level")
 		t.Equal("b", le.Data["a"], "incorrect field")
 		t.Equal(tc.bodylen, len(le.Data["truncated_response_body"].(string)),
-		 	"incorrect body length")
+			"incorrect body length")
 		for _, c := range tc.contents {
 			t.Contains(le.Data["truncated_response_body"], c, "incorrect body")
 		}
@@ -299,7 +300,7 @@ func (t *TestSuite) TestValidateUserName() {
 	for _, names := range tc {
 		cachefor, err := kb.ValidateUserNames(logrus.WithField("a", "b"), &names, t.tokenNoRole)
 		t.Nil(err, "unexpected error")
-		t.Equal(30 * 60 * 1000, cachefor, "incorrect cachefor")
+		t.Equal(30*60*1000, cachefor, "incorrect cachefor")
 	}
 	t.Equal(0, len(t.loggerhook.AllEntries()), "unexpected logging")
 }
@@ -307,7 +308,7 @@ func (t *TestSuite) TestValidateUserName() {
 func (t *TestSuite) TestValidateUserNamesBadNameInput() {
 	type tvun struct {
 		names *[]string
-		err error
+		err   error
 	}
 
 	tc := []tvun{
@@ -342,10 +343,10 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 		"   \t    \n   ": errors.New("token cannot be empty or whitespace only"),
 		"no such token":  NewInvalidTokenError("KBase auth server reported token was invalid"),
 	}
-	
+
 	kb, err := NewKBaseProvider(*t.authURL)
 	t.Nil(err, "unexpected error")
-	
+
 	for token, expectederr := range tc {
 		cachefor, err := kb.ValidateUserNames(
 			logrus.WithField("a", "b"), &[]string{"noroles"}, token)
@@ -358,10 +359,10 @@ func (t *TestSuite) TestValidateUserNameFailBadToken() {
 func (t *TestSuite) TestValidateUserNameFailBadURL() {
 	// this test goes against outside resources and so is delicate
 	type testcase struct {
-		url string
-		errstr string
+		url      string
+		errstr   string
 		contents []string
-		bodylen int
+		bodylen  int
 	}
 	testcases := []testcase{
 		testcase{
@@ -401,7 +402,7 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 		t.Equal(logrus.ErrorLevel, le.Level, "incorrect level")
 		t.Equal("b", le.Data["a"], "incorrect field")
 		t.Equal(tc.bodylen, len(le.Data["truncated_response_body"].(string)),
-		 	"incorrect body length")
+			"incorrect body length")
 		for _, c := range tc.contents {
 			t.Contains(le.Data["truncated_response_body"], c, "incorrect body")
 		}

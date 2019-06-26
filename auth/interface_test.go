@@ -2,8 +2,9 @@ package auth
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUser(t *testing.T) {
@@ -19,7 +20,7 @@ func TestUser(t *testing.T) {
 }
 
 func TestUserFailInput(t *testing.T) {
-	u, err := NewUser("  \t\t     ", false) 
+	u, err := NewUser("  \t\t     ", false)
 	assert.Nil(t, u, "expected error")
 	assert.Equal(t, err, errors.New("userName cannot be empty or whitespace only"),
 		"incorrect error")
@@ -27,8 +28,8 @@ func TestUserFailInput(t *testing.T) {
 
 func TestInvalidUserError(t *testing.T) {
 	type tiue struct {
-		users *[]string
-		errstr 	string
+		users  *[]string
+		errstr string
 	}
 
 	tc := []tiue{

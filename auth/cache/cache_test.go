@@ -1,15 +1,16 @@
 package cache
 
 import (
-	"github.com/sirupsen/logrus"
 	"errors"
-	"time"
-	"github.com/stretchr/testify/assert"
-	"github.com/kbase/blobstore/auth"
 	"testing"
+	"time"
 
-	authmocks "github.com/kbase/blobstore/auth/mocks"
+	"github.com/kbase/blobstore/auth"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+
 	cachemocks "github.com/kbase/blobstore/auth/cache/mocks"
+	authmocks "github.com/kbase/blobstore/auth/mocks"
 )
 
 func TestGetUserCacheFor(t *testing.T) {
@@ -42,7 +43,7 @@ func TestGetUserCacheFor(t *testing.T) {
 
 	// cache miss again
 	provmock.On("GetUser", le, "sometoken").Return(u, int64(1310), 100, nil).Once()
-	timemock.On("Now").Return(time.Unix(1, 110 * 1000000)).Once()
+	timemock.On("Now").Return(time.Unix(1, 110*1000000)).Once()
 	got, err = c.GetUser(le, "sometoken")
 	assert.Equal(t, u, got, "incorrect user")
 	assert.Nil(t, err, "unexpected error")
@@ -89,7 +90,7 @@ func TestGetUserExpires(t *testing.T) {
 
 	// cache miss again
 	provmock.On("GetUser", le, "sometoken").Return(u, int64(4210), 200, nil).Once()
-	timemock.On("Now").Return(time.Unix(4, 110 * 1000000)).Once()
+	timemock.On("Now").Return(time.Unix(4, 110*1000000)).Once()
 	got, err = c.GetUser(le, "sometoken")
 	assert.Equal(t, u, got, "incorrect user")
 	assert.Nil(t, err, "unexpected error")

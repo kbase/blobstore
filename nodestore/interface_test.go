@@ -1,12 +1,13 @@
 package nodestore
 
 import (
-	"github.com/kbase/blobstore/core/values"
-	"time"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/google/uuid"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kbase/blobstore/core/values"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewUser(t *testing.T) {
@@ -35,7 +36,7 @@ func TestNewNodeMin(t *testing.T) {
 		67,
 		*md5,
 		tm,
-		)
+	)
 	assert.Nil(t, err, "unexpected error")
 
 	readers := []User{*owner}
@@ -67,7 +68,7 @@ func TestNewNodeFull(t *testing.T) {
 		FileName("   file.txt   "),
 		Public(true),
 		Reader(*r1), Reader(*r2), Reader(*r1), Reader(*owner), // test duplicates are removed
-		)
+	)
 	assert.Nil(t, err, "unexpected error")
 
 	readers := []User{*owner, *r1, *r2}
@@ -94,8 +95,8 @@ func TestNodeImmutable(t *testing.T) {
 		*md5,
 		time.Now(),
 		Reader(*r1),
-		)
-	
+	)
+
 	// this test isn't really failsafe since it's not clear when append returns a new slice
 	readers := []User{*owner, *r1}
 	_ = append(*n.GetReaders(), *r2)
@@ -111,7 +112,7 @@ func TestNodeBadInput(t *testing.T) {
 		0,
 		*md5,
 		time.Now(),
-		)
+	)
 	assert.Nil(t, n, "expected nil object")
 	assert.Equal(t, errors.New("size must be > 0"), err, "incorrect error")
 }
@@ -129,7 +130,7 @@ func TestNodeWithPublic(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1),
-		)
+	)
 
 	expected, _ := NewNode(
 		nid,
@@ -139,7 +140,7 @@ func TestNodeWithPublic(t *testing.T) {
 		tme,
 		Reader(*r1),
 		Public(true),
-		)
+	)
 
 	assert.Equal(t, expected, n.WithPublic(true), "incorrect node")
 	assert.Equal(t, false, n.GetPublic(), "incorrect public") // check orignal node unchanged
@@ -162,7 +163,7 @@ func TestNodeWithOwner(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1),
-		)
+	)
 
 	expected, _ := NewNode(
 		nid,
@@ -172,7 +173,7 @@ func TestNodeWithOwner(t *testing.T) {
 		tme,
 		Reader(*owner),
 		Reader(*r1),
-		)
+	)
 
 	assert.Equal(t, expected, n.WithOwner(*newowner), "incorrect node")
 	// check orignal node unchanged
@@ -193,7 +194,7 @@ func TestNodeWithOwner(t *testing.T) {
 		tme,
 		Reader(*r1),
 		Reader(*newowner),
-		)
+	)
 
 	assert.Equal(t, expected, n2.WithOwner(*newowner), "incorrect node")
 	// check orignal node unchanged
@@ -214,7 +215,7 @@ func TestNodeWithReaders(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1),
-		)
+	)
 
 	r2, _ := NewUser(uuid.New(), " r2 ")
 	r3, _ := NewUser(uuid.New(), " r3 ")
@@ -226,7 +227,7 @@ func TestNodeWithReaders(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1), Reader(*r2), Reader(*r3),
-		)
+	)
 
 	n2 := n.WithReaders(*r2, *r1, *owner, *r3)
 	assert.Equal(t, expected, n2, "incorrect node")
@@ -250,8 +251,7 @@ func TestNodeWithoutReaders(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1), Reader(*r2), Reader(*r3),
-		)
-
+	)
 
 	expected, _ := NewNode(
 		nid,
@@ -260,7 +260,7 @@ func TestNodeWithoutReaders(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1), Reader(*r3),
-		)
+	)
 
 	n2 := n.WithoutReaders(*r2, *owner)
 	assert.Equal(t, expected, n2, "incorrect node")
@@ -284,7 +284,7 @@ func TestNodeHasReader(t *testing.T) {
 		*md5,
 		tme,
 		Reader(*r1), Reader(*r3),
-		)
+	)
 
 	assert.Equal(t, true, n.HasReader(*owner), "incorrect has reader")
 	assert.Equal(t, true, n.HasReader(*r1), "incorrect has reader")

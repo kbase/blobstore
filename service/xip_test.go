@@ -3,12 +3,13 @@ package service
 // tests the getIP() method thoroughly. The integration tests just do basic tests.
 
 import (
+	"io/ioutil"
 	"net/http"
 	"testing"
-	"io/ioutil"
-	"github.com/stretchr/testify/suite"
+
 	"github.com/sirupsen/logrus"
 	logrust "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/suite"
 )
 
 type TestSuiteIP struct {
@@ -88,10 +89,10 @@ func (t *TestSuiteIP) TestXRIPHeader() {
 	r.Header.Set("x-forwarded-for", "      ,    456.789.123.456    ")
 	r.Header.Set("x-real-Ip", "     789.123.456.789     ")
 
-	t.Equal( "789.123.456.789", getIP(logrus.WithFields(logrus.Fields{}), &r, false),
+	t.Equal("789.123.456.789", getIP(logrus.WithFields(logrus.Fields{}), &r, false),
 		"incorrect ip")
 	t.confirmLog("      ,    456.789.123.456    ",
-	"     789.123.456.789     ", "123.456.789.123", "789.123.456.789")
+		"     789.123.456.789     ", "123.456.789.123", "789.123.456.789")
 }
 
 func (t *TestSuiteIP) confirmLog(xFF, xRIP, RemoteAddr, IP string) {
@@ -100,12 +101,12 @@ func (t *TestSuiteIP) confirmLog(xFF, xRIP, RemoteAddr, IP string) {
 	got := t.loggerhook.AllEntries()[0]
 	t.Equal(logrus.InfoLevel, got.Level, "incorrect level")
 	t.Equal("logging ip information", got.Message, "incorrect message")
-	
+
 	expectedfields := map[string]interface{}{
 		"X-Forwarded-For": xFF,
-		"X-Real-IP": xRIP,
-		"RemoteAddr": RemoteAddr,
-		"ip": IP,
+		"X-Real-IP":       xRIP,
+		"RemoteAddr":      RemoteAddr,
+		"ip":              IP,
 	}
 	t.Equal(expectedfields, map[string]interface{}(got.Data), "incorrect fields")
 }

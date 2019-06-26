@@ -1,20 +1,21 @@
 package config
 
 import (
-	"net/url"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
-	"github.com/google/uuid"
 	"path/filepath"
+	"testing"
+
+	"github.com/google/uuid"
 	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type TestSuite struct {
 	suite.Suite
-	tempDir string
+	tempDir       string
 	deleteTempDir bool
 }
 
@@ -80,17 +81,17 @@ func (t *TestSuite) TestMinimalConfig() {
 	t.Nil(err, "unexpected error")
 	u, _ := url.Parse("https://kbase.us/authyauth")
 	expected := Config{
-		Host: "localhost:12345",
-		MongoHost: "localhost:67890",
-		MongoDatabase: "mydb",
-		S3Host: "localhost:34567",
-		S3Bucket: "mybucket",
-		S3AccessKey: "akey",
-		S3AccessSecret: "sooporsekrit",
-		S3Region: "us-west-1",
-		S3DisableSSL: false,
-		AuthURL: u,
-		AuthAdminRoles: &[]string{},
+		Host:                "localhost:12345",
+		MongoHost:           "localhost:67890",
+		MongoDatabase:       "mydb",
+		S3Host:              "localhost:34567",
+		S3Bucket:            "mybucket",
+		S3AccessKey:         "akey",
+		S3AccessSecret:      "sooporsekrit",
+		S3Region:            "us-west-1",
+		S3DisableSSL:        false,
+		AuthURL:             u,
+		AuthAdminRoles:      &[]string{},
 		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
@@ -117,17 +118,17 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 	t.Nil(err, "unexpected error")
 	u, _ := url.Parse("https://kbase.us/authyauth")
 	expected := Config{
-		Host: "localhost:12345",
-		MongoHost: "localhost:67890",
-		MongoDatabase: "mydb",
-		S3Host: "localhost:34567",
-		S3Bucket: "mybucket",
-		S3AccessKey: "akey",
-		S3AccessSecret: "sooporsekrit",
-		S3Region: "us-west-1",
-		S3DisableSSL: false,
-		AuthURL: u,
-		AuthAdminRoles: &[]string{},
+		Host:                "localhost:12345",
+		MongoHost:           "localhost:67890",
+		MongoDatabase:       "mydb",
+		S3Host:              "localhost:34567",
+		S3Bucket:            "mybucket",
+		S3AccessKey:         "akey",
+		S3AccessSecret:      "sooporsekrit",
+		S3Region:            "us-west-1",
+		S3DisableSSL:        false,
+		AuthURL:             u,
+		AuthAdminRoles:      &[]string{},
 		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
@@ -154,19 +155,19 @@ func (t *TestSuite) TestMaximalConfig() {
 	t.Nil(err, "unexpected error")
 	u, _ := url.Parse("https://kbase.us/authyauth")
 	expected := Config{
-		Host: "localhost:12345",
-		MongoHost: "localhost:67890",
-		MongoDatabase: "mydb",
-		MongoUser: "mdbu",
-		MongoPwd: "mdbp",
-		S3Host: "localhost:34567",
-		S3Bucket: "mybucket",
-		S3AccessKey: "akey",
-		S3AccessSecret: "sooporsekrit",
-		S3DisableSSL: true,
-		S3Region: "us-west-1",
-		AuthURL: u,
-		AuthAdminRoles: &[]string{"foo", "bar", "baz"},
+		Host:                "localhost:12345",
+		MongoHost:           "localhost:67890",
+		MongoDatabase:       "mydb",
+		MongoUser:           "mdbu",
+		MongoPwd:            "mdbp",
+		S3Host:              "localhost:34567",
+		S3Bucket:            "mybucket",
+		S3AccessKey:         "akey",
+		S3AccessSecret:      "sooporsekrit",
+		S3DisableSSL:        true,
+		S3Region:            "us-west-1",
+		AuthURL:             u,
+		AuthAdminRoles:      &[]string{"foo", "bar", "baz"},
 		DontTrustXIPHeaders: true,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
@@ -327,7 +328,7 @@ func (t *TestSuite) TestConfigFailMongoUserPwd() {
 	for _, f := range []string{nouser, wsuser, nopwd, wspwd} {
 		cfg, err := New(f)
 		t.Nil(cfg, "expected error")
-		t.Equal(fmt.Errorf("Either both or neither of mongodb-user and mongodb-pwd must be " +
+		t.Equal(fmt.Errorf("Either both or neither of mongodb-user and mongodb-pwd must be "+
 			"supplied in section BlobStore of config file %s", f),
 			err, "incorrect error")
 	}
@@ -498,7 +499,7 @@ func (t *TestSuite) TestConfigFailBadAuthURL() {
 
 	cfg, err := New(f)
 	t.Nil(cfg, "expected error")
-	t.Equal(fmt.Errorf("Value for key kbase-auth-url in section BlobStore of config file %s " +
+	t.Equal(fmt.Errorf("Value for key kbase-auth-url in section BlobStore of config file %s "+
 		"is not a valid url: parse ://kbase.us/authyauth: missing protocol scheme", f),
 		err, "incorrect error")
 }
