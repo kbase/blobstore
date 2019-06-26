@@ -147,18 +147,9 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" -T mylittlefile
 ## Copy a node
 ```
 AUTHORIZATION REQUIRED
-POST /node
-<multipart form>
+POST /node/<id>/copy
 
 RETURNS: a Node.
-```
-
-The multipart form must have exactly one part with the name `copy_data` and the value the id of
-the node to copy.
-
-Curl example:
-```
-curl -H "Authorization: OAuth $KBASE_TOKEN" -F "copy_data=<node id>" http://<host>/node/
 ```
 
 ## Get a node
@@ -334,6 +325,26 @@ public class blobstoreclient {
 }
 ```
 
+## Copy a node via a MIME multipart form
+
+This copy method is provided for Shock compatibilty. It is recommended that the prior copy
+method is used rather than this one.
+
+```
+AUTHORIZATION REQUIRED
+POST /node
+<multipart form>
+
+RETURNS: a Node.
+```
+
+The multipart form must have exactly one part with the name `copy_data` and the value the id of
+the node to copy.
+
+Curl example:
+```
+curl -H "Authorization: OAuth $KBASE_TOKEN" -F "copy_data=<node id>" http://<host>/node/
+```
 
 # Requirements:
 * go 1.12

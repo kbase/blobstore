@@ -101,6 +101,9 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}", s.deleteNode).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/", s.deleteNode).Methods(http.MethodDelete)
 
+	router.HandleFunc("/node/{id}/copy", s.copyNode).Methods(http.MethodPost)
+	router.HandleFunc("/node/{id}/copy/", s.copyNode).Methods(http.MethodPost)
+
 	router.HandleFunc("/node/{id}/acl", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/", s.getACL).Methods(http.MethodGet)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.getACL).Methods(http.MethodGet)
@@ -109,7 +112,6 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.addNodeACL).Methods(http.MethodPut)
 	router.HandleFunc("/node/{id}/acl/{acltype}", s.removeNodeACL).Methods(http.MethodDelete)
 	router.HandleFunc("/node/{id}/acl/{acltype}/", s.removeNodeACL).Methods(http.MethodDelete)
-	// TODO CONVERT script from shock -> bs, key off minio files
 	return s, nil
 }
 
@@ -350,7 +352,7 @@ func (s *Server) createNodeFromForm(
 		defer part.Close()
 	}
 	if part.FormName() == formCopyData {
-		s.copyNode(le, user, part, w)
+		s.copyNodeViaForm(le, user, part, w)
 		return
 	} else if part.FormName() == formUpload {
 		cl, err := strconv.ParseInt(part.Header.Get("Content-Length"), 10, 64)
@@ -405,7 +407,7 @@ func getNextFormPart(le *logrus.Entry, form *multipart.Reader, w http.ResponseWr
 }
 
 // caller must close part
-func (s *Server) copyNode(
+func (s *Server) copyNodeViaForm(
 	le *logrus.Entry,
 	user auth.User,
 	part *multipart.Part,
@@ -459,6 +461,24 @@ func getQuery(u *url.URL, param string) string {
 		return strings.TrimSpace(s[0])
 	}
 	return ""
+}
+
+func (s *Server) copyNode(w http.ResponseWriter, r *http.Request) {
+	le := getLogger(r)
+	id, err := getNodeID(le, w, r)
+	if err != nil {
+		return
+	}
+	user, err := getUserRequired(le, w, r)
+	if err != nil {
+		return
+	}
+	node, err := s.store.CopyNode(*user, *id)
+	if err != nil {
+		writeError(le, err, w)
+		return
+	}
+	writeNode(w, node)
 }
 
 func writeNode(w http.ResponseWriter, node *core.BlobNode) {
