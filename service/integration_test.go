@@ -1156,11 +1156,11 @@ func (t *TestSuite) TestDeleteNodeFail() {
 }
 
 func (t *TestSuite) TestCopyNode() {
-	t.testCopyNode("/node")
-	t.testCopyNode("/node/")
+	t.testCopyNode("/copy")
+	t.testCopyNode("/copy/")
 }
 
-func (t *TestSuite) testCopyNode(path string) {
+func (t *TestSuite) testCopyNode(endpath string) {
 	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
 		"Oauth "+t.noRole.token, 374, 200)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -1174,21 +1174,11 @@ func (t *TestSuite) testCopyNode(path string) {
 		"Oauth "+t.noRole.token, 440, 200)
 	t.loggerhook.Reset()
 
-	noroleID := t.getUserIDFromMongo(t.noRole.user)
-	noroleUser := map[string]interface{}{"uuid": noroleID, "username": t.noRole.user}
-
-	// don't do this normally, memory hog
-	form := new(bytes.Buffer)
-	writer := multipart.NewWriter(form)
-	_ = writer.WriteField("copy_data", id)
-	_ = writer.Close()
-
-	req, err := http.NewRequest("POST", t.url+path, form)
+	req, err := http.NewRequest("POST", t.url+"/node/"+id+endpath, nil)
 	t.Nil(err, "unexpected error")
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("authorization", "oauth "+t.noRole.token)
+	req.Header.Set("authorization", "oauth "+t.noRole2.token)
 	body2 := t.requestToJSON(req, 374, 200)
-	t.checkLogs(logEvent{logrus.InfoLevel, "POST", path, 200, &t.noRole.user,
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/" + id + endpath, 200, &t.noRole2.user,
 		"request complete", mtmap(), false},
 	)
 
@@ -1214,11 +1204,119 @@ func (t *TestSuite) testCopyNode(path string) {
 		"status": float64(200),
 	}
 
-	expectedacl := getExpectedACL(noroleUser, []map[string]interface{}{}, false)
+	norole2ID := t.getUserIDFromMongo(t.noRole2.user)
+	norole2User := map[string]interface{}{"uuid": norole2ID, "username": t.noRole2.user}
+	expectedacl := getExpectedACL(norole2User, []map[string]interface{}{}, false)
 
-	t.checkNode(id2, &t.noRole, 374, expected)
-	t.checkACL(id2, "", "", &t.noRole, 395, expectedacl)
-	t.checkFile(t.url+"/node/"+id2+"?download", "/node/"+id2, &t.noRole, 9, id2,
+	t.checkNode(id2, &t.noRole2, 374, expected)
+	t.checkACL(id2, "", "", &t.noRole2, 395, expectedacl)
+	t.checkFile(t.url+"/node/"+id2+"?download", "/node/"+id2, &t.noRole2, 9, id2,
+		[]byte("foobarbaz"))
+}
+
+func (t *TestSuite) TestCopyNodeFail() {
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"Oauth "+t.kBaseAdmin.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	type testcase struct {
+		urlsuffix string
+		token     string
+		user      *string
+		status    int
+		errstring string
+		conlen    int64
+	}
+
+	invauth := "Invalid authorization header or content"
+	badid := uuid.New().String()
+	c := "/copy"
+	testcases := []testcase{
+		testcase{"badid" + c, "", nil, 404, "Node not found", 75},
+		testcase{"worseid" + c + "/", "", nil, 404, "Node not found", 75},
+		testcase{id + c, "", nil, 401, "No Authorization", 77},
+		testcase{id + c + "/", "", nil, 401, "No Authorization", 77},
+		testcase{id + c, "oauth badtoken", nil, 400, invauth, 100},
+		testcase{id + c, "oauh " + t.noRole.token, nil, 400, invauth, 100},
+		testcase{badid + c, "oauth " + t.kBaseAdmin.token, &t.kBaseAdmin.user, 404,
+			"Node not found", 75},
+		testcase{id + c, "oauth " + t.noRole.token, &t.noRole.user, 401, "User Unauthorized", 78},
+	}
+
+	for _, tc := range testcases {
+		body := t.req("POST", t.url+"/node/"+tc.urlsuffix, nil, tc.token, tc.conlen,
+			tc.status)
+		t.checkError(body, tc.status, tc.errstring)
+		t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node/" + tc.urlsuffix, tc.status,
+			tc.user, tc.errstring, mtmap(), false},
+		)
+	}
+}
+
+func (t *TestSuite) TestCopyNodeViaForm() {
+	t.testCopyNodeViaForm("/node")
+	t.testCopyNodeViaForm("/node/")
+}
+
+func (t *TestSuite) testCopyNodeViaForm(path string) {
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"Oauth "+t.noRole.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+
+	// add public read
+	t.req("PUT", t.url+"/node/"+id+"/acl/public_read", nil, "OAuth "+t.noRole.token, 394,
+		200)
+
+	// add user
+	t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
+		"Oauth "+t.noRole.token, 440, 200)
+	t.loggerhook.Reset()
+
+	// don't do this normally, memory hog
+	form := new(bytes.Buffer)
+	writer := multipart.NewWriter(form)
+	_ = writer.WriteField("copy_data", id)
+	_ = writer.Close()
+
+	req, err := http.NewRequest("POST", t.url+path, form)
+	t.Nil(err, "unexpected error")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("authorization", "oauth "+t.noRole2.token)
+	body2 := t.requestToJSON(req, 374, 200)
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", path, 200, &t.noRole2.user,
+		"request complete", mtmap(), false},
+	)
+
+	data2 := body2["data"].(map[string]interface{})
+	time := data2["created_on"].(string)
+	id2 := data2["id"].(string)
+	t.NotEqual(id2, id, "expected non equal ids")
+
+	expected := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes":    nil,
+			"created_on":    time,
+			"last_modified": time,
+			"id":            id2,
+			"format":        "",
+			"file": map[string]interface{}{
+				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
+				"name":     "",
+				"size":     float64(9),
+			},
+		},
+		"error":  nil,
+		"status": float64(200),
+	}
+
+	norole2ID := t.getUserIDFromMongo(t.noRole2.user)
+	norole2User := map[string]interface{}{"uuid": norole2ID, "username": t.noRole2.user}
+	expectedacl := getExpectedACL(norole2User, []map[string]interface{}{}, false)
+
+	t.checkNode(id2, &t.noRole2, 374, expected)
+	t.checkACL(id2, "", "", &t.noRole2, 395, expectedacl)
+	t.checkFile(t.url+"/node/"+id2+"?download", "/node/"+id2, &t.noRole2, 9, id2,
 		[]byte("foobarbaz"))
 }
 
@@ -1302,7 +1400,7 @@ func (t *TestSuite) TestFormNodeFailBadFormName() {
 	)
 }
 
-func (t *TestSuite) TestCopyNodeFail() {
+func (t *TestSuite) TestCopyNodeViaFormFail() {
 	// tests the more standard cases where form mangling isn't required
 
 	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
