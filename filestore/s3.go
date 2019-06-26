@@ -154,18 +154,21 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	}
 	// tried parsing the date from the returned headers, but wasn't always the same as what's
 	// returned by head. Head should be cheap compared to a write
-	return fs.getFileInfo(p.id)
+	return fs.getFileInfo(p.id, true)
 }
 
-func (fs *S3FileStore) getFileInfo(id string) (*FileInfo, error) {
+func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error) {
 	headObj, err := fs.s3client.HeadObject(&s3.HeadObjectInput{Bucket: &fs.bucket, Key: &id})
 	if err != nil {
 		return nil, errors.New("s3 store head: " + err.Error()) // not sure how to test this
 	}
 	md5str := strings.Trim(*headObj.ETag, `"`)
 	md5, err := values.NewMD5(md5str)
-	if err != nil {
-		// this is a real pain to test, need to start minio in s3 incompatibility mode
+	if strictMD5 && err != nil {
+		// this is a real pain to test
+		// tried putting a file with minio PutObject but would need to use at least 5MB parts
+		// infuriatingly the mc client does make a non-md5 etag
+		// try the AMZ client maybe. For now test manually.
 		return nil, errors.New("s3 store returned invalid MD5: " + md5str)
 	}
 	return &FileInfo{
@@ -175,7 +178,7 @@ func (fs *S3FileStore) getFileInfo(id string) (*FileInfo, error) {
 			// theoretically, the Etag is opaque. In practice, it's the md5
 			// If that changes, MultiWrite the file to an md5 writer.
 			// That means that we can't return the md5 in get file though.
-			MD5:    *md5,
+			MD5:    md5,
 			Size:   *headObj.ContentLength,
 			Stored: headObj.LastModified.UTC(),
 		},
@@ -200,17 +203,16 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 		return nil, errors.New("s3 store get: " + err.Error())
 	}
 	md5str := strings.Trim(*res.ETag, `"`)
-	md5, err := values.NewMD5(md5str)
-	if err != nil {
-		// this is a real pain to test, need to start minio in s3 incompatibility mode
-		return nil, errors.New("s3 store returned invalid MD5: " + md5str)
-	}
+	// ignore errors. Can occur if the file was uploaded in parts, etc.
+	// should never happen for files uploaded via StoreFile, but if data is transferred in it
+	// may not have a true MD5.
+	md5, _ := values.NewMD5(md5str)
 	return &GetFileOutput{
 			ID:       id,
 			Size:     *res.ContentLength,
 			Filename: getMeta(res.Metadata, "Filename"),
 			Format:   getMeta(res.Metadata, "Format"),
-			MD5:      *md5,
+			MD5:      md5,
 			Data:     res.Body,
 			Stored:   res.LastModified.UTC(),
 		},
@@ -268,5 +270,8 @@ func (fs *S3FileStore) CopyFile(sourceID string, targetID string) (*FileInfo, er
 		return nil, errors.New("s3 store copy: " + err.Error())
 
 	}
-	return fs.getFileInfo(targetID)
+	// ignore MD5 errors. Can occur if the file was uploaded in parts, etc.
+	// should never happen for files uploaded via StoreFile, but if data is transferred in it
+	// may not have a true MD5.
+	return fs.getFileInfo(targetID, false)
 }

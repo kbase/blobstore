@@ -1,21 +1,22 @@
 package core
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/kbase/blobstore/core/values"
-	"io/ioutil"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"time"
-	"github.com/kbase/blobstore/filestore"
-	"github.com/kbase/blobstore/nodestore"
-	"github.com/kbase/blobstore/auth"
+	"io/ioutil"
 	"strings"
-	"github.com/google/uuid"
-	nsmocks "github.com/kbase/blobstore/nodestore/mocks"
-	fsmocks "github.com/kbase/blobstore/filestore/mocks"
-	cmocks "github.com/kbase/blobstore/core/mocks"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kbase/blobstore/auth"
+	cmocks "github.com/kbase/blobstore/core/mocks"
+	"github.com/kbase/blobstore/core/values"
+	"github.com/kbase/blobstore/filestore"
+	fsmocks "github.com/kbase/blobstore/filestore/mocks"
+	"github.com/kbase/blobstore/nodestore"
+	nsmocks "github.com/kbase/blobstore/nodestore/mocks"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNoBlobError(t *testing.T) {
@@ -54,12 +55,12 @@ func TestStoreBasic(t *testing.T) {
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	sto := filestore.FileInfo{
-		ID: "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
-		Size: 12,
-		Format: "",
+		ID:       "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		Size:     12,
+		Format:   "",
 		Filename: "",
-		MD5: *md5,
-		Stored: tme,
+		MD5:      md5,
+		Stored:   tme,
 	}
 	le := logrus.WithField("a", "b")
 	fsmock.On("StoreFile", le, p).Return(&sto, nil)
@@ -79,16 +80,16 @@ func TestStoreBasic(t *testing.T) {
 		*ff,
 	)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "",
-		Format: "",
-		Owner: User{userid, "username"},
-		Readers: &[]User{User{userid, "username"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{userid, "username"},
+		Readers:  &[]User{User{userid, "username"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -116,12 +117,12 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		filestore.Format("excel"))
 	tme := time.Now()
 	sto := filestore.FileInfo{
-		ID: "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
-		Size: 12,
-		Format: "myfile",
+		ID:       "41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		Size:     12,
+		Format:   "myfile",
 		Filename: "excel",
-		MD5: *md5,
-		Stored: tme,
+		MD5:      md5,
+		Stored:   tme,
 	}
 	le := logrus.WithField("a", "b")
 	fsmock.On("StoreFile", le, p).Return(&sto, nil)
@@ -143,16 +144,16 @@ func TestStoreWithFilenameAndFormat(t *testing.T) {
 		*ff,
 	)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "myfile",
-		Format: "excel",
-		Owner: User{userid, "username"},
-		Readers: &[]User{User{userid, "username"}},
-		Public: false,
+		Format:   "excel",
+		Owner:    User{userid, "username"},
+		Readers:  &[]User{User{userid, "username"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -287,12 +288,12 @@ func TestStoreFailStoreNode(t *testing.T) {
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	sto := filestore.FileInfo{
-		ID: "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
-		Size: 12,
-		Format: "",
+		ID:       "/41/22/a8/4122a860-ce69-45cc-9d5d-3d2585fbfd74",
+		Size:     12,
+		Format:   "",
 		Filename: "",
-		MD5: *md5,
-		Stored: tme,
+		MD5:      md5,
+		Stored:   tme,
 	}
 	le := logrus.WithField("a", "b")
 	fsmock.On("StoreFile", le, p).Return(&sto, nil)
@@ -310,7 +311,7 @@ func TestStoreFailStoreNode(t *testing.T) {
 		strings.NewReader("012345678910"),
 		12,
 		*fn,
-		*ff,	
+		*ff,
 	)
 	assert.Nil(t, bnode, "expected error")
 	assert.Equal(t, errors.New("the loveliest of them all"), err, "incorrect error")
@@ -339,16 +340,16 @@ func TestGetAsOwner(t *testing.T) {
 
 	bnode, err := bs.Get(auser, uid)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "fn",
-		Format: "json",
-		Owner: User{userid, "username"},
-		Readers: &[]User{User{userid, "username"}},
-		Public: false,
+		Format:   "json",
+		Owner:    User{userid, "username"},
+		Readers:  &[]User{User{userid, "username"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -380,16 +381,16 @@ func TestGetAsReader(t *testing.T) {
 
 	bnode, err := bs.Get(auser, uid)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "",
-		Format: "",
-		Owner: User{nid, "username"},
-		Readers: &[]User{User{nid, "username"}, User{oid, "other"}, User{rid, "reader"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{nid, "username"},
+		Readers:  &[]User{User{nid, "username"}, User{oid, "other"}, User{rid, "reader"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -419,16 +420,16 @@ func TestGetAsAdmin(t *testing.T) {
 
 	bnode, err := bs.Get(auser, uid)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "",
-		Format: "",
-		Owner: User{nid, "username"},
-		Readers: &[]User{User{nid, "username"}, User{oid, "other"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{nid, "username"},
+		Readers:  &[]User{User{nid, "username"}, User{oid, "other"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -453,17 +454,17 @@ func TestGetPublic(t *testing.T) {
 	node, _ := nodestore.NewNode(uid, *nuser, 12, *md5, tme, nodestore.Public(true))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
-	
-	expected := &BlobNode {
-		ID: uid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+
+	expected := &BlobNode{
+		ID:       uid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "",
-		Format: "",
-		Owner: User{nid, "username"},
-		Readers: &[]User{User{nid, "username"}},
-		Public: true,
+		Format:   "",
+		Owner:    User{nid, "username"},
+		Readers:  &[]User{User{nid, "username"}},
+		Public:   true,
 	}
 	bnode, err := bs.Get(nil, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -497,10 +498,9 @@ func TestGetFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
-		errors.New("that node isn't the messiah, he's a very naughty boy"):
-			errors.New("that node isn't the messiah, he's a very naughty boy"),
+		errors.New("that node isn't the messiah, he's a very naughty boy"): errors.New(
+			"that node isn't the messiah, he's a very naughty boy"),
 		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
 	}
 
@@ -511,7 +511,7 @@ func TestGetFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		bnode, err := bs.Get(auser, uid)
 		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
@@ -572,13 +572,13 @@ func TestGetFileAsOwner(t *testing.T) {
 
 	md5fake, _ := values.NewMD5("4d838d477ddf355Bc15df1db90bee0aa")
 	gfo := filestore.GetFileOutput{
-		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
-		Size: 9,
-		Format: "who cares",
+		ID:       "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size:     9,
+		Format:   "who cares",
 		Filename: "my_lovely_file",
-		MD5: *md5fake,
-		Stored: time.Now(),
-		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+		MD5:      md5fake,
+		Stored:   time.Now(),
+		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
@@ -613,13 +613,13 @@ func TestGetFileAsReader(t *testing.T) {
 
 	md5fake, _ := values.NewMD5("3d838d477ddf955fc15df1db90bee0aa")
 	gfo := filestore.GetFileOutput{
-		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
-		Size: 9,
-		Format: "who cares",
+		ID:       "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size:     9,
+		Format:   "who cares",
 		Filename: "",
-		MD5: *md5fake,
-		Stored: time.Now(),
-		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+		MD5:      md5fake,
+		Stored:   time.Now(),
+		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
@@ -654,13 +654,13 @@ func TestGetFileAsAdmin(t *testing.T) {
 
 	md5fake, _ := values.NewMD5("2d838d487ddf355fc15df1db90bee0aa")
 	gfo := filestore.GetFileOutput{
-		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
-		Size: 9,
-		Format: "who cares",
+		ID:       "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size:     9,
+		Format:   "who cares",
 		Filename: "afile",
-		MD5: *md5fake,
-		Stored: time.Now(),
-		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+		MD5:      md5fake,
+		Stored:   time.Now(),
+		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
@@ -697,13 +697,13 @@ func TestGetFilePublic(t *testing.T) {
 
 	md5fake, _ := values.NewMD5("4d838d477ddf355fc15df1db90bee0aa")
 	gfo := filestore.GetFileOutput{
-		ID: "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
-		Size: 9,
-		Format: "who cares",
+		ID:       "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		Size:     9,
+		Format:   "who cares",
 		Filename: "afile",
-		MD5: *md5fake,
-		Stored: time.Now(),
-		Data: ioutil.NopCloser(strings.NewReader("012345678")),
+		MD5:      md5fake,
+		Stored:   time.Now(),
+		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
 	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
 
@@ -762,11 +762,11 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -791,12 +791,12 @@ func TestSetNodePublicTrueAsOwner(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	oid := uuid.New()
 	nuser, _ := nodestore.NewUser(oid, "un")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -808,16 +808,16 @@ func TestSetNodePublicTrueAsOwner(t *testing.T) {
 
 	bnode, err := bs.SetNodePublic(*auser, nid, true)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{oid, "un"},
-		Readers: &[]User{User{oid, "un"}},
-		Public: true,
+		Format:   "",
+		Owner:    User{oid, "un"},
+		Readers:  &[]User{User{oid, "un"}},
+		Public:   true,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -829,14 +829,14 @@ func TestSetNodePublicFalseAsAdmin(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", true)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	oid := uuid.New()
 	nowner, _ := nodestore.NewUser(oid, "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -848,16 +848,16 @@ func TestSetNodePublicFalseAsAdmin(t *testing.T) {
 
 	bnode, err := bs.SetNodePublic(*auser, nid, false)
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{oid, "owner"},
-		Readers: &[]User{User{oid, "owner"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{oid, "owner"},
+		Readers:  &[]User{User{oid, "owner"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -885,10 +885,9 @@ func TestSetNodePublicFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
 		errors.New("You are all individuals"): errors.New("You are all individuals"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		nodestore.NewNoNodeError("oops"):      NewNoBlobError("oops"),
 	}
 
 	for causeerr, expectederr := range inputs {
@@ -898,7 +897,7 @@ func TestSetNodePublicFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		bnode, err := bs.SetNodePublic(*auser, uid, false)
 		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
@@ -912,13 +911,13 @@ func TestSetNodePublicFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -933,23 +932,23 @@ func TestSetNodePublicFailUnauthorized(t *testing.T) {
 }
 
 func TestSetNodePublicFailSetPublic(t *testing.T) {
-	
+
 	auser, _ := auth.NewUser("un", true)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
-	
+
 	inputs := map[error]error{
 		errors.New("You are all individuals"): errors.New("You are all individuals"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		nodestore.NewNoNodeError("oops"):      NewNoBlobError("oops"),
 	}
-	
+
 	for causeerr, expectederr := range inputs {
 		fsmock := new(fsmocks.FileStore)
 		nsmock := new(nsmocks.NodeStore)
 		bs := New(fsmock, nsmock)
-		
+
 		nsmock.On("GetUser", "un").Return(nuser, nil)
-		
+
 		nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 		tme := time.Now()
 		md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -969,12 +968,12 @@ func TestAddReaders(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("owner", false)
 	oid := uuid.New()
 	o, _ := nodestore.NewUser(oid, "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -994,16 +993,16 @@ func TestAddReaders(t *testing.T) {
 
 	bnode, err := bs.AddReaders(*auser, nid, []string{"r1", "r2"})
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{oid, "owner"},
-		Readers: &[]User{User{oid, "owner"}, User{r1id, "r1"}, User{r2id, "r2"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{oid, "owner"},
+		Readers:  &[]User{User{oid, "owner"}, User{r1id, "r1"}, User{r2id, "r2"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 
@@ -1020,17 +1019,17 @@ func TestRemoveReaders(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("owner", false)
 	oid := uuid.New()
 	o, _ := nodestore.NewUser(oid, "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
-	
+
 	r1id := uuid.New()
 	r1, _ := nodestore.NewUser(r1id, "r1")
 	r2id := uuid.New()
 	r2, _ := nodestore.NewUser(r2id, "r2")
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1047,16 +1046,16 @@ func TestRemoveReaders(t *testing.T) {
 
 	bnode, err := bs.RemoveReaders(*auser, nid, []string{"r1", "r2"})
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{oid, "owner"},
-		Readers: &[]User{User{oid, "owner"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{oid, "owner"},
+		Readers:  &[]User{User{oid, "owner"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 
@@ -1073,23 +1072,23 @@ func TestRemoveReaderSelf(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("r1", false)
 
 	oid := uuid.New()
 	o, _ := nodestore.NewUser(oid, "owner")
-	
+
 	r1id := uuid.New()
 	r1, _ := nodestore.NewUser(r1id, "r1")
 	r2id := uuid.New()
 	r2, _ := nodestore.NewUser(r2id, "r2")
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	node, _ := nodestore.NewNode(nid, *o, 12, *md5, tme, nodestore.FileName("foo"),
 		nodestore.Reader(*r1), nodestore.Reader(*r2))
-	
+
 	nsmock.On("GetUser", "r1").Return(r1, nil)
 
 	nsmock.On("GetNode", nid).Return(node, nil)
@@ -1098,16 +1097,16 @@ func TestRemoveReaderSelf(t *testing.T) {
 
 	bnode, err := bs.RemoveReaders(*auser, nid, []string{"r1"})
 	assert.Nil(t, err, "unexpected error")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{oid, "owner"},
-		Readers: &[]User{User{oid, "owner"}, User{r2id, "r2"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{oid, "owner"},
+		Readers:  &[]User{User{oid, "owner"}, User{r2id, "r2"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 }
@@ -1139,10 +1138,9 @@ func TestAddAndRemoveReadersFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
 		errors.New("You are all individuals"): errors.New("You are all individuals"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		nodestore.NewNoNodeError("oops"):      NewNoBlobError("oops"),
 	}
 
 	for causeerr, expectederr := range inputs {
@@ -1152,7 +1150,7 @@ func TestAddAndRemoveReadersFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		bnode, err := bs.AddReaders(*auser, uid, []string{"r"})
 		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
@@ -1170,13 +1168,13 @@ func TestAddAndRemoveReadersFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1185,7 +1183,7 @@ func TestAddAndRemoveReadersFailUnauthorized(t *testing.T) {
 	nsmock.On("GetNode", nid).Return(node, nil)
 
 	readers := [][]string{
-		[]string{"r"},       // tests reader != self check
+		[]string{"r"},        // tests reader != self check
 		[]string{"un", "r2"}, // tests single reader check
 	}
 
@@ -1210,13 +1208,13 @@ func TestAddReaderSelfFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("reader", false)
-	
+
 	ruser, _ := nodestore.NewUser(uuid.New(), "reader")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "reader").Return(ruser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1235,11 +1233,11 @@ func TestAddAndRemoveReadersFailGetReader(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("notowner", true)
 	no, _ := nodestore.NewUser(uuid.New(), "notowner")
 	nsmock.On("GetUser", "notowner").Return(no, nil)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
@@ -1260,25 +1258,25 @@ func TestAddAndRemoveReadersFailGetReader(t *testing.T) {
 }
 
 func TestAddAndRemoveReadersFailAddRemoveReader(t *testing.T) {
-	
+
 	auser, _ := auth.NewUser("un", true)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 	r, _ := nodestore.NewUser(uuid.New(), "r")
-	
+
 	inputs := map[error]error{
-		errors.New("Sausages and plant and goldfish"):
-			errors.New("Sausages and plant and goldfish"),
+		errors.New("Sausages and plant and goldfish"): errors.New(
+			"Sausages and plant and goldfish"),
 		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
 	}
-	
+
 	for causeerr, expectederr := range inputs {
 		fsmock := new(fsmocks.FileStore)
 		nsmock := new(nsmocks.NodeStore)
 		bs := New(fsmock, nsmock)
-		
+
 		nsmock.On("GetUser", "un").Return(nuser, nil)
-		
+
 		nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 		tme := time.Now()
 		md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1305,12 +1303,12 @@ func TestChangeOwner(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("owner", false)
 	oid := uuid.New()
 	o, _ := nodestore.NewUser(oid, "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
-	
+
 	r1id := uuid.New()
 	r1, _ := nodestore.NewUser(r1id, "r1")
 
@@ -1328,16 +1326,16 @@ func TestChangeOwner(t *testing.T) {
 	nsmock.On("ChangeOwner", nid, *newowner).Return(nil)
 
 	bnode, err := bs.ChangeOwner(*auser, nid, "new")
-	expected := &BlobNode {
-		ID: nid,
-		Size: 12,
-		MD5: *md5,
-		Stored: tme,
+	expected := &BlobNode{
+		ID:       nid,
+		Size:     12,
+		MD5:      *md5,
+		Stored:   tme,
 		Filename: "foo",
-		Format: "",
-		Owner: User{newid, "new"},
-		Readers: &[]User{User{newid, "new"}, User{oid, "owner"}, User{r1id, "r1"}},
-		Public: false,
+		Format:   "",
+		Owner:    User{newid, "new"},
+		Readers:  &[]User{User{newid, "new"}, User{oid, "owner"}, User{r1id, "r1"}},
+		Public:   false,
 	}
 	assert.Equal(t, expected, bnode, "incorrect node")
 	assert.Nil(t, err, "unexpected error")
@@ -1374,10 +1372,9 @@ func TestChangeOwnerFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
 		errors.New("You are all individuals"): errors.New("You are all individuals"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		nodestore.NewNoNodeError("oops"):      NewNoBlobError("oops"),
 	}
 
 	for causeerr, expectederr := range inputs {
@@ -1387,7 +1384,7 @@ func TestChangeOwnerFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		bnode, err := bs.ChangeOwner(*auser, uid, "foo")
 		assert.Equal(t, expectederr, err, "incorrect error")
 		assert.Nil(t, bnode, "expected error")
@@ -1401,13 +1398,13 @@ func TestChangeOwnerFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1425,11 +1422,11 @@ func TestChangeOwnerFailGetNewOwner(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("notowner", true)
 	no, _ := nodestore.NewUser(uuid.New(), "notowner")
 	nsmock.On("GetUser", "notowner").Return(no, nil)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
@@ -1446,25 +1443,24 @@ func TestChangeOwnerFailGetNewOwner(t *testing.T) {
 }
 
 func TestChangeOwnerFailChangeOwner(t *testing.T) {
-	
+
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 	newowner, _ := nodestore.NewUser(uuid.New(), "new")
-	
+
 	inputs := map[error]error{
-		errors.New("Now you discharge yours"):
-			errors.New("Now you discharge yours"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		errors.New("Now you discharge yours"): errors.New("Now you discharge yours"),
+		nodestore.NewNoNodeError("oops"):      NewNoBlobError("oops"),
 	}
-	
+
 	for causeerr, expectederr := range inputs {
 		fsmock := new(fsmocks.FileStore)
 		nsmock := new(nsmocks.NodeStore)
 		bs := New(fsmock, nsmock)
-		
+
 		nsmock.On("GetUser", "un").Return(nuser, nil)
-		
+
 		nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 		tme := time.Now()
 		md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1473,7 +1469,7 @@ func TestChangeOwnerFailChangeOwner(t *testing.T) {
 		nsmock.On("GetNode", nid).Return(node, nil)
 
 		nsmock.On("GetUser", "new").Return(newowner, nil)
-		
+
 		nsmock.On("ChangeOwner", nid, *newowner).Return(causeerr)
 
 		bnode, err := bs.ChangeOwner(*auser, nid, "new")
@@ -1486,9 +1482,9 @@ func TestDeleteNode(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("owner", false)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
 
@@ -1536,9 +1532,8 @@ func TestDeleteNodeFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
-		errors.New("I'm not"): errors.New("I'm not"),
+		errors.New("I'm not"):            errors.New("I'm not"),
 		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
 	}
 
@@ -1549,7 +1544,7 @@ func TestDeleteNodeFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		err := bs.DeleteNode(*auser, uid)
 		assert.Equal(t, expectederr, err, "incorrect error")
 	}
@@ -1562,13 +1557,13 @@ func TestDeleteNodeFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1582,23 +1577,22 @@ func TestDeleteNodeFailUnauthorized(t *testing.T) {
 
 func TestDeleteNodeFailDeleteNode(t *testing.T) {
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
-	
+
 	inputs := map[error]error{
-		errors.New("vivian! You bastard"):
-			errors.New("vivian! You bastard"),
-		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
+		errors.New("vivian! You bastard"): errors.New("vivian! You bastard"),
+		nodestore.NewNoNodeError("oops"):  NewNoBlobError("oops"),
 	}
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
-	
+
 	for causeerr, expectederr := range inputs {
 		fsmock := new(fsmocks.FileStore)
 		nsmock := new(nsmocks.NodeStore)
 		bs := New(fsmock, nsmock)
-		
+
 		nsmock.On("GetUser", "un").Return(nuser, nil)
-		
+
 		tme := time.Now()
 		md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 		node, _ := nodestore.NewNode(nid, *nuser, 12, *md5, tme, nodestore.FileName("foo"))
@@ -1616,9 +1610,9 @@ func TestDeleteNodeFailDeleteFile(t *testing.T) {
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 	bs := New(fsmock, nsmock)
-	
+
 	auser, _ := auth.NewUser("owner", false)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	nsmock.On("GetUser", "owner").Return(o, nil)
 
@@ -1645,18 +1639,18 @@ func TestCopyNode(t *testing.T) {
 }
 
 func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
-	
+
 	owner, _ := auth.NewUser("owner", false)
 	admin, _ := auth.NewUser("admin", true)
 	reader, _ := auth.NewUser("r1", true)
 	noperms, _ := auth.NewUser("noperms", true)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
 	a, _ := nodestore.NewUser(uuid.New(), "admin")
 	r1, _ := nodestore.NewUser(uuid.New(), "r1")
 	r2, _ := nodestore.NewUser(uuid.New(), "r2")
 	np, _ := nodestore.NewUser(uuid.New(), "noperms")
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
@@ -1667,14 +1661,13 @@ func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
 	pubnode, _ := nodestore.NewNode(nid, *o, 12, *md5, tme, nodestore.Public(true),
 		nodestore.FileName(filename), nodestore.Format(format))
 
-
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
 	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	newtme, _ := time.Parse("2000-01-01T01:01:02Z01:00", time.RFC3339)
 
 	type testcase struct {
-		node *nodestore.Node
-		user auth.User
+		node  *nodestore.Node
+		user  auth.User
 		nuser nodestore.User
 	}
 
@@ -1697,7 +1690,7 @@ func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
 		md5fake, _ := values.NewMD5("4d838d477ddf355fc15df1db90bee0aa")
 		fsmock.On("CopyFile", fid, newfid).Return(
 			&filestore.FileInfo{
-				ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: *md5fake,
+				ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: md5fake,
 				Stored: newtme},
 			nil,
 		)
@@ -1708,17 +1701,17 @@ func testCopyNodeWithFnF(t *testing.T, filename string, format string) {
 		nsmock.On("StoreNode", newnode).Return(nil)
 
 		bnode, err := bs.CopyNode(tc.user, nid)
-		assert.Nil(t, err, "unexpected error for user " + tc.user.GetUserName())
-		expected := &BlobNode {
-			ID: newnid,
-			Size: 12,
-			MD5: *md5,
-			Stored: newtme,
+		assert.Nil(t, err, "unexpected error for user "+tc.user.GetUserName())
+		expected := &BlobNode{
+			ID:       newnid,
+			Size:     12,
+			MD5:      *md5,
+			Stored:   newtme,
 			Filename: filename,
-			Format: format,
-			Owner: User{tc.nuser.GetID(), tc.user.GetUserName()},
-			Readers: &[]User{User{tc.nuser.GetID(), tc.user.GetUserName()}},
-			Public: false,
+			Format:   format,
+			Owner:    User{tc.nuser.GetID(), tc.user.GetUserName()},
+			Readers:  &[]User{User{tc.nuser.GetID(), tc.user.GetUserName()}},
+			Public:   false,
 		}
 		assert.Equal(t, expected, bnode, "incorrect node")
 	}
@@ -1747,9 +1740,8 @@ func TestCopyNodeFailGetNode(t *testing.T) {
 	userid := uuid.New()
 	nuser, _ := nodestore.NewUser(userid, "username")
 
-
 	inputs := map[error]error{
-		errors.New("Bacon sandwich"): errors.New("Bacon sandwich"),
+		errors.New("Bacon sandwich"):     errors.New("Bacon sandwich"),
 		nodestore.NewNoNodeError("oops"): NewNoBlobError("oops"),
 	}
 
@@ -1760,7 +1752,7 @@ func TestCopyNodeFailGetNode(t *testing.T) {
 		nsmock.On("GetUser", "un").Return(nuser, nil)
 
 		nsmock.On("GetNode", uid).Return(nil, causeerr)
-	
+
 		bnode, err := bs.CopyNode(*auser, uid)
 		assert.Nil(t, bnode, "expected error")
 		assert.Equal(t, expectederr, err, "incorrect error")
@@ -1774,13 +1766,13 @@ func TestCopyNodeFailUnauthorized(t *testing.T) {
 	bs := New(fsmock, nsmock)
 
 	auser, _ := auth.NewUser("un", false)
-	
+
 	nuser, _ := nodestore.NewUser(uuid.New(), "un")
 
 	nowner, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nsmock.On("GetUser", "un").Return(nuser, nil)
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
@@ -1795,9 +1787,9 @@ func TestCopyNodeFailUnauthorized(t *testing.T) {
 
 func TestCopyNodeFailCopyFile(t *testing.T) {
 	owner, _ := auth.NewUser("owner", false)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
@@ -1807,7 +1799,7 @@ func TestCopyNodeFailCopyFile(t *testing.T) {
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
 	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	fsmock := new(fsmocks.FileStore)
-	
+
 	nsmock := new(nsmocks.NodeStore)
 	uuidmock := new(cmocks.UUIDGen)
 	bs := NewWithUUIDGen(fsmock, nsmock, uuidmock)
@@ -1824,9 +1816,9 @@ func TestCopyNodeFailCopyFile(t *testing.T) {
 
 func TestCopyNodeFailStoreNode(t *testing.T) {
 	owner, _ := auth.NewUser("owner", false)
-	
+
 	o, _ := nodestore.NewUser(uuid.New(), "owner")
-	
+
 	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
 	fid := "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d"
 	tme, _ := time.Parse("2000-01-01T01:01:01Z01:00", time.RFC3339)
@@ -1836,7 +1828,7 @@ func TestCopyNodeFailStoreNode(t *testing.T) {
 	newnid, _ := uuid.Parse("b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1")
 	newfid := "b6/f2/d8/b6f2d8b7-429e-4639-b2d9-c619e4e9f4e1"
 	fsmock := new(fsmocks.FileStore)
-	
+
 	nsmock := new(nsmocks.NodeStore)
 	uuidmock := new(cmocks.UUIDGen)
 	bs := NewWithUUIDGen(fsmock, nsmock, uuidmock)
@@ -1848,7 +1840,7 @@ func TestCopyNodeFailStoreNode(t *testing.T) {
 	md5fake, _ := values.NewMD5("4d838d477ddf355fc15df1db90bee0aa")
 	fsmock.On("CopyFile", fid, newfid).Return(
 		&filestore.FileInfo{
-			ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: *md5fake,
+			ID: newfid, Size: 120, Format: "ignored", Filename: "ignored", MD5: md5fake,
 			Stored: storedtime},
 		nil,
 	)

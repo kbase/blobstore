@@ -140,7 +140,8 @@ func (bs *BlobStore) Store(
 	if err != nil {
 		return nil, err // errors should only occur for unusual situations here
 	}
-	node, _ := nodestore.NewNode(uid, *nodeuser, size, f.MD5, f.Stored,
+	// enforce presence of a correct MD5
+	node, _ := nodestore.NewNode(uid, *nodeuser, size, *f.MD5, f.Stored,
 		nodestore.FileName(filename.GetFileName()), nodestore.Format(format.GetFileFormat()))
 	err = bs.nodeStore.StoreNode(node)
 	if err != nil {
