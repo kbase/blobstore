@@ -81,11 +81,15 @@ type FileInfo struct {
 	Format string
 	// The filename.
 	Filename string
-	// The MD5 of the file.
-	MD5 values.MD5
+	// The MD5 of the file. May be nil if the backend service does not provide an MD5 - for
+	// example many S3 upload methods. Always provided for a store file operation.
+	MD5 *values.MD5
 	// The time the file was stored.
 	Stored time.Time
 }
+
+// may want to make specific structs for save and copy, but that complicates the code
+// quite a bit. YAGNI for now.
 
 // GetFileOutput the output when getting a file. The user is responsible for closing the reader.
 type GetFileOutput struct {
@@ -97,8 +101,9 @@ type GetFileOutput struct {
 	Format string
 	// The filename.
 	Filename string
-	// The MD5 of the file.
-	MD5 values.MD5
+	// The MD5 of the file. May be nil if the backend service does not provide an MD5 - for
+	// example many S3 upload methods.
+	MD5 *values.MD5
 	// The time the file was stored.
 	Stored time.Time
 	// The file's contents.
@@ -121,7 +126,7 @@ func (e *NoFileError) Error() string {
 // FileStore an interface to a file storage system that allows storing and retrieving files
 // by ID.
 type FileStore interface {
-	// Store a file.
+	// Store a file. In this case the MD5 is always provided.
 	StoreFile(le *logrus.Entry, p *StoreFileParams) (*FileInfo, error)
 	// Get a file by the ID of the file.
 	// Returns NoFileError if there is no file by the given ID.

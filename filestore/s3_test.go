@@ -1,32 +1,32 @@
 package filestore
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/kbase/blobstore/core/values"
-	"fmt"
-	"os"
 	"bytes"
-	"time"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/kbase/blobstore/core/values"
+	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/kbase/blobstore/test/miniocontroller"
 	"github.com/kbase/blobstore/test/testhelpers"
-	"github.com/stretchr/testify/suite"
 	"github.com/minio/minio-go"
+	"github.com/stretchr/testify/suite"
 
 	logrust "github.com/sirupsen/logrus/hooks/test"
-	
 )
 
 type TestSuite struct {
 	suite.Suite
 	minio         *miniocontroller.Controller
-	loggerhook *logrust.Hook
+	loggerhook    *logrust.Hook
 	deleteTempDir bool
 }
 
@@ -107,14 +107,14 @@ func (t *TestSuite) TestConstructFailBadBucketName() {
 	ls := b.String() + "123"
 	t.Equal(63, len(ls), "incorrect string length")
 	testcases := map[string]string{
-		"": "bucket length must be between 3 and 63 characters",
-		"  \t     ": "bucket length must be between 3 and 63 characters",
+		"":            "bucket length must be between 3 and 63 characters",
+		"  \t     ":   "bucket length must be between 3 and 63 characters",
 		"     fo    ": "bucket length must be between 3 and 63 characters",
-		ls + "a": "bucket length must be between 3 and 63 characters",
-		"-ab": "bucket must start with a letter or number",
-		"a𐤈b": "bucket contains an illegal character: 𐤈",
-		"aCb": "bucket contains an illegal character: C",
-		"a#b": "bucket contains an illegal character: #",
+		ls + "a":      "bucket length must be between 3 and 63 characters",
+		"-ab":         "bucket must start with a letter or number",
+		"a𐤈b":         "bucket contains an illegal character: 𐤈",
+		"aCb":         "bucket contains an illegal character: C",
+		"a#b":         "bucket contains an illegal character: #",
 	}
 
 	for bucket, er := range testcases {
@@ -177,7 +177,7 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
-	testhelpers.AssertCloseToNow(t.T(), stored, 2 * time.Second)
+	testhelpers.AssertCloseToNow(t.T(), stored, 2*time.Second)
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	expected := &FileInfo{
 		ID:       "myid",
@@ -185,7 +185,7 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 		Stored:   stored, // fake
 		Filename: filename,
 		Format:   format,
-		MD5:      *md5,
+		MD5:      md5,
 	}
 
 	t.Equal(expected, res, "unexpected output")
@@ -201,7 +201,7 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 		Size:     12,
 		Filename: filename,
 		Format:   format,
-		MD5:      *md5,
+		MD5:      md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
 		Stored:   stored,
 	}
@@ -212,7 +212,7 @@ func (t *TestSuite) TestStoreWithNilInput() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
-	
+
 	res, err := fstore.StoreFile(nil, &StoreFileParams{}) // DO NOT init SFP like this
 	t.Nil(res, "expected error")
 	t.Equal(errors.New("logger cannot be nil"), err, "incorrect error")
@@ -322,8 +322,8 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 
 	_, err := s3client.PutObject(&s3.PutObjectInput{
 		Bucket: &bkt,
-		Body: bytes.NewReader([]byte("012345678910")),
-		Key: &id,
+		Body:   bytes.NewReader([]byte("012345678910")),
+		Key:    &id,
 	})
 	if err != nil {
 		t.Fail(err.Error())
@@ -337,8 +337,8 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
-	testhelpers.AssertCloseToNow(t.T(), obj.Stored, 2 * time.Second)
-	
+	testhelpers.AssertCloseToNow(t.T(), obj.Stored, 2*time.Second)
+
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
@@ -349,9 +349,9 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 		Size:     12,
 		Filename: "",
 		Format:   "",
-		MD5:      *md5,
+		MD5:      md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
-		Stored:   obj.Stored, //fake
+		Stored:   obj.Stored,                              //fake
 	}
 
 	t.Equal(expected, obj, "incorrect return")
@@ -412,7 +412,6 @@ func (t *TestSuite) TestDeleteWithBlankID() {
 	t.Equal(errors.New("id cannot be empty or whitespace only"), err, "incorrect err")
 }
 
-
 func (t *TestSuite) TestDeleteFailNoBucket() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
@@ -421,16 +420,16 @@ func (t *TestSuite) TestDeleteFailNoBucket() {
 	t.minio.Clear(false)
 
 	err := fstore.DeleteFile("myid")
-	t.True(strings.HasPrefix(err.Error(), "s3 store delete: NoSuchBucket: " +
+	t.True(strings.HasPrefix(err.Error(), "s3 store delete: NoSuchBucket: "+
 		"The specified bucket does not exist\n\tstatus code: 404, request id:"),
-		"incorrect error: " + err.Error())
+		"incorrect error: "+err.Error())
 }
 
 func (t *TestSuite) TestCopyWithSlashes() {
-	t.copy("  my/myid  ",  "   my/myid3     ", "", "")
+	t.copy("  my/myid  ", "   my/myid3     ", "", "")
 }
 func (t *TestSuite) TestCopyWithMeta() {
-	t.copy("  myid"  , "   myid3   ", "fn", "json")
+	t.copy("  myid", "   myid3   ", "fn", "json")
 }
 
 func (t *TestSuite) copy(
@@ -457,16 +456,16 @@ func (t *TestSuite) copy(
 	// sometimes a 1 sec delta fails. I'm guessing that S3 returns a time that is rounded
 	// down, and so if the time is very close to the next second, at the time the test occurs
 	// it's flipped over to the next second and the test fails.
-	testhelpers.AssertCloseToNow(t.T(), fi.Stored, 2 * time.Second)
+	testhelpers.AssertCloseToNow(t.T(), fi.Stored, 2*time.Second)
 	t.True(fi.Stored.After(res.Stored), "expected copy time later than source time")
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
 	fiexpected := FileInfo{
-		ID: strings.TrimSpace(dstobj),
-		Size: 12,
-		Format: format,
+		ID:       strings.TrimSpace(dstobj),
+		Size:     12,
+		Format:   format,
 		Filename: filename,
-		MD5: *md5,
-		Stored: fi.Stored, // fake
+		MD5:      md5,
+		Stored:   fi.Stored, // fake
 	}
 	t.Equal(&fiexpected, fi, "incorrect copy result")
 
@@ -481,9 +480,9 @@ func (t *TestSuite) copy(
 		Size:     12,
 		Filename: filename,
 		Format:   format,
-		MD5:      *md5,
+		MD5:      md5,
 		Data:     ioutil.NopCloser(strings.NewReader("")), // fake
-		Stored:   fi.Stored, // fake
+		Stored:   fi.Stored,                               // fake
 	}
 	t.Equal(expected, obj, "incorrect object")
 }
@@ -526,7 +525,7 @@ func (t *TestSuite) TestCopyNonExistentFile() {
 	t.copyFail(fstore, "  myid2   ", "   myid3  ", NewNoFileError("No such ID: myid2"))
 }
 
-func (t* TestSuite) testCopyLargeObject() {
+func (t *TestSuite) testCopyLargeObject() {
 	// this takes a long time so should not be part of the regular test suite.
 	// run it manually as needed
 	largefilepath := os.Getenv("TEST_LARGE_FILE_PATH")
