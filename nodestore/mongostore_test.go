@@ -1,20 +1,21 @@
 package nodestore
 
 import (
-	"github.com/kbase/blobstore/core/values"
-	"fmt"
-	"time"
-	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson"
-	"errors"
-	"testing"
 	"context"
+	"errors"
+	"fmt"
 	"strconv"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo"
-	"github.com/kbase/blobstore/test/testhelpers"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kbase/blobstore/core/values"
 	"github.com/kbase/blobstore/test/mongocontroller"
+	"github.com/kbase/blobstore/test/testhelpers"
 	"github.com/stretchr/testify/suite"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -25,7 +26,7 @@ type TestSuite struct {
 	suite.Suite
 	mongo         *mongocontroller.Controller
 	deleteTempDir bool
-	client *mongo.Client
+	client        *mongo.Client
 }
 
 func (t *TestSuite) SetupSuite() {
@@ -36,8 +37,8 @@ func (t *TestSuite) SetupSuite() {
 
 	mongoctl, err := mongocontroller.New(mongocontroller.Params{
 		ExecutablePath: tcfg.MongoExePath,
-		UseWiredTiger: tcfg.UseWiredTiger,
-		RootTempDir: tcfg.TempDir,
+		UseWiredTiger:  tcfg.UseWiredTiger,
+		RootTempDir:    tcfg.TempDir,
 	})
 	if err != nil {
 		t.Fail(err.Error())
@@ -50,7 +51,7 @@ func (t *TestSuite) SetupSuite() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	client, err := mongo.NewClient(&copts)	
+	client, err := mongo.NewClient(&copts)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -102,7 +103,7 @@ func (t *TestSuite) TestConstructFailAddConfigIndex() {
 	// error strings are different for different versions, but have common sub strings
 	t.Contains(err.Error(), "mongo create index", "incorrect error")
 	t.Contains(err.Error(), "E11000 duplicate key error", "incorrect error")
-	t.Contains(err.Error(), testDB + ".config", "incorrect error")
+	t.Contains(err.Error(), testDB+".config", "incorrect error")
 	t.Contains(err.Error(), "schema_1", "incorrect error")
 	t.Contains(err.Error(), "dup key: { : \"schema\" }", "incorrect error")
 }
@@ -121,8 +122,8 @@ func (t *TestSuite) TestConstructFailTwoConfigDocs() {
 func (t *TestSuite) TestConstructFailBadSchemaVer() {
 	col := t.client.Database(testDB).Collection("config")
 	_, err := col.InsertOne(nil, map[string]interface{}{
-		"schema": "schema",
-		"inupdate": false,
+		"schema":    "schema",
+		"inupdate":  false,
 		"schemaver": 82})
 	t.Nil(err, "unexpected error")
 
@@ -133,8 +134,8 @@ func (t *TestSuite) TestConstructFailBadSchemaVer() {
 func (t *TestSuite) TestConstructFailInUpdate() {
 	col := t.client.Database(testDB).Collection("config")
 	_, err := col.InsertOne(nil, map[string]interface{}{
-		"schema": "schema",
-		"inupdate": true,
+		"schema":    "schema",
+		"inupdate":  true,
 		"schemaver": 1})
 	t.Nil(err, "unexpected error")
 
@@ -150,8 +151,8 @@ func (t *TestSuite) failConstruct(db *mongo.Database, expected error) {
 func (t *TestSuite) TestConstructWithPreexistingSchemaDoc() {
 	col := t.client.Database(testDB).Collection("config")
 	_, err := col.InsertOne(nil, map[string]interface{}{
-		"schema": "schema",
-		"inupdate": false,
+		"schema":    "schema",
+		"inupdate":  false,
 		"schemaver": 1})
 	t.Nil(err, "unexpected error")
 	cli, err := NewMongoNodeStore(t.client.Database(testDB))
@@ -201,13 +202,13 @@ func (t *TestSuite) TestGetUserFailBadInput() {
 }
 
 type mDup struct {
-	err error
+	err   error
 	isDup bool
 }
 
 func (t *TestSuite) TestInternalsCreateUser() {
 	// testing internals is often considered naughty
-	
+
 	// tests the case where two different concurrent processes are trying to create the same user.
 	// P1 reads the user, finds nothing.
 	// P2 reads the user, finds nothing.
@@ -229,34 +230,33 @@ func (t *TestSuite) TestInternalsIsMongoDuplicateKey() {
 	// testing internals is often considered naughty
 	tests := []mDup{
 		mDup{
-			err: errors.New("some error"),
+			err:   errors.New("some error"),
 			isDup: false},
 		mDup{
 			err: mongo.WriteException{
 				WriteConcernError: &mongo.WriteConcernError{Code: 1},
-				WriteErrors: []mongo.WriteError{mongo.WriteError{Code: 11000}},
+				WriteErrors:       []mongo.WriteError{mongo.WriteError{Code: 11000}},
 			},
 			isDup: false},
 		mDup{
 			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
 				mongo.WriteError{Code: 11000},
 				mongo.WriteError{Code: 11000},
-				},
+			},
 			},
 			isDup: false},
 		mDup{
 			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
 				mongo.WriteError{Code: 10000},
-				},
+			},
 			},
 			isDup: false},
 		mDup{
 			err: mongo.WriteException{WriteErrors: []mongo.WriteError{
 				mongo.WriteError{Code: 11000},
-				},
+			},
 			},
 			isDup: true},
-	
 	}
 	for _, d := range tests {
 		t.Equal(d.isDup, isMongoDuplicateKey(d.err), "incorrect duplicate detection")
@@ -265,7 +265,7 @@ func (t *TestSuite) TestInternalsIsMongoDuplicateKey() {
 
 func (t *TestSuite) TestStoreAndGetNodeMinimal() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	nid := uuid.New()
@@ -288,10 +288,9 @@ func (t *TestSuite) TestStoreAndGetNodeMinimal() {
 	t.Equal(nexpected, ngot, "incorrect node")
 }
 
-
 func (t *TestSuite) TestStoreAndGetNodeMaximal() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	nid := uuid.New()
@@ -314,7 +313,7 @@ func (t *TestSuite) TestStoreAndGetNodeMaximal() {
 		Public(true),
 		Reader(*r1),
 		Reader(*r2),
-		)
+	)
 	err = mns.StoreNode(n)
 	if err != nil {
 		t.Fail(err.Error())
@@ -336,13 +335,13 @@ func (t *TestSuite) TestStoreAndGetNodeMaximal() {
 		Public(true),
 		Reader(*r1),
 		Reader(*r2),
-		)
+	)
 	t.Equal(nexpected, ngot, "incorrect node")
 }
 
 func (t *TestSuite) TestFailStoreNodeFailBadInput() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	err = mns.StoreNode(nil)
@@ -351,7 +350,7 @@ func (t *TestSuite) TestFailStoreNodeFailBadInput() {
 
 func (t *TestSuite) TestStoreNodeFailWithSameID() {
 	mns, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	nid := uuid.New()
@@ -384,7 +383,7 @@ func (t *TestSuite) TestGetNodeFailNoNode() {
 	nid2 := uuid.New()
 	n2, err := mns.GetNode(nid2)
 	t.Nil(n2, "expected nil node")
-	t.Equal(NewNoNodeError("No such node " + nid2.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid2.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestDeleteNode() {
@@ -402,7 +401,7 @@ func (t *TestSuite) TestDeleteNode() {
 
 	n2, err := mns.GetNode(nid)
 	t.Nil(n2, "expected nil node")
-	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error") 
+	t.Equal(NewNoNodeError("No such node "+nid.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestDeleteNodeFailNoNode() {
@@ -416,7 +415,7 @@ func (t *TestSuite) TestDeleteNodeFailNoNode() {
 
 	nid2 := uuid.New()
 	err = mns.DeleteNode(nid2)
-	t.Equal(NewNoNodeError("No such node " + nid2.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid2.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestSetNodePublic() {
@@ -431,10 +430,10 @@ func (t *TestSuite) TestSetNodePublic() {
 
 	err = mns.SetNodePublic(nid, true)
 	t.Nil(err, "expected no error")
-	
+
 	ngot, err := mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
+
 	nexpected, _ := NewNode(
 		nid,
 		*own,
@@ -442,15 +441,15 @@ func (t *TestSuite) TestSetNodePublic() {
 		*md5,
 		ngot.GetStoredTime(),
 		Public(true),
-		)
+	)
 	t.Equal(nexpected, ngot, "incorrect node")
 
 	err = mns.SetNodePublic(nid, false)
 	t.Nil(err, "expected no error")
-	
+
 	ngot, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
+
 	nexpected, _ = NewNode(
 		nid,
 		*own,
@@ -458,7 +457,7 @@ func (t *TestSuite) TestSetNodePublic() {
 		*md5,
 		ngot.GetStoredTime(),
 		Public(false),
-		)
+	)
 	t.Equal(nexpected, ngot, "incorrect node")
 }
 
@@ -473,7 +472,7 @@ func (t *TestSuite) TestSetNodePublicFailNoNode() {
 
 	nid := uuid.New()
 	err = mns.SetNodePublic(nid, true)
-	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestAddAndRemoveReader() {
@@ -496,24 +495,24 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	t.Nil(err, "expected no error")
 
 	tme := node.GetStoredTime()
-	
+
 	expected, _ := NewNode(nid, *own, 78, *md5, tme, Reader(*r1))
 	t.Equal(expected, node, "incorrect node")
-	
+
 	err = mns.AddReader(nid, *r2)
 	t.Nil(err, "expected no error")
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
-	expected, _= NewNode(nid, *own, 78, *md5, tme,
+
+	expected, _ = NewNode(nid, *own, 78, *md5, tme,
 		Reader(*r1), Reader(*r2))
 	t.Equal(expected, node, "incorrect node")
-	
+
 	err = mns.RemoveReader(nid, *r1)
 	t.Nil(err, "expected no error")
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
+
 	expected, _ = NewNode(nid, *own, 78, *md5, tme, Reader(*r2))
 	t.Equal(expected, node, "incorrect node")
 
@@ -521,7 +520,7 @@ func (t *TestSuite) TestAddAndRemoveReader() {
 	t.Nil(err, "expected no error")
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
+
 	expected, _ = NewNode(nid, *own, 78, *md5, tme)
 	t.Equal(expected, node, "incorrect node")
 }
@@ -583,10 +582,10 @@ func (t *TestSuite) TestAddReaderTwice() {
 	t.Nil(err, "expected no error")
 
 	r, _ := NewUser(uuid.New(), "r")
-	
+
 	err = mns.AddReader(nid, *r)
 	t.Nil(err, "expected no error")
-	
+
 	node, err := mns.GetNode(nid)
 	expected, _ := NewNode(nid, *own, 78, *md5, node.GetStoredTime(),
 		Reader(*r))
@@ -645,7 +644,7 @@ func (t *TestSuite) TestAddReaderFailNoNode() {
 
 	nid := uuid.New()
 	err = mns.AddReader(nid, *own)
-	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestRemoveReaderFailNoNode() {
@@ -660,7 +659,7 @@ func (t *TestSuite) TestRemoveReaderFailNoNode() {
 
 	nid := uuid.New()
 	err = mns.RemoveReader(nid, *own)
-	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestChangeOwner() {
@@ -680,7 +679,7 @@ func (t *TestSuite) TestChangeOwner() {
 	t.Nil(err, "expected no error")
 
 	tme := node.GetStoredTime()
-	
+
 	expected, _ := NewNode(nid, *own, 78, *md5, tme)
 	t.Equal(expected, node, "incorrect node")
 
@@ -689,14 +688,14 @@ func (t *TestSuite) TestChangeOwner() {
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
 	t.Equal(expected, node, "incorrect node")
-	
+
 	// actually change the owner
 	err = mns.ChangeOwner(nid, *newown)
 	t.Nil(err, "expected no error")
 	node, err = mns.GetNode(nid)
 	t.Nil(err, "expected no error")
-	
-	expected, _= NewNode(nid, *newown, 78, *md5, tme, Reader(*own))
+
+	expected, _ = NewNode(nid, *newown, 78, *md5, tme, Reader(*own))
 	t.Equal(expected, node, "incorrect node")
 }
 
@@ -713,14 +712,14 @@ func (t *TestSuite) TestChangeOwnerFailNoNode() {
 	nid := uuid.New()
 	newown, _ := NewUser(uuid.New(), "newowner")
 	err = mns.ChangeOwner(nid, *newown)
-	t.Equal(NewNoNodeError("No such node " + nid.String()), err, "incorrect error")
+	t.Equal(NewNoNodeError("No such node "+nid.String()), err, "incorrect error")
 }
 
 func (t *TestSuite) TestCollections() {
 	// for some reason that's beyond me the mongo go client returns the collection names and
 	// the index names in the same list for mongo 2.X...
 	_, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	ctx := context.Background()
@@ -739,29 +738,29 @@ func (t *TestSuite) TestCollections() {
 		m := elem.Map()
 		names[m["name"].(string)] = struct{}{}
 	}
-	if (cur.Err() != nil) {
+	if cur.Err() != nil {
 		t.Fail(err.Error())
 	}
 	var expected map[string]struct{}
 	if t.mongo.GetIncludesIndexes() {
 		e := map[string]struct{}{
-			"system.indexes": struct{}{},
-			"users": struct{}{},
-			"users.$_id_": struct{}{},
-			"users.$user_1": struct{}{},
-			"users.$id_1": struct{}{},
-			"nodes": struct{}{},
-			"nodes.$_id_": struct{}{},
-			"nodes.$id_1": struct{}{},
-			"config": struct{}{},
-			"config.$_id_": struct{}{},
+			"system.indexes":   struct{}{},
+			"users":            struct{}{},
+			"users.$_id_":      struct{}{},
+			"users.$user_1":    struct{}{},
+			"users.$id_1":      struct{}{},
+			"nodes":            struct{}{},
+			"nodes.$_id_":      struct{}{},
+			"nodes.$id_1":      struct{}{},
+			"config":           struct{}{},
+			"config.$_id_":     struct{}{},
 			"config.$schema_1": struct{}{},
 		}
 		expected = e
 	} else {
 		e := map[string]struct{}{
-			"users": struct{}{},
-			"nodes": struct{}{},
+			"users":  struct{}{},
+			"nodes":  struct{}{},
 			"config": struct{}{},
 		}
 		expected = e
@@ -771,19 +770,19 @@ func (t *TestSuite) TestCollections() {
 
 func (t *TestSuite) TestConfigIndexes() {
 	expected := map[string]bool{
-		"_id_": false,
+		"_id_":     false,
 		"schema_1": true,
 	}
-	t.checkIndexes("config", testDB + ".config", expected)
+	t.checkIndexes("config", testDB+".config", expected)
 }
 
 func (t *TestSuite) TestUserIndexes() {
 	expected := map[string]bool{
-		"_id_": false,
+		"_id_":   false,
 		"user_1": true,
-		"id_1": true,
+		"id_1":   true,
 	}
-	t.checkIndexes("users", testDB + ".users", expected)
+	t.checkIndexes("users", testDB+".users", expected)
 }
 
 func (t *TestSuite) TestNodeIndexes() {
@@ -791,15 +790,15 @@ func (t *TestSuite) TestNodeIndexes() {
 		"_id_": false,
 		"id_1": true,
 	}
-	t.checkIndexes("nodes", testDB + ".nodes", expected)
+	t.checkIndexes("nodes", testDB+".nodes", expected)
 }
 
 func (t *TestSuite) checkIndexes(
-		collection string,
-	 	expectedNamespace string,
-	  	expectedIndexes map[string]bool) {
+	collection string,
+	expectedNamespace string,
+	expectedIndexes map[string]bool) {
 	_, err := NewMongoNodeStore(t.client.Database(testDB))
-	if (err != nil) {
+	if err != nil {
 		t.Fail(err.Error())
 	}
 	ctx := context.Background()
@@ -823,7 +822,7 @@ func (t *TestSuite) checkIndexes(
 			names[m["name"].(string)] = false
 		}
 	}
-	if (cur.Err() != nil) {
+	if cur.Err() != nil {
 		t.Fail(err.Error())
 	}
 	t.Equal(expectedIndexes, names, "incorrect indexes")

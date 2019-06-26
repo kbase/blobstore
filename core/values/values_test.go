@@ -1,10 +1,11 @@
 package values
 
 import (
-	"strings"
 	"errors"
-	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewMD5(t *testing.T) {
@@ -32,7 +33,7 @@ func TestNewMD5Fail(t *testing.T) {
 	} {
 		md5, err := NewMD5(m)
 		assert.Nil(t, md5, "expected error")
-		assert.Equal(t, errors.New(m + " is not an MD5 string"), err, "incorrect error")
+		assert.Equal(t, errors.New(m+" is not an MD5 string"), err, "incorrect error")
 	}
 }
 
