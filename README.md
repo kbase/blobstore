@@ -354,7 +354,7 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" -F "copy_data=<node id>" http://<hos
 * MongoDB 2.6+
 
 # Running the server:
-* Minio and MongoDB must be running.
+* An S3 compatible storage system and MongoDB must be running.
 * Copy `deploy.cfg.example` to `deploy.cfg` and adjust the values as necessary.
 * In the module directory:
   * `go build app/blobstore.go`
@@ -381,6 +381,7 @@ export GIT_COMMIT=$(git rev-list -1 HEAD)
     branch.
   * Update the version as per the semantic version rules in `app/blobstore.go`.
   * Tag the version in git and github.
+    * Tags must follow the Go module semantic version format, e.g. `vX.Y.Z`.
 
 ## Testing
 

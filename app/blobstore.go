@@ -1,17 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"github.com/kbase/blobstore/config"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/kbase/blobstore/service"
+	"github.com/kbase/blobstore/config"
+
 	"github.com/jessevdk/go-flags"
+	"github.com/kbase/blobstore/service"
 )
 
 // note that the contents of this file are tested manually.
@@ -20,7 +21,7 @@ const (
 	name        = "blobstore"
 	version     = "0.1.0"
 	shockname   = "Shock"
-	shockver    = "0.9.6"
+	shockver    = "0.9.6" // do not increment
 	deprecation = "The id and version fields are deprecated."
 )
 
@@ -59,10 +60,10 @@ func main() {
 		os.Exit(1)
 	}
 	server := &http.Server{
-		Addr:    cfg.Host,
-		Handler: serv,
-		ReadTimeout:    24 * time.Hour,
-		WriteTimeout:   24 * time.Hour,
+		Addr:         cfg.Host,
+		Handler:      serv,
+		ReadTimeout:  24 * time.Hour,
+		WriteTimeout: 24 * time.Hour,
 	}
 
 	// TODO BUGNASTY figure out how to abort when no more data is being sent https://groups.google.com/forum/#!topic/golang-nuts/Hmjf5Ws8g5w
