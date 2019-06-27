@@ -1,6 +1,6 @@
 [BlobstoreTest]
 
-# the path to the Minio executable to use.
+# the path to the Minio executable to use. The Minio version must be at least 2019-05-14T23-57-45Z.
 test.minio.exe=minio
 
 # the path to the MongoDB executable to use.
