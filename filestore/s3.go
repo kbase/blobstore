@@ -190,6 +190,7 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 // ** Add S3 Range Header **
 func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
+//	Range:  aws.String("bytes=" + strconv.FormatInt(*obj.ContentLength, 10) + "-"),
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
