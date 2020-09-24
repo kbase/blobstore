@@ -191,6 +191,7 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
 //	Range:  aws.String("bytes=" + strconv.FormatInt(*obj.ContentLength, 10) + "-"),
+//  Also see https://github.com/minio/minio/blob/master/cmd/httprange.go
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
