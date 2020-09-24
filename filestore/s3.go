@@ -187,15 +187,13 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 
 // GetFile Get a file by the ID of the file.
 // The user is responsible for closing the reader.
-
-// Add 2 headers to the request for offset and # of bytes 
-
-func (fs *S3FileStore) GetFile(id string, offset int, bytes int) (out *GetFileOutput, err error) {
+// ** Add S3 Range Header **
+func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
-	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id, Offset: &offset, Bytes: &bytes})
+	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:
@@ -212,8 +210,6 @@ func (fs *S3FileStore) GetFile(id string, offset int, bytes int) (out *GetFileOu
 	md5, _ := values.NewMD5(md5str)
 	return &GetFileOutput{
 			ID:       id,
-			Offset:	  offset,
-			Bytes:    bytes,
 			Size:     *res.ContentLength,
 			Filename: getMeta(res.Metadata, "Filename"),
 			Format:   getMeta(res.Metadata, "Format"),
