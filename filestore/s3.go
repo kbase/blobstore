@@ -187,11 +187,21 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 
 // GetFile Get a file by the ID of the file.
 // The user is responsible for closing the reader.
-// ** Add S3 Range Header **
+
 func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
+
+// ** Add S3 Range Header **
+// calculate position
+// input.Range = aws.String(fmt.Sprintf("bytes=%d-%d", Position, Offset))
+
+// Get particular chunk of object
+//result, err := o.Service().GetObject(input)	
+
+// Alternate Range
 //	Range:  aws.String("bytes=" + strconv.FormatInt(*obj.ContentLength, 10) + "-"),
-//  Also see https://github.com/minio/minio/blob/master/cmd/httprange.go
+
+
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
