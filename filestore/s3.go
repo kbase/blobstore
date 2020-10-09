@@ -205,7 +205,8 @@ func (fs *S3FileStore) GetFile(id string, position int, offset int) (out *GetFil
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
-	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
+	// This is where the magic happens
+	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id, Range: blobrange})
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:
