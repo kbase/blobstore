@@ -104,6 +104,8 @@ type GetFileOutput struct {
 	// The MD5 of the file. May be nil if the backend service does not provide an MD5 - for
 	// example many S3 upload methods.
 	MD5 *values.MD5
+	// The range of bits to acquire
+	Range *string
 	// The time the file was stored.
 	Stored time.Time
 	// The file's contents.
@@ -130,7 +132,7 @@ type FileStore interface {
 	StoreFile(le *logrus.Entry, p *StoreFileParams) (*FileInfo, error)
 	// Get a file by the ID of the file.
 	// Returns NoFileError if there is no file by the given ID.
-	GetFile(id string) (*GetFileOutput, error)
+	GetFile(id string, position int, offset int) (*GetFileOutput, error)
 	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
 	DeleteFile(id string) error
 	// CopyFile copies a file from one ID to another.

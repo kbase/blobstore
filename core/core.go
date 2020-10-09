@@ -243,17 +243,17 @@ func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) boo
 
 // GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
 func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
-) (data io.ReadCloser, size int64, filename string, err error) {
+) (data io.ReadCloser, size int64, filename string, position int, offset int, err error) {
 	node, err := bs.Get(user, id) // checks auth
 	if err != nil {
 		return nil, 0, "", err
 	}
-	f, err := bs.fileStore.GetFile(uuidToFilePath(id))
+	f, err := bs.fileStore.GetFile(uuidToFilePath(id),position,offset)
 	if err != nil {
 		// errors should only occur for unusual situations here since we got the node
 		return nil, 0, "", err
 	}
-	return f.Data, f.Size, node.Filename, nil
+	return f.Data, f.Size, f.Position, f.Offset, node.Filename, nil
 }
 
 // SetNodePublic sets whether a node can be read by anyone, including anonymous users.

@@ -188,15 +188,15 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 // GetFile Get a file by the ID of the file.
 // The user is responsible for closing the reader.
 
-func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
+func (fs *S3FileStore) GetFile(id string, position int, offset int) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
 
 // ** Add S3 Range Header **
 // calculate position
-// input.Range = aws.String(fmt.Sprintf("bytes=%d-%d", Position, Offset))
-
+    blobrange := aws.String(fmt.Sprintf("bytes=%d-%d", position, offset))
+// Looks like we need to add `Position, Offset` to the S3FileStore struct?
 // Get particular chunk of object
-//result, err := o.Service().GetObject(input)	
+//  result, err := o.Service().GetObject(input)	
 
 // Alternate Range
 //	Range:  aws.String("bytes=" + strconv.FormatInt(*obj.ContentLength, 10) + "-"),
@@ -225,6 +225,7 @@ func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
 			Size:     *res.ContentLength,
 			Filename: getMeta(res.Metadata, "Filename"),
 			Format:   getMeta(res.Metadata, "Format"),
+			Range:    blobrange,
 			MD5:      md5,
 			Data:     res.Body,
 			Stored:   res.LastModified.UTC(),
