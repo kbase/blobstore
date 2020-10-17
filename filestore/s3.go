@@ -191,14 +191,14 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 func (fs *S3FileStore) GetFile(id string, position int, offset int) (out *GetFileOutput, err error) {
 	id = strings.TrimSpace(id)
 
-// ** Add S3 Range Header **
+// ** Add S3 range headers here **
 // calculate position
     blobrange := aws.String(fmt.Sprintf("bytes=%d-%d", position, offset))
 // Looks like we need to add `Position, Offset` to the S3FileStore struct?
 // Get particular chunk of object
 //  result, err := o.Service().GetObject(input)	
 
-// Alternate Range
+// Alternate
 //	Range:  aws.String("bytes=" + strconv.FormatInt(*obj.ContentLength, 10) + "-"),
 
 
