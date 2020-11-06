@@ -244,14 +244,14 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 	}
 	testcases := []testcase{
 		testcase{
-			"https://ci.kbase.us/services",
+			"https://httpbin.org/status/404",
 			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
 			[]string{
-				"<html>",
-				"<head><title>404 Not Found</title></head>",
-				"<center><h1>404 Not Found</h1></center>",
+				"<!DOCTYPE HTML",
+				"<title>404 Not Found</title>",
+				"<p>The requested URL was not found on the server.",
 			},
-			169,
+			233,
 		},
 		testcase{
 			"https://en.wikipedia.org/wiki/1944_Birthday_Honours",
@@ -366,14 +366,14 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 	}
 	testcases := []testcase{
 		testcase{
-			"https://ci.kbase.us/services",
+			"https://httpbin.org/status/404",
 			"kbase auth: Non-JSON response from KBase auth server, status code: 404",
 			[]string{
-				"<html>",
-				"<head><title>404 Not Found</title></head>",
-				"<center><h1>404 Not Found</h1></center>",
+				"<!DOCTYPE HTML",
+				"<title>404 Not Found</title>",
+				"<p>The requested URL was not found on the server.",
 			},
-			169,
+			233,
 		},
 		testcase{
 			"https://en.wikipedia.org/wiki/1944_Birthday_Honours",
