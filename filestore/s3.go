@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -186,13 +187,33 @@ func (fs *S3FileStore) getFileInfo(id string, strictMD5 bool) (*FileInfo, error)
 }
 
 // GetFile Get a file by the ID of the file.
+// seek and length determine the byte range of the file returned.
+// Passing 0 for length implies the remainder of the file should be returned.
+// seeking beyond the file length will return an error, but requesting a file longer than the
+// actual length is accepted and will return the remainder of the file.
 // The user is responsible for closing the reader.
-func (fs *S3FileStore) GetFile(id string) (out *GetFileOutput, err error) {
+func (fs *S3FileStore) GetFile(
+	id string,
+	seek uint64,
+	length uint64,
+) (out *GetFileOutput, err error) {
+	// might want to consider a struct for input values
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, errors.New("id cannot be empty or whitespace only")
 	}
-	res, err := fs.s3client.GetObject(&s3.GetObjectInput{Bucket: &fs.bucket, Key: &id})
+	var endpos string
+	if length == 0 {
+		endpos = ""
+	} else {
+		endpos = strconv.FormatUint(seek+length-1, 10)
+	}
+	rnge := fmt.Sprintf("bytes=%d-%s", seek, endpos)
+	res, err := fs.s3client.GetObject(&s3.GetObjectInput{
+		Bucket: &fs.bucket,
+		Key:    &id,
+		Range:  &rnge,
+	})
 	if err != nil {
 		switch err.(awserr.Error).Code() {
 		case s3.ErrCodeNoSuchKey:

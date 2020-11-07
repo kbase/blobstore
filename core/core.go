@@ -28,7 +28,7 @@ type User struct {
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID
-	Size     int64
+	Size     int64 // TODO make this an unsigned int
 	MD5      values.MD5
 	Stored   time.Time
 	Filename string
@@ -245,10 +245,11 @@ func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) boo
 func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
 ) (data io.ReadCloser, size int64, filename string, err error) {
 	node, err := bs.Get(user, id) // checks auth
+	// TODO check seek + length <= node.Size
 	if err != nil {
 		return nil, 0, "", err
 	}
-	f, err := bs.fileStore.GetFile(uuidToFilePath(id))
+	f, err := bs.fileStore.GetFile(uuidToFilePath(id), 0, 0)
 	if err != nil {
 		// errors should only occur for unusual situations here since we got the node
 		return nil, 0, "", err
