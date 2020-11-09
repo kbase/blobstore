@@ -3,6 +3,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -242,14 +243,21 @@ func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) boo
 }
 
 // GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
-func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
+// seek and length determine the byte range of the file returned.
+// Passing 0 for length implies the remainder of the file should be returned.
+// seeking beyond the file length will return an error, but requesting a file longer than the
+// actual length is accepted and will return the remainder of the file.
+func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID, seek uint64, length uint64,
 ) (data io.ReadCloser, size int64, filename string, err error) {
 	node, err := bs.Get(user, id) // checks auth
-	// TODO check seek + length <= node.Size
 	if err != nil {
 		return nil, 0, "", err
 	}
-	f, err := bs.fileStore.GetFile(uuidToFilePath(id), 0, 0)
+	if seek >= uint64(node.Size) {
+		return nil, 0, "", values.NewIllegalInputError(
+			fmt.Sprintf("seek value of %d is larger than the file", seek))
+	}
+	f, err := bs.fileStore.GetFile(uuidToFilePath(id), seek, length)
 	if err != nil {
 		// errors should only occur for unusual situations here since we got the node
 		return nil, 0, "", err
