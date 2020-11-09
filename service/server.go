@@ -510,7 +510,7 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	user := getUser(r)
 	download := download(r.URL)
 	if download != "" {
-		datareader, size, filename, err := s.store.GetFile(user, *id)
+		datareader, size, filename, err := s.store.GetFile(user, *id, 0, 0)
 		if err != nil {
 			writeError(le, err, w)
 			return
