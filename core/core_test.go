@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const U0 = uint64(0)
+
 func TestNoBlobError(t *testing.T) {
 	e := NewNoBlobError("some error")
 	assert.Equal(t, "some error", e.Error(), "incorrect error")
@@ -580,7 +582,7 @@ func TestGetFileAsOwner(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -621,7 +623,7 @@ func TestGetFileAsReader(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -662,7 +664,7 @@ func TestGetFileAsAdmin(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -705,7 +707,7 @@ func TestGetFilePublic(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
 	rd, size, filename, err := bs.GetFile(auser, uid)
 	assert.Nil(t, err, "unexpected error")
@@ -774,7 +776,7 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(
 		nil, errors.New("whoopsie"))
 
 	rd, size, filename, err := bs.GetFile(auser, nid)

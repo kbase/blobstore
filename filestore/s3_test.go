@@ -153,13 +153,43 @@ func (t *TestSuite) TestConstructWithExistingBucket() {
 }
 
 func (t *TestSuite) TestStoreAndGet() {
-	t.storeAndGet("", "")
+	t.storeAndGet("", "", 0, 0, "012345678910")
 }
 func (t *TestSuite) TestStoreAndGetWithMeta() {
-	t.storeAndGet("fn", "json")
+	t.storeAndGet("fn", "json", 0, 0, "012345678910")
 }
 
-func (t *TestSuite) storeAndGet(filename string, format string) {
+func (t *TestSuite) TestStoreAndGetWithSeek() {
+	t.storeAndGet("", "", 3, 0, "345678910")
+}
+
+func (t *TestSuite) TestStoreAndGetWithExactSeek() {
+	t.storeAndGet("", "", 11, 0, "0")
+}
+
+func (t *TestSuite) TestStoreAndGetWithLength() {
+	t.storeAndGet("", "", 0, 8, "01234567")
+}
+
+func (t *TestSuite) TestStoreAndGetWithSeekAndLength() {
+	t.storeAndGet("", "", 1, 5, "12345")
+}
+
+func (t *TestSuite) TestStoreAndGetWithSeekAndExactLength() {
+	t.storeAndGet("", "", 1, 11, "12345678910")
+}
+
+func (t *TestSuite) TestStoreAndGetWithSeekAndExcessLength() {
+	t.storeAndGet("", "", 1, 15, "12345678910")
+}
+
+func (t *TestSuite) storeAndGet(
+	filename string,
+	format string,
+	seek uint64,
+	length uint64,
+	expectedfile string,
+) {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
@@ -190,15 +220,15 @@ func (t *TestSuite) storeAndGet(filename string, format string) {
 
 	t.Equal(expected, res, "unexpected output")
 
-	obj, _ := fstore.GetFile("  myid   ")
+	obj, _ := fstore.GetFile("  myid   ", seek, length)
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
-	t.Equal("012345678910", string(b), "incorrect object contents")
+	t.Equal(expectedfile, string(b), "incorrect object contents")
 	obj.Data = ioutil.NopCloser(strings.NewReader("")) // fake
 
 	expected2 := &GetFileOutput{
 		ID:       "myid",
-		Size:     12,
+		Size:     int64(len(expectedfile)),
 		Filename: filename,
 		Format:   format,
 		MD5:      md5,
@@ -280,7 +310,7 @@ func (t *TestSuite) TestGetWithBlankID() {
 	mclient, _ := t.minio.CreateMinioClient()
 	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
 
-	res, err := fstore.GetFile("")
+	res, err := fstore.GetFile("", 0, 0)
 	if res != nil {
 		t.Fail("returned object is not null")
 	}
@@ -304,11 +334,35 @@ func (t *TestSuite) TestGetWithNonexistentID() {
 }
 
 func (t *TestSuite) assertNoFile(fstore FileStore, id string) {
-	res, err := fstore.GetFile(id)
+	res, err := fstore.GetFile(id, 0, 0)
 	if res != nil {
 		t.Fail("returned object is not null")
 	}
 	t.Equal(NewNoFileError("No such id: "+strings.TrimSpace(id)), err, "incorrect err")
+}
+
+func (t *TestSuite) TestGetWithExcessSeek() {
+	s3client := t.minio.CreateS3Client()
+	mclient, _ := t.minio.CreateMinioClient()
+	fstore, _ := NewS3FileStore(s3client, mclient, "mybucket")
+	p, _ := NewStoreFileParams(
+		"myid",
+		12,
+		strings.NewReader("012345678910"),
+	)
+	_, err := fstore.StoreFile(logrus.WithField("a", "b"), p)
+	if err != nil {
+		t.Fail(err.Error())
+	}
+	res, err := fstore.GetFile("myid", 12, 0)
+	if res != nil {
+		t.Fail("returned object is not null")
+	}
+	t.True(strings.HasPrefix(
+		err.Error(),
+		"s3 store get: InvalidRange: The requested range is not satisfiable\n\tstatus " +
+		"code: 416, request id: "),
+		"incorrect error: "+err.Error())
 }
 
 func (t *TestSuite) TestGetWithoutMetaData() {
@@ -329,7 +383,7 @@ func (t *TestSuite) TestGetWithoutMetaData() {
 		t.Fail(err.Error())
 	}
 
-	obj, err := fstore.GetFile(id)
+	obj, err := fstore.GetFile(id, 0 , 0)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -394,7 +448,7 @@ func (t *TestSuite) TestDeleteObjectWrongID() {
 	if err != nil {
 		t.Fail(err.Error())
 	}
-	obj, err := fstore.GetFile("  myid   ")
+	obj, err := fstore.GetFile("  myid   ", 0, 0)
 	if err != nil {
 		t.Fail(err.Error())
 	}
@@ -469,7 +523,7 @@ func (t *TestSuite) copy(
 	}
 	t.Equal(&fiexpected, fi, "incorrect copy result")
 
-	obj, _ := fstore.GetFile(dstobj)
+	obj, _ := fstore.GetFile(dstobj, 0, 0)
 	defer obj.Data.Close()
 	b, _ := ioutil.ReadAll(obj.Data)
 	t.Equal("012345678910", string(b), "incorrect object contents")
@@ -558,7 +612,7 @@ func (t *TestSuite) testCopyLargeObject() {
 	fmt.Printf("%v\n", finfo)
 	fmt.Printf("Copy took %s\n", time.Since(stored))
 	copied := time.Now()
-	res, err := fstore.GetFile("myid2")
+	res, err := fstore.GetFile("myid2", 0, 0)
 	if err != nil {
 		t.Fail(err.Error())
 	}
