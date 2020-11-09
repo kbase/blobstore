@@ -242,11 +242,12 @@ func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) boo
 	return false
 }
 
-// GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
+// GetFile gets the file from a node.
 // seek and length determine the byte range of the file returned.
 // Passing 0 for length implies the remainder of the file should be returned.
 // seeking beyond the file length will return an error, but requesting a file longer than the
 // actual length is accepted and will return the remainder of the file.
+// Returns NoBlobError, UnauthorizedError, and IllegalInputError.
 func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID, seek uint64, length uint64,
 ) (data io.ReadCloser, size int64, filename string, err error) {
 	node, err := bs.Get(user, id) // checks auth
