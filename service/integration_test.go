@@ -532,10 +532,12 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 	path := "/node/" + id
 	t.checkNode(id, &t.stdRole, 378, expected)
 	dl := fmt.Sprintf("?download&seek=2&length=5")
+	dlnolen := fmt.Sprintf("?download&seek=6")
 	dlr := fmt.Sprintf("?download_raw&seek=7&length=100")
 	noopdl := fmt.Sprintf("?download&seek=0&length=0")
-	dlrlen := fmt.Sprintf("?download_raw&seek=0&length=7")
+	dlrlen := fmt.Sprintf("?download_raw&length=7")
 	t.checkFile(t.url+path+dl, path, &t.stdRole, 5, id, []byte("obarb"))
+	t.checkFile(t.url+path+dlnolen, path, &t.stdRole, 3, id, []byte("baz"))
 	t.checkFile(t.url+path+dlr, path, &t.stdRole, 2, "", []byte("az"))
 	t.checkNode(id, &t.kBaseAdmin, 378, expected)
 	t.checkFile(t.url+path+noopdl, path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
