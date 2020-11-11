@@ -510,7 +510,12 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	user := getUser(r)
 	download := download(r.URL)
 	if download != "" {
-		datareader, size, filename, err := s.store.GetFile(user, *id, 0, 0)
+		seek, length, err := getSeekAndLengthFromQuery(r.URL)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
+		datareader, size, filename, err := s.store.GetFile(user, *id, seek, length)
 		if err != nil {
 			writeError(le, err, w)
 			return
@@ -533,6 +538,30 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		}
 		writeNode(w, node)
 	}
+}
+
+func getSeekAndLengthFromQuery(u *url.URL) (uint64, uint64, error) {
+	seek, err := getUint64FromQuery(u, "seek")
+	if err != nil {
+		return 0, 0, err
+	}
+	length, err := getUint64FromQuery(u, "length")
+	if err != nil {
+		return 0, 0, err
+	}
+	return seek, length, nil
+}
+
+// returns the value of the first instance in the url and ignores any others
+func getUint64FromQuery(u *url.URL, param string) (uint64, error) {
+	if val, ok := u.Query()[param]; ok {
+		if paramint, err := strconv.ParseUint(val[0], 10, 64); err == nil {
+			return paramint, nil
+		}
+		return 0, values.NewIllegalInputError(fmt.Sprintf(
+			"Cannot parse %s param %s to non-negative integer", param, val[0]))
+	}
+	return 0, nil
 }
 
 func download(u *url.URL) string {
