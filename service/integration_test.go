@@ -502,7 +502,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlash() {
+func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekAndGet() {
 	body := t.req("POST", t.url+"/node/?format=JSON", strings.NewReader("foobarbaz"),
 		"oauth "+t.noRole.token, 378, 200)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
@@ -531,11 +531,17 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlash() {
 	}
 	path := "/node/" + id
 	t.checkNode(id, &t.stdRole, 378, expected)
-	t.checkFile(t.url+path+"?download", path, &t.stdRole, 9, id, []byte("foobarbaz"))
-	t.checkFile(t.url+path+"?download_raw", path, &t.stdRole, 9, "", []byte("foobarbaz"))
+	dl := fmt.Sprintf("?download&seek=2&length=5")
+	dlnolen := fmt.Sprintf("?download&seek=6")
+	dlr := fmt.Sprintf("?download_raw&seek=7&length=100")
+	noopdl := fmt.Sprintf("?download&seek=0&length=0")
+	dlrlen := fmt.Sprintf("?download_raw&length=7")
+	t.checkFile(t.url+path+dl, path, &t.stdRole, 5, id, []byte("obarb"))
+	t.checkFile(t.url+path+dlnolen, path, &t.stdRole, 3, id, []byte("baz"))
+	t.checkFile(t.url+path+dlr, path, &t.stdRole, 2, "", []byte("az"))
 	t.checkNode(id, &t.kBaseAdmin, 378, expected)
-	t.checkFile(t.url+path+"?download", path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
-	t.checkFile(t.url+path+"?download_raw", path, &t.kBaseAdmin, 9, "", []byte("foobarbaz"))
+	t.checkFile(t.url+path+noopdl, path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
+	t.checkFile(t.url+path+dlrlen, path, &t.kBaseAdmin, 7, "", []byte("foobarb"))
 }
 
 func (t *TestSuite) TestStoreMIMEMultipartFilenameFormat() {
@@ -881,7 +887,12 @@ func (t *TestSuite) requestToJSON(req *http.Request, contentLength int64, status
 	return body
 }
 
-func (t *TestSuite) checkFile(url string, path string, user *User, size int64, filename string,
+func (t *TestSuite) checkFile(
+	url string,
+	path string,
+	user *User,
+	size int64,
+	filename string,
 	expected []byte) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	t.Nil(err, "unexpected error")
@@ -1051,6 +1062,45 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	t.checkError(nodeb4, 401, "User Unauthorized")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
 		"User Unauthorized", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestGetNodeFailSeekAndLength() {
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"OAuth "+t.kBaseAdmin.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.kBaseAdmin.user,
+		"request complete", mtmap(), false},
+	)
+
+	nodeb := t.get(t.url+"/node/"+id+"?download&seek=9", &t.kBaseAdmin, 100, 400)
+	t.checkError(nodeb, 400, "seek value of 9 is larger than the file")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
+		"seek value of 9 is larger than the file", mtmap(), false},
+	)
+
+	nodeb2 := t.get(t.url+"/node/"+id+"?download&seek=-1", &t.kBaseAdmin, 111, 400)
+	t.checkError(nodeb2, 400, "Cannot parse seek param -1 to non-negative integer")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
+		"Cannot parse seek param -1 to non-negative integer", mtmap(), false},
+	)
+
+	nodeb3 := t.get(t.url+"/node/"+id+"?download&length=-1", &t.kBaseAdmin, 113, 400)
+	t.checkError(nodeb3, 400, "Cannot parse length param -1 to non-negative integer")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
+		"Cannot parse length param -1 to non-negative integer", mtmap(), false},
+	)
+
+	nodeb4 := t.get(t.url+"/node/"+id+"?download&seek=forty-two", &t.kBaseAdmin, 118, 400)
+	t.checkError(nodeb4, 400, "Cannot parse seek param forty-two to non-negative integer")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
+		"Cannot parse seek param forty-two to non-negative integer", mtmap(), false},
+	)
+
+	nodeb5 := t.get(t.url+"/node/"+id+"?download&length=totallyanumber", &t.kBaseAdmin, 125, 400)
+	t.checkError(nodeb5, 400, "Cannot parse length param totallyanumber to non-negative integer")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
+		"Cannot parse length param totallyanumber to non-negative integer", mtmap(), false},
 	)
 }
 

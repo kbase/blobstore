@@ -29,7 +29,7 @@ type User struct {
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID
-	Size     int64 // TODO make this an unsigned int
+	Size     int64 // ideally uint64, but ContentLength in http req is int64, so pointless
 	MD5      values.MD5
 	Stored   time.Time
 	Filename string
