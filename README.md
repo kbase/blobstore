@@ -171,13 +171,20 @@ RETURNS: an ACL.
 ## Download a file from a node
 ```
 AUTHORIZATION OPTIONAL
-GET /node/<id>?download[_raw]
+GET /node/<id>?download[_raw][&seek=#][&length=#]
 
 RETURNS: the file content.
 ```
 
 `?download_raw`, as opposed to `?download`, causes the `Content-Disposition` header to be
 omitted.
+
+`seek` causes the first `#` bytes of the file to be skipped. A `seek` value greater than or equal
+to the file size is an error. Defaults to 0.
+
+`length` determines the number of bytes of the file to return after skipping `seek` bytes.
+`length` may be greater than the remaining file length. Defaults to 0, which indicates that the
+remainder of the file should be returned.
 
 ## Set a node to be publicly readable
 ```

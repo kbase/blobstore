@@ -502,7 +502,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
-func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekAndGet() {
+func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekAndLength() {
 	body := t.req("POST", t.url+"/node/?format=JSON", strings.NewReader("foobarbaz"),
 		"oauth "+t.noRole.token, 378, 200)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
