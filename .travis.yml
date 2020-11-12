@@ -5,8 +5,8 @@ go: "1.12"
 
 env: 
   - MONGODB_VER=mongodb-linux-x86_64-2.6.12 MINIO=2019-05-23T00-29-34Z WIRED_TIGER=false
-  - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-05-23T00-29-34Z WIRED_TIGER=false
-  - MONGODB_VER=mongodb-linux-x86_64-3.6.8  MINIO=2019-05-23T00-29-34Z WIRED_TIGER=true
+  - MONGODB_VER=mongodb-linux-x86_64-3.6.20  MINIO=2019-05-23T00-29-34Z WIRED_TIGER=false
+  - MONGODB_VER=mongodb-linux-x86_64-3.6.20 MINIO=2019-05-23T00-29-34Z WIRED_TIGER=true
 
 install: true
 

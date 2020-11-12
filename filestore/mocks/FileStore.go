@@ -48,13 +48,13 @@ func (_m *FileStore) DeleteFile(id string) error {
 	return r0
 }
 
-// GetFile provides a mock function with given fields: id
-func (_m *FileStore) GetFile(id string) (*filestore.GetFileOutput, error) {
-	ret := _m.Called(id)
+// GetFile provides a mock function with given fields: id, seek, length
+func (_m *FileStore) GetFile(id string, seek uint64, length uint64) (*filestore.GetFileOutput, error) {
+	ret := _m.Called(id, seek, length)
 
 	var r0 *filestore.GetFileOutput
-	if rf, ok := ret.Get(0).(func(string) *filestore.GetFileOutput); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(string, uint64, uint64) *filestore.GetFileOutput); ok {
+		r0 = rf(id, seek, length)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*filestore.GetFileOutput)
@@ -62,8 +62,8 @@ func (_m *FileStore) GetFile(id string) (*filestore.GetFileOutput, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(id)
+	if rf, ok := ret.Get(1).(func(string, uint64, uint64) error); ok {
+		r1 = rf(id, seek, length)
 	} else {
 		r1 = ret.Error(1)
 	}

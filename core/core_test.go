@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const U0 = uint64(0)
+
 func TestNoBlobError(t *testing.T) {
 	e := NewNoBlobError("some error")
 	assert.Equal(t, "some error", e.Error(), "incorrect error")
@@ -580,16 +582,17 @@ func TestGetFileAsOwner(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
-	rd, size, filename, err := bs.GetFile(auser, uid)
+	rd, size, filename, err := bs.GetFile(auser, uid, 0, 0)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
 	assert.Equal(t, "a_file", filename, "incorrect filename")
 	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
 }
 
-func TestGetFileAsReader(t *testing.T) {
+func TestGetFileAsReaderWithSeekAndLength(t *testing.T) {
+	// tests that seek and length are properly passed through
 	fsmock := new(fsmocks.FileStore)
 	nsmock := new(nsmocks.NodeStore)
 
@@ -606,7 +609,7 @@ func TestGetFileAsReader(t *testing.T) {
 
 	tme := time.Now()
 	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
-	node, _ := nodestore.NewNode(uid, *nuser, 12, *md5, tme,
+	node, _ := nodestore.NewNode(uid, *nuser, 1000000007, *md5, tme,
 		nodestore.Reader(*ouser), nodestore.Reader(*ruser), nodestore.FileName(""))
 
 	nsmock.On("GetNode", uid).Return(node, nil)
@@ -621,9 +624,14 @@ func TestGetFileAsReader(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On(
+		"GetFile",
+		"f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d",
+		uint64(1000000006),
+		uint64(5000000000),
+	).Return(&gfo, nil)
 
-	rd, size, filename, err := bs.GetFile(auser, uid)
+	rd, size, filename, err := bs.GetFile(auser, uid, 1000000006, 5000000000)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
 	assert.Equal(t, "", filename, "incorrect filename")
@@ -662,9 +670,9 @@ func TestGetFileAsAdmin(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
-	rd, size, filename, err := bs.GetFile(auser, uid)
+	rd, size, filename, err := bs.GetFile(auser, uid, 0, 0)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
 	assert.Equal(t, "bfile", filename, "incorrect filename")
@@ -705,15 +713,15 @@ func TestGetFilePublic(t *testing.T) {
 		Stored:   time.Now(),
 		Data:     ioutil.NopCloser(strings.NewReader("012345678")),
 	}
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(&gfo, nil)
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(&gfo, nil)
 
-	rd, size, filename, err := bs.GetFile(auser, uid)
+	rd, size, filename, err := bs.GetFile(auser, uid, 0, 0)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
 	assert.Equal(t, "bfile", filename, "incorrect filename")
 	assert.Equal(t, rd, ioutil.NopCloser(strings.NewReader("012345678")), "incorrect data")
 
-	rd, size, filename, err = bs.GetFile(nil, uid)
+	rd, size, filename, err = bs.GetFile(nil, uid, 0, 0)
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, int64(9), size, "incorrect size")
 	assert.Equal(t, "bfile", filename, "incorrect filename")
@@ -742,17 +750,44 @@ func TestGetFileUnauthorized(t *testing.T) {
 
 	nsmock.On("GetNode", uid).Return(node, nil)
 
-	rd, size, filename, err := bs.GetFile(auser, uid)
+	rd, size, filename, err := bs.GetFile(auser, uid, 0, 0)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
 	assert.Equal(t, "", filename, "incorrect filename")
 	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
 
-	rd, size, filename, err = bs.GetFile(nil, uid)
+	rd, size, filename, err = bs.GetFile(nil, uid, 0, 0)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
 	assert.Equal(t, "", filename, "incorrect filename")
 	assert.Equal(t, NewUnauthorizedError("Unauthorized"), err, "incorrect error")
+}
+
+func TestGetFileFailLargeSeek(t *testing.T) {
+	fsmock := new(fsmocks.FileStore)
+	nsmock := new(nsmocks.NodeStore)
+
+	bs := New(fsmock, nsmock)
+
+	auser, _ := auth.NewUser("un", false)
+
+	nuser, _ := nodestore.NewUser(uuid.New(), "un")
+
+	nsmock.On("GetUser", "un").Return(nuser, nil)
+
+	nid, _ := uuid.Parse("f6029a11-0914-42b3-beea-fed420f75d7d")
+	tme := time.Now()
+	md5, _ := values.NewMD5("5d838d477ddf355fc15df1db90bee0aa")
+	node, _ := nodestore.NewNode(nid, *nuser, 12, *md5, tme, nodestore.FileName("foo"))
+
+	nsmock.On("GetNode", nid).Return(node, nil)
+
+	rd, size, filename, err := bs.GetFile(auser, nid, 12, 0)
+	assert.Equal(t, int64(0), size, "expected error")
+	assert.Equal(t, rd, nil, "expected error")
+	assert.Equal(t, "", filename, "incorrect filename")
+	assert.Equal(t, values.NewIllegalInputError(
+		"seek value of 12 is larger than the file"), err, "incorrect error")
 }
 
 func TestGetFileFailGetFromStorage(t *testing.T) {
@@ -774,10 +809,10 @@ func TestGetFileFailGetFromStorage(t *testing.T) {
 
 	nsmock.On("GetNode", nid).Return(node, nil)
 
-	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d").Return(
+	fsmock.On("GetFile", "f6/02/9a/f6029a11-0914-42b3-beea-fed420f75d7d", U0, U0).Return(
 		nil, errors.New("whoopsie"))
 
-	rd, size, filename, err := bs.GetFile(auser, nid)
+	rd, size, filename, err := bs.GetFile(auser, nid, 0, 0)
 	assert.Equal(t, int64(0), size, "expected error")
 	assert.Equal(t, rd, nil, "expected error")
 	assert.Equal(t, "", filename, "incorrect filename")

@@ -3,6 +3,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -28,7 +29,7 @@ type User struct {
 // BlobNode contains basic information about a blob stored in the blobstore.
 type BlobNode struct {
 	ID       uuid.UUID
-	Size     int64
+	Size     int64 // ideally uint64, but ContentLength in http req is int64, so pointless
 	MD5      values.MD5
 	Stored   time.Time
 	Filename string
@@ -241,14 +242,23 @@ func authok(user *auth.User, nodeuser *nodestore.User, node *nodestore.Node) boo
 	return false
 }
 
-// GetFile gets the file from a node. Returns NoBlobError and UnauthorizedError.
-func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID,
+// GetFile gets the file from a node.
+// seek and length determine the byte range of the file returned.
+// Passing 0 for length implies the remainder of the file should be returned.
+// seeking beyond the file length will return an error, but requesting a file longer than the
+// actual length is accepted and will return the remainder of the file.
+// Returns NoBlobError, UnauthorizedError, and IllegalInputError.
+func (bs *BlobStore) GetFile(user *auth.User, id uuid.UUID, seek uint64, length uint64,
 ) (data io.ReadCloser, size int64, filename string, err error) {
 	node, err := bs.Get(user, id) // checks auth
 	if err != nil {
 		return nil, 0, "", err
 	}
-	f, err := bs.fileStore.GetFile(uuidToFilePath(id))
+	if seek >= uint64(node.Size) {
+		return nil, 0, "", values.NewIllegalInputError(
+			fmt.Sprintf("seek value of %d is larger than the file", seek))
+	}
+	f, err := bs.fileStore.GetFile(uuidToFilePath(id), seek, length)
 	if err != nil {
 		// errors should only occur for unusual situations here since we got the node
 		return nil, 0, "", err

@@ -129,8 +129,12 @@ type FileStore interface {
 	// Store a file. In this case the MD5 is always provided.
 	StoreFile(le *logrus.Entry, p *StoreFileParams) (*FileInfo, error)
 	// Get a file by the ID of the file.
+	// seek and length determine the byte range of the file returned.
+	// Passing 0 for length implies the remainder of the file should be returned.
+	// seeking beyond the file length will return an error, but requesting a file longer than the
+	// actual length is accepted and will return the remainder of the file.
 	// Returns NoFileError if there is no file by the given ID.
-	GetFile(id string) (*GetFileOutput, error)
+	GetFile(id string, seek uint64, length uint64) (*GetFileOutput, error)
 	// DeleteFile deletes a file. Deleting a file that does not exist is not an error.
 	DeleteFile(id string) error
 	// CopyFile copies a file from one ID to another.
