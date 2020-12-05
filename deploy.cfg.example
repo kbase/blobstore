@@ -20,7 +20,7 @@ s3-bucket = blobstore
 s3-access-key = [access key goes here]
 s3-access-secret = [access secret goes here]
 s3-region = us-west-1
-# Use plaintext to talk to destination S3.  Default false.
+# Use plaintext to talk to destination S3.  Default false. (false is not tested)
 #s3-disable-ssl = false
 # Disable verifying the destination S3 SSL cert (e.g. for self-signed certs).  Default false.
 #s3-disable-ssl-verify = false
