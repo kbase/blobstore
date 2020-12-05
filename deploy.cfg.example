@@ -21,6 +21,7 @@ s3-access-key = [access key goes here]
 s3-access-secret = [access secret goes here]
 s3-region = us-west-1
 #s3-disable-ssl = false
+#s3-disable-ssl-verify = false
 
 # KBase auth server parameters.
 # The root url of the auth server.
