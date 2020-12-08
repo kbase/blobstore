@@ -33,6 +33,7 @@ type S3FileStore struct {
 	s3client    *s3.S3
 	minioClient *minio.Client
 	bucket      string
+	disableSSLverify	bool
 }
 
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
@@ -44,6 +45,7 @@ func NewS3FileStore(
 	s3client *s3.S3,
 	minioClient *minio.Client,
 	bucket string,
+	disableSSLverify bool,
 ) (*S3FileStore, error) {
 
 	if s3client == nil {
@@ -62,7 +64,7 @@ func NewS3FileStore(
 		// Ignore for now.
 		return nil, err
 	}
-	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket}, nil
+	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket, disableSSLverify: disableSSLverify}, nil
 }
 
 func checkBucketName(bucket string) (string, error) {
