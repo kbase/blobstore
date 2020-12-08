@@ -74,13 +74,8 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
 
 	minioClient, err := minio.NewWithRegion(
-		cfg.S3Host,
-		&minio.Options{
-			Creds: creds,
-			Secure: !cfg.S3DisableSSL,
-			Region: cfg.S3Region,
-			Transport: customTransport,
-		} )
+		cfg.S3Host, cfg.S3AccessKey, cfg.S3AccessSecret, !cfg.S3DisableSSL, cfg.S3Region)
+        minioClient.SetCustomTransport(customTransport)
 	
 	if err != nil {
 		return nil, err
