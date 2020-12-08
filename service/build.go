@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 
@@ -22,6 +23,8 @@ import (
 	authcache "github.com/kbase/blobstore/auth/cache"
 	"github.com/kbase/blobstore/config"
 	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/pkg/credentials"
+
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -58,6 +61,12 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 
 	sess := session.Must(session.NewSession())
 	creds := credentials.NewStaticCredentials(cfg.S3AccessKey, cfg.S3AccessSecret, "")
+
+	// need a custom transport to support not verifying SSL cert
+	customTransport := &http.Transport{
+	    TLSClientConfig: &tls.Config{InsecureSkipVerify: &cfg.S3DisableSSLVerify}
+        }
+
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
 		Endpoint:         &cfg.S3Host,
@@ -66,7 +75,14 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
 
 	minioClient, err := minio.NewWithRegion(
-		cfg.S3Host, cfg.S3AccessKey, cfg.S3AccessSecret, !cfg.S3DisableSSL, cfg.S3Region)
+		cfg.S3Host,
+		&minio.Options{
+			Creds: credentialsNewStaticV4(cfg.S3AccessKey, cfg.S3AccessSecret, ""),
+			Secure: !cfg.S3DisableSSL,
+			Region: cfg.S3Region,
+			Transport: customTransport
+		} )
+	
 	if err != nil {
 		return nil, err
 	}
