@@ -76,7 +76,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 	minioClient, err := minio.NewWithRegion(
 		cfg.S3Host,
 		&minio.Options{
-			Creds: credentialsNewStaticV4(cfg.S3AccessKey, cfg.S3AccessSecret, ""),
+			Creds: creds,
 			Secure: !cfg.S3DisableSSL,
 			Region: cfg.S3Region,
 			Transport: customTransport,
