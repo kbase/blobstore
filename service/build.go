@@ -73,7 +73,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 		Endpoint:         &cfg.S3Host,
 		Region:           &cfg.S3Region,
 		DisableSSL:       &cfg.S3DisableSSL,
-		HTTPClient: customHTTPClient,
+		HTTPClient:       customHTTPClient,
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
 
 	minioClient, err := minio.NewWithRegion(
