@@ -66,12 +66,14 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 	customTransport := &http.Transport{
 	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
+	customHTTPClient := &http.Client{Transport: customTransport}
 
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
 		Endpoint:         &cfg.S3Host,
 		Region:           &cfg.S3Region,
 		DisableSSL:       &cfg.S3DisableSSL,
+		HTTPClient: customHTTPClient,
 		S3ForcePathStyle: &trueref}) // minio pukes otherwise
 
 	minioClient, err := minio.NewWithRegion(
