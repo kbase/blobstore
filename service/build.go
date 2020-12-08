@@ -23,7 +23,6 @@ import (
 	authcache "github.com/kbase/blobstore/auth/cache"
 	"github.com/kbase/blobstore/config"
 	"github.com/minio/minio-go"
-	"github.com/minio/minio-go/pkg/credentials"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -64,7 +63,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 
 	// need a custom transport to support not verifying SSL cert
 	customTransport := &http.Transport{
-	    TLSClientConfig: &tls.Config{InsecureSkipVerify: &cfg.S3DisableSSLVerify}
+	    TLSClientConfig: &tls.Config{InsecureSkipVerify: &cfg.S3DisableSSLVerify},
         }
 
 	awscli := s3.New(sess, &aws.Config{
@@ -80,7 +79,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 			Creds: credentialsNewStaticV4(cfg.S3AccessKey, cfg.S3AccessSecret, ""),
 			Secure: !cfg.S3DisableSSL,
 			Region: cfg.S3Region,
-			Transport: customTransport
+			Transport: customTransport,
 		} )
 	
 	if err != nil {
