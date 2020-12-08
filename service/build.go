@@ -64,7 +64,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 
 	// need a custom transport to support not verifying SSL cert
 	customTransport := &http.Transport{
-	    TLSClientConfig: &tls.Config{InsecureSkipVerify: &cfg.S3DisableSSLVerify},
+	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
 
 	awscli := s3.New(sess, &aws.Config{
