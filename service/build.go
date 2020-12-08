@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"crypto/tls"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 
