@@ -137,7 +137,7 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
             TLSClientConfig: &tls.Config{InsecureSkipVerify: fs.disableSSLverify},
         }
 //		  Timeout: time.Second * 10,
-	httpClient := &http.DefaultClient{
+	httpClient := &http.Client{
 	    Transport: customTransport,
 	}
 
