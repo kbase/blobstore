@@ -131,7 +131,16 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	req.Header.Set("x-amz-meta-Filename", p.filename)
 	req.Header.Set("x-amz-meta-Format", p.format)
 
-	resp, err := http.DefaultClient.Do(req)
+	// disable SSL verify if necessary
+	customTransport := &http.Transport{
+            TLSClientConfig: &tls.Config{InsecureSkipVerify: fs.disableSSLverify},
+        }
+//		  Timeout: time.Second * 10,
+	httpClient := &http.DefaultClient{
+	    Transport: customTransport,
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		// don't expose the presigned url in the returned error
 		errstr := err.(*url.Error).Err.Error()
