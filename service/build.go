@@ -83,7 +83,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket)
+	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket, cfg.S3DisableSSLVerify)
 }
 
 func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {
