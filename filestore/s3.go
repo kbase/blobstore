@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"crypto/tls"
 	"strconv"
 	"strings"
 	"time"
