@@ -11,7 +11,7 @@ mongodb-database = blobstore
 #mongodb-user = [username]
 #mongodb-pwd = [password]
 
-# S3 API parameters. All are required other than disable-ssl.
+# S3 API parameters. All are required other than s3-disable-ssl and s3-disable-ssl-verify.
 # disable-ssl treats any value other than 'true' as false.
 s3-host = localhost:9000
 # The bucket name must obey https://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
@@ -20,7 +20,7 @@ s3-bucket = blobstore
 s3-access-key = [access key goes here]
 s3-access-secret = [access secret goes here]
 s3-region = us-west-1
-# Use plaintext to talk to destination S3.  Default false. (false is not tested)
+# Use plaintext to talk to destination S3.  Default false.
 #s3-disable-ssl = false
 # Disable verifying the destination S3 SSL cert (e.g. for self-signed certs).  Default false.
 #s3-disable-ssl-verify = false
