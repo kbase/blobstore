@@ -35,6 +35,10 @@ const (
 	// KeyS3DisableSSL is the configuration key that determines whether SSL is to be used.
 	// any value other than 'true' is treated as false.
 	KeyS3DisableSSL = "s3-disable-ssl"
+	// KeyS3DisableSSLVerify is the configuration key that determines whether to verify the
+	// SSL certificate of the remote servers (in case a self-signed cert is used).
+	// any value other than 'true' is treated as false.
+	KeyS3DisableSSLVerify = "s3-disable-ssl-verify"
 	// KeyS3Region is the configuration key where the value is the S3 region
 	KeyS3Region = "s3-region"
 	// KeyAuthURL is the configuration key where the value is the KBase auth server URL
@@ -69,6 +73,8 @@ type Config struct {
 	S3AccessSecret string
 	// S3DisableSSL determines whether SSL should be used
 	S3DisableSSL bool
+	// S3DisableSSLVerify determines whether SSL certs should be verified
+	S3DisableSSLVerify bool
 	// S3Region is the S3 region
 	S3Region string
 	// AuthURL is the KBase auth server URL. It is never nil.
@@ -102,6 +108,7 @@ func New(configFilePath string) (*Config, error) {
 	s3key, err := getString(err, configFilePath, sec, KeyS3AccessKey, true)
 	s3secret, err := getString(err, configFilePath, sec, KeyS3AccessSecret, true)
 	s3disableSSL, err := getString(err, configFilePath, sec, KeyS3DisableSSL, false)
+	s3disableSSLVerify, err := getString(err, configFilePath, sec, KeyS3DisableSSLVerify, false)
 	s3region, err := getString(err, configFilePath, sec, KeyS3Region, true)
 	authurl, err := getURL(err, configFilePath, sec, KeyAuthURL)
 	roles, err := getStringList(err, configFilePath, sec, KeyAuthAdminRoles)
@@ -126,6 +133,7 @@ func New(configFilePath string) (*Config, error) {
 			S3AccessKey:         s3key,
 			S3AccessSecret:      s3secret,
 			S3DisableSSL:        "true" == s3disableSSL,
+			S3DisableSSLVerify:  "true" == s3disableSSLVerify,
 			S3Region:            s3region,
 			AuthURL:             authurl,
 			AuthAdminRoles:      roles,
