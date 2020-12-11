@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 	"net/http"
+	"crypto/tls"
 
 	"github.com/kbase/blobstore/core/values"
 	"github.com/sirupsen/logrus"
