@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"crypto/tls"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +33,7 @@ type S3FileStore struct {
 	s3client    *s3.S3
 	minioClient *minio.Client
 	bucket      string
-	disableSSLverify	bool
+	httpClient  *http.Client
 }
 
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
@@ -46,7 +45,7 @@ func NewS3FileStore(
 	s3client *s3.S3,
 	minioClient *minio.Client,
 	bucket string,
-	customHTTPClient *http.Client,
+	httpClient *http.Client,
 ) (*S3FileStore, error) {
 
 	if s3client == nil {
@@ -65,7 +64,7 @@ func NewS3FileStore(
 		// Ignore for now.
 		return nil, err
 	}
-	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket, customHTTPClient: customHTTPClient}, nil
+	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket, httpClient: httpClient}, nil
 }
 
 func checkBucketName(bucket string) (string, error) {
@@ -132,7 +131,7 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	req.Header.Set("x-amz-meta-Filename", p.filename)
 	req.Header.Set("x-amz-meta-Format", p.format)
 
-	resp, err := fs.customHTTPClient.Do(req)
+	resp, err := fs.httpClient.Do(req)
 	if err != nil {
 		// don't expose the presigned url in the returned error
 		errstr := err.(*url.Error).Err.Error()
