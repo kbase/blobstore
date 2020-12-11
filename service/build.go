@@ -71,6 +71,9 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
                 Transport:        customTransport,
 		Timeout:         24 * time.Hour }
 
+	// use our http.Client with the aws client
+	// this is encouraged, see https://docs.aws.amazon.com/sdk-for-go/api/aws/
+	// (search for  "SDK Default HTTP Client")
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
 		Endpoint:         &cfg.S3Host,
@@ -81,6 +84,8 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 
 	minioClient, err := minio.NewWithRegion(
 		cfg.S3Host, cfg.S3AccessKey, cfg.S3AccessSecret, !cfg.S3DisableSSL, cfg.S3Region)
+	// use our http.Transport with the minio client
+	// this is typical, see https://godoc.org/gopkg.in/minio/minio-go.v1#Client.SetCustomTransport
 	minioClient.SetCustomTransport(customTransport)
 	
 	if err != nil {
