@@ -69,7 +69,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
         }
 	customHTTPClient := &http.Client{
                 Transport:        customTransport,
-		Timmeout:         24 * time.Hour }
+		Timeout:         24 * time.Hour }
 
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
