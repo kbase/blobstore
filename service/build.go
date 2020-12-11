@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"crypto/tls"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 
@@ -66,7 +67,9 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 	customTransport := &http.Transport{
 	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
-	customHTTPClient := &http.Client{Transport: customTransport}
+	customHTTPClient := &http.Client{
+                Transport:        customTransport,
+		Timmeout:         24 * time.Hour }
 
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
@@ -83,7 +86,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket, cfg.S3DisableSSLVerify)
+	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket, customHTTPClient)
 }
 
 func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {
