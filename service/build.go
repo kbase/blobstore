@@ -57,7 +57,7 @@ func constructDependencies(cfg *config.Config, HTTPTimeout *time.Duration) (*Dep
 	return &d, nil
 }
 
-func buildFileStore(cfg *config.Config, HTTPTimeout *time.Duration) (filestore.FileStore, error) {
+func buildFileStore(cfg *config.Config, HTTPTimeout time.Duration) (filestore.FileStore, error) {
 	trueref := true
 
 	sess := session.Must(session.NewSession())
