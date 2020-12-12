@@ -56,7 +56,7 @@ type ServerStaticConf struct {
 	// GitCommit is the git commit from which the server was built.
 	GitCommit string
 	// HTTPTimeout is the timeout of the S3 clients' http.Client
-	HTTPTimeout int
+	HTTPTimeout time.Duration
 }
 
 // Server the blobstore server
