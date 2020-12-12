@@ -38,7 +38,7 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
-func constructDependencies(cfg *config.Config) (*Dependencies, error) {
+func constructDependencies(cfg *config.Config, HTTPTimeout int) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
 	if err != nil {
@@ -49,7 +49,7 @@ func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	fs, err := buildFileStore(cfg)
+	fs, err := buildFileStore(cfg, HTTPTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	return &d, nil
 }
 
-func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
+func buildFileStore(cfg *config.Config, HTTPTimeout int) (filestore.FileStore, error) {
 	trueref := true
 
 	sess := session.Must(session.NewSession())
@@ -69,7 +69,7 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
         }
 	customHTTPClient := &http.Client{
                 Transport:        customTransport,
-		Timeout:         24 * time.Hour }
+		Timeout:         HTTPTimeout }
 
 	// use our http.Client with the aws client
 	// this is encouraged, see https://docs.aws.amazon.com/sdk-for-go/api/aws/
