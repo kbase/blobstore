@@ -38,7 +38,7 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
-func constructDependencies(cfg *config.Config, HTTPTimeout *time.Duration) (*Dependencies, error) {
+func constructDependencies(cfg *config.Config, HTTPTimeout time.Duration) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
 	if err != nil {
