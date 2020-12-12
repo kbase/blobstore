@@ -38,7 +38,7 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
-func constructDependencies(cfg *config.Config, HTTPTimeout int) (*Dependencies, error) {
+func constructDependencies(cfg *config.Config, HTTPTimeout *time.Duration) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
 	if err != nil {
@@ -57,7 +57,7 @@ func constructDependencies(cfg *config.Config, HTTPTimeout int) (*Dependencies, 
 	return &d, nil
 }
 
-func buildFileStore(cfg *config.Config, HTTPTimeout int) (filestore.FileStore, error) {
+func buildFileStore(cfg *config.Config, HTTPTimeout *time.Duration) (filestore.FileStore, error) {
 	trueref := true
 
 	sess := session.Must(session.NewSession())
