@@ -23,6 +23,7 @@ const (
 	shockname   = "Shock"
 	shockver    = "0.9.6" // do not increment
 	deprecation = "The id and version fields are deprecated."
+	httpTimeout = 24 * time.Hour
 )
 
 // expect initialization via go build -ldflags "-X main.gitCommit=$GIT_COMMIT"
@@ -53,6 +54,7 @@ func main() {
 			ServerVersionCompat: shockver,
 			DeprecationWarning:  deprecation,
 			GitCommit:           gitCommit,
+			HTTPTimeout:         httpTimeout,
 		},
 	)
 	if err != nil {
@@ -62,8 +64,8 @@ func main() {
 	server := &http.Server{
 		Addr:         cfg.Host,
 		Handler:      serv,
-		ReadTimeout:  24 * time.Hour,
-		WriteTimeout: 24 * time.Hour,
+		ReadTimeout:  httpTimeout,
+		WriteTimeout: httpTimeout,
 	}
 
 	// TODO BUGNASTY figure out how to abort when no more data is being sent https://groups.google.com/forum/#!topic/golang-nuts/Hmjf5Ws8g5w
