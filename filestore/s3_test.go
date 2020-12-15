@@ -30,7 +30,6 @@ type TestSuite struct {
 	minio         *miniocontroller.Controller
 	loggerhook    *logrust.Hook
 	deleteTempDir bool
-	httpClient    *http.Client
 }
 
 func httpClient() *http.Client {
