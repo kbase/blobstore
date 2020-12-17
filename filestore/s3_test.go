@@ -38,8 +38,8 @@ func httpClient() *http.Client {
 	    TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
         }
 	customHTTPClient := &http.Client{
-                Transport:        customTransport,
-		Timeout:         24 * time.Hour }
+            Transport:        customTransport,
+            Timeout:         24 * time.Hour }
 	return customHTTPClient
 }
 
