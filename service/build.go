@@ -68,8 +68,8 @@ func buildFileStore(cfg *config.Config, HTTPTimeout time.Duration) (filestore.Fi
 	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
 	customHTTPClient := &http.Client{
-                Transport:        customTransport,
-		Timeout:         HTTPTimeout }
+	    Transport:       customTransport,
+            Timeout:         HTTPTimeout }
 
 	// use our http.Client with the aws client
 	// this is encouraged, see https://docs.aws.amazon.com/sdk-for-go/api/aws/
