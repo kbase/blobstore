@@ -55,7 +55,9 @@ type ServerStaticConf struct {
 	DeprecationWarning string
 	// GitCommit is the git commit from which the server was built.
 	GitCommit string
-	// HTTPTimeout is the timeout of the S3 clients' http.Client
+	// HTTPTimeout is the timeout of the blobstore http.Server,
+	// the minio http.Client, the AWS http.Client,
+	// and the custom http.Client that pushes to S3
 	HTTPTimeout time.Duration
 }
 
