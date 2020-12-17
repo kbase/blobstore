@@ -107,13 +107,16 @@ func (t *TestSuite) TestConstructWithGoodBucketNames() {
 func (t *TestSuite) TestConstructFail() {
 	min, _ := t.minio.CreateMinioClient()
 	cli := t.minio.CreateS3Client()
-	constructFail(t, nil, min, "s", errors.New("s3client cannot be nil"))
-	constructFail(t, cli, nil, "s", errors.New("minioClient cannot be nil"))
+	httpClient := httpClient()
+	constructFail(t, nil, min, httpClient, "s", errors.New("s3client cannot be nil"))
+	constructFail(t, cli, nil, httpClient, "s", errors.New("minioClient cannot be nil"))
+	constructFail(t, cli, min, nil, "s", errors.New("httpClient cannot be nil"))
 }
 
 func (t *TestSuite) TestConstructFailBadBucketName() {
 	min, _ := t.minio.CreateMinioClient()
 	cli := t.minio.CreateS3Client()
+	httpClient := httpClient()
 
 	b := strings.Builder{}
 	for i := 0; i < 6; i++ {
@@ -133,12 +136,11 @@ func (t *TestSuite) TestConstructFailBadBucketName() {
 	}
 
 	for bucket, er := range testcases {
-		constructFail(t, cli, min, bucket, errors.New(er))
+		constructFail(t, cli, min, httpClient, bucket, errors.New(er))
 	}
 }
 
-func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, bucket string, expected error) {
-	httpClient := httpClient()
+func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, httpClient *http.Client, bucket string, expected error) {
 	fstore, err := NewS3FileStore(client, min, bucket, httpClient)
 	if err == nil {
 		t.FailNow("expected error")
@@ -152,13 +154,13 @@ func constructFail(t *TestSuite, client *s3.S3, min *minio.Client, bucket string
 func (t *TestSuite) TestConstructWithExistingBucket() {
 	s3client := t.minio.CreateS3Client()
 	mclient, _ := t.minio.CreateMinioClient()
+	httpClient := httpClient()
 	bucket := "somebucket"
 	input := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	_, err := s3client.CreateBucket(input)
 	if err != nil {
 		t.FailNow(err.Error())
 	}
-	httpClient := httpClient()
 	fstore, err := NewS3FileStore(s3client, mclient, bucket, httpClient)
 	if err != nil {
 		t.FailNow(err.Error())
