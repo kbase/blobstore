@@ -54,6 +54,9 @@ func NewS3FileStore(
 	if minioClient == nil {
 		return nil, errors.New("minioClient cannot be nil")
 	}
+	if httpClient == nil {
+		return nil, errors.New("httpClient cannot be nil")
+	}
 	bucket, err := checkBucketName(bucket)
 	if err != nil {
 		return nil, err
