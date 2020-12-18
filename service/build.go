@@ -64,6 +64,8 @@ func buildFileStore(cfg *config.Config, HTTPTimeout time.Duration) (filestore.Fi
 	creds := credentials.NewStaticCredentials(cfg.S3AccessKey, cfg.S3AccessSecret, "")
 
 	// need a custom transport to support not verifying SSL cert
+	// if you modify the SSL code, be sure to manually test against
+	// a minio instance with a self-signed certificate
 	customTransport := &http.Transport{
 	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
