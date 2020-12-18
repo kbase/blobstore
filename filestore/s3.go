@@ -39,7 +39,10 @@ type S3FileStore struct {
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
 // bucket, which will be created if it doesn't exist. The provided clients must have write
 // privileges for the bucket.
-// Two clients are currently required because they are better at different operations.
+// Three clients are currently required because they are better at different operations:
+// s3client: an aws-sdk s3 client
+// minioClient: a minio-go client
+// httpClient: an http.Client client (used directly for faster PUTs)
 // This may change in a future version if one client provides all the necessary operations.
 func NewS3FileStore(
 	s3client *s3.S3,
