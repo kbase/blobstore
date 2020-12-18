@@ -38,6 +38,8 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
+// cfg is a configuration structure populated from the config file
+// HTTPTimeout is a timeout for the various clients connecting to the S3 backend (s3, minio, http)
 func constructDependencies(cfg *config.Config, HTTPTimeout time.Duration) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
