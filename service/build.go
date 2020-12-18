@@ -67,10 +67,10 @@ func buildFileStore(cfg *config.Config, HTTPTimeout time.Duration) (filestore.Fi
 	// if you modify the SSL code, be sure to manually test against
 	// a minio instance with a self-signed certificate
 	customTransport := &http.Transport{
-	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
+            TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
 	customHTTPClient := &http.Client{
-	    Transport:       customTransport,
+            Transport:       customTransport,
             Timeout:         HTTPTimeout }
 
 	// use our http.Client with the aws client
