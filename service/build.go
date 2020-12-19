@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"crypto/tls"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 
@@ -37,7 +38,9 @@ type Dependencies struct {
 }
 
 // ConstructDependencies builds the blobstore dependencies from a configuration.
-func constructDependencies(cfg *config.Config) (*Dependencies, error) {
+// cfg is a configuration structure populated from the config file
+// HTTPTimeout is a timeout for the various clients connecting to the S3 backend (s3, minio, http)
+func constructDependencies(cfg *config.Config, HTTPTimeout time.Duration) (*Dependencies, error) {
 	d := Dependencies{}
 	auth, err := buildAuth(cfg)
 	if err != nil {
@@ -48,7 +51,7 @@ func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	fs, err := buildFileStore(cfg)
+	fs, err := buildFileStore(cfg, HTTPTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -56,18 +59,25 @@ func constructDependencies(cfg *config.Config) (*Dependencies, error) {
 	return &d, nil
 }
 
-func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
+func buildFileStore(cfg *config.Config, HTTPTimeout time.Duration) (filestore.FileStore, error) {
 	trueref := true
 
 	sess := session.Must(session.NewSession())
 	creds := credentials.NewStaticCredentials(cfg.S3AccessKey, cfg.S3AccessSecret, "")
 
 	// need a custom transport to support not verifying SSL cert
+	// if you modify the SSL code, be sure to manually test against
+	// a minio instance with a self-signed certificate
 	customTransport := &http.Transport{
-	    TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
+            TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.S3DisableSSLVerify},
         }
-	customHTTPClient := &http.Client{Transport: customTransport}
+	customHTTPClient := &http.Client{
+            Transport:       customTransport,
+            Timeout:         HTTPTimeout }
 
+	// use our http.Client with the aws client
+	// this is encouraged, see https://docs.aws.amazon.com/sdk-for-go/api/aws/
+	// (search for  "SDK Default HTTP Client")
 	awscli := s3.New(sess, &aws.Config{
 		Credentials:      creds,
 		Endpoint:         &cfg.S3Host,
@@ -78,12 +88,14 @@ func buildFileStore(cfg *config.Config) (filestore.FileStore, error) {
 
 	minioClient, err := minio.NewWithRegion(
 		cfg.S3Host, cfg.S3AccessKey, cfg.S3AccessSecret, !cfg.S3DisableSSL, cfg.S3Region)
-        minioClient.SetCustomTransport(customTransport)
+	// use our http.Transport with the minio client
+	// this is typical, see https://godoc.org/gopkg.in/minio/minio-go.v1#Client.SetCustomTransport
+	minioClient.SetCustomTransport(customTransport)
 	
 	if err != nil {
 		return nil, err
 	}
-	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket, cfg.S3DisableSSLVerify)
+	return filestore.NewS3FileStore(awscli, minioClient, cfg.S3Bucket, customHTTPClient)
 }
 
 func buildNodeStore(cfg *config.Config) (nodestore.NodeStore, error) {

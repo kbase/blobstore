@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"crypto/tls"
 	"strconv"
 	"strings"
 	"time"
@@ -34,19 +33,22 @@ type S3FileStore struct {
 	s3client    *s3.S3
 	minioClient *minio.Client
 	bucket      string
-	disableSSLverify	bool
+	httpClient  *http.Client
 }
 
 // NewS3FileStore creates a new S3 based file store. Files will be stored in the provided
 // bucket, which will be created if it doesn't exist. The provided clients must have write
 // privileges for the bucket.
-// Two clients are currently required because they are better at different operations.
+// Three clients are currently required because they are better at different operations:
+// s3client: an aws-sdk s3 client
+// minioClient: a minio-go client
+// httpClient: an http.Client client (used directly for faster PUTs)
 // This may change in a future version if one client provides all the necessary operations.
 func NewS3FileStore(
 	s3client *s3.S3,
 	minioClient *minio.Client,
 	bucket string,
-	disableSSLverify bool,
+	httpClient *http.Client,
 ) (*S3FileStore, error) {
 
 	if s3client == nil {
@@ -54,6 +56,9 @@ func NewS3FileStore(
 	}
 	if minioClient == nil {
 		return nil, errors.New("minioClient cannot be nil")
+	}
+	if httpClient == nil {
+		return nil, errors.New("httpClient cannot be nil")
 	}
 	bucket, err := checkBucketName(bucket)
 	if err != nil {
@@ -65,7 +70,7 @@ func NewS3FileStore(
 		// Ignore for now.
 		return nil, err
 	}
-	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket, disableSSLverify: disableSSLverify}, nil
+	return &S3FileStore{s3client: s3client, minioClient: minioClient, bucket: bucket, httpClient: httpClient}, nil
 }
 
 func checkBucketName(bucket string) (string, error) {
@@ -132,16 +137,7 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 	req.Header.Set("x-amz-meta-Filename", p.filename)
 	req.Header.Set("x-amz-meta-Format", p.format)
 
-	// disable SSL verify if necessary
-	customTransport := &http.Transport{
-            TLSClientConfig: &tls.Config{InsecureSkipVerify: fs.disableSSLverify},
-        }
-//		  Timeout: time.Second * 10,
-	httpClient := &http.Client{
-	    Transport: customTransport,
-	}
-
-	resp, err := httpClient.Do(req)
+	resp, err := fs.httpClient.Do(req)
 	if err != nil {
 		// don't expose the presigned url in the returned error
 		errstr := err.(*url.Error).Err.Error()
