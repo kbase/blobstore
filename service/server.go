@@ -55,6 +55,10 @@ type ServerStaticConf struct {
 	DeprecationWarning string
 	// GitCommit is the git commit from which the server was built.
 	GitCommit string
+	// HTTPTimeout is the timeout of the blobstore http.Server,
+	// the minio http.Client, the AWS http.Client,
+	// and the custom http.Client that pushes to S3
+	HTTPTimeout time.Duration
 }
 
 // Server the blobstore server
@@ -73,7 +77,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 	if cfg.AuthURL.Scheme != "https" {
 		logrus.Warnf("Insecure auth url " + cfg.AuthURL.String())
 	}
-	deps, err := constructDependencies(cfg)
+	deps, err := constructDependencies(cfg, sconf.HTTPTimeout)
 	if err != nil {
 		return nil, err // this is a pain to test
 	}
