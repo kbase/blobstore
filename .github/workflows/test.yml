@@ -43,10 +43,11 @@ jobs:
       - name: Install dependencies and set up test config
         shell: bash
         run: |
-          # setup HOMEDIR
+
+          # set HOMEDIR
           export HOMEDIR=`pwd`
 
-          # move to parent dir of homedir to install binaries etc
+          # move to parent dir to install binaries etc
           cd ..
 
           # set up jars
@@ -59,9 +60,9 @@ jobs:
           export MONGOD=`pwd`/${{matrix.mongo}}/bin/mongod
 
           # set up minio
-          wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2019-05-23T00-29-34Z -O minio
-          chmod a+x minio
-          export MINIOD=`pwd`/minio
+          export MINIO=$HOMEDIR/test_dependencies/minio/${{matrix.minio}}/minio
+          gunzip $MINIO.gz 
+          chmod a+x $MINIO
 
           # set up test config
           cd $HOMEDIR
@@ -69,7 +70,7 @@ jobs:
           sed -i "s#^test.temp.dir =.*#test.temp.dir=temp_test_dir#" test.cfg
           sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
           sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIO#" test.cfg
-          sed -i "s#^test.mongo.useWiredTiger.*#test.mongo.useWiredTiger=${{matrix.wired_tiger}}#" test.cfg
+          sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=${{matrix.wired_tiger}}#" test.cfg
           sed -i "s#^test.jars.dir.*#test.jars.dir=$JARSDIR#" test.cfg
           cat test.cfg
 
