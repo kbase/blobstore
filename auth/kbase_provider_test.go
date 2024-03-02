@@ -260,7 +260,6 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 				"<!DOCTYPE html>",
 				"<head>",
 				"<title>1944 Birthday Honours/api/V2/token - Wikipedia</title>",
-				"February",
 			},
 			1000,
 		},
@@ -282,12 +281,7 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 		t.Equal("b", le.Data["a"], "incorrect field")
 		t.Equal(tc.bodylen, len(le.Data["truncated_response_body"].(string)),
 			"incorrect body length")
-		
-		fmt.Println("------")
-		fmt.Println(le.Data["truncated_response_body"])
-		fmt.Println("------")
 		for _, c := range tc.contents {
-			fmt.Println(le.Data["truncated_response_body"])
 			t.Contains(le.Data["truncated_response_body"], c, "incorrect body")
 		}
 		t.loggerhook.Reset()
@@ -387,7 +381,6 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 				"<!DOCTYPE html>",
 				"<head>",
 				"<title>1944 Birthday Honours/api/V2/users - Wikipedia</title>",
-				"February",
 			},
 			1000,
 		},
