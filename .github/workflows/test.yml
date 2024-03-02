@@ -1,0 +1,87 @@
+name: KBase Blobstore test
+
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
+  push:
+    # run workflow when merging to main or develop
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  workspace_deluxe_tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - go: '1.12'
+            mongo: 'mongodb-linux-x86_64-3.6.12'
+            minio: '2019-05-23T00-29-34Z'
+            wired_tiger: 'false'
+          - go: '1.12'
+            mongo: 'mongodb-linux-x86_64-3.6.20'
+            minio: '2019-05-23T00-29-34Z'
+            wired_tiger: 'false'
+          - go: '1.12'
+            mongo: 'mongodb-linux-x86_64-3.6.20'
+            minio: '2019-05-23T00-29-34Z'
+            wired_tiger: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{matrix.go}}
+
+      - name: Install dependencies and set up test config
+        shell: bash
+        run: |
+          # setup HOMEDIR
+          export HOMEDIR=`pwd`
+
+          # move to parent dir of homedir to install binaries etc
+          cd ..
+
+          # set up jars
+          git clone https://github.com/kbase/jars
+          export JARSDIR=`pwd`/jars/lib/jars/
+
+          # set up mongo
+          wget -q http://fastdl.mongodb.org/linux/${{matrix.mongo}}.tgz
+          tar xfz ${{matrix.mongo}}.tgz
+          export MONGOD=`pwd`/${{matrix.mongo}}/bin/mongod
+
+          # set up minio
+          wget https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.$MINIO -O minio
+          chmod a+x minio
+          export MINIOD=`pwd`/minio
+
+          # set up test config
+          cd $HOMEDIR
+          cp -n test.cfg.example test.cfg
+          sed -i "s#^test.temp.dir =.*#test.temp.dir=temp_test_dir#" test.cfg
+          sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
+          sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIO#" test.cfg
+          sed -i "s#^test.mongo.useWiredTiger.*#test.mongo.useWiredTiger=${{matrix.wired_tiger}}#" test.cfg
+          sed -i "s#^test.jars.dir.*#test.jars.dir=$JARSDIR#" test.cfg
+          cat test.cfg
+
+      - name: Run tests
+        shell: bash
+        run: |
+          export GO111MODULE=on
+          go build app/blobstore.go
+          export TCFG=`pwd`/test.cfg
+          BLOBSTORE_TEST_CFG=$TCFG go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
