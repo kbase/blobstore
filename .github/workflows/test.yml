@@ -51,6 +51,7 @@ jobs:
           cd ..
 
           # set up jars
+          # TODO switch to the auth shadow jar
           git clone https://github.com/kbase/jars
           export JARSDIR=`pwd`/jars/lib/jars/
 
