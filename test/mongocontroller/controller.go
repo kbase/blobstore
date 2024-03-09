@@ -66,7 +66,11 @@ func New(p Params) (*Controller, error) {
 		return nil, err
 	}
 
-	if ver.LessThan(*semver.New("6.1")) {
+	// Starting in MongoDB 6.1, journaling is always enabled. 
+	// As a result, MongoDB removes the storage.journal.enabled option and 
+	// the corresponding --journal and --nojournal command-line options.
+	// https://www.mongodb.com/docs/manual/release-notes/6.1/#changes-to-journaling
+	if ver.LessThan(*semver.New("6.1.0")) {
 		cmdargs = append(cmdargs, "--nojournal")
 	}
 	if p.UseWiredTiger {
