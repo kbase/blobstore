@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,7 +29,7 @@ type Params struct {
 	UseWiredTiger bool
 }
 
-// Controller is a Minio controller.
+// Controller is a Mongo controller.
 type Controller struct {
 	port            int
 	tempDir         string
@@ -53,14 +54,25 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cmdargs := []string{
 		"--port", strconv.Itoa(port),
 		"--dbpath", ddir,
-		"--nojournal",
+	}
+
+	// check mongodb version
+	ver, err := getMongoDBVer(p.ExecutablePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if ver.LessThan(*semver.New("6.1")) {
+		cmdargs = append(cmdargs, "--nojournal")
 	}
 	if p.UseWiredTiger {
 		cmdargs = append(cmdargs, "--storageEngine", "wiredTiger")
 	}
+
 	cmd := exec.Command(p.ExecutablePath, cmdargs...)
 	cmd.Stdout = outfile
 	cmd.Stderr = outfile
@@ -80,18 +92,8 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := client.Database("foo").RunCommand(nil, map[string]int{"buildinfo": 1})
-	if res.Err() != nil {
-		return nil, res.Err()
-	}
-	var doc map[string]interface{}
-	err = res.Decode(&doc)
-	if err != nil {
-		return nil, err
-	}
 	// wired tiger will also not include index names for 3.0, but we're not going to test
 	// that so screw it
-	ver := semver.New(doc["version"].(string))
 	return &Controller{port, tdir, cmd, ver.LessThan(*semver.New("3.2.1000"))}, nil
 }
 
@@ -120,4 +122,15 @@ func (c *Controller) Destroy(deleteTempDir bool) error {
 		os.RemoveAll(c.tempDir)
 	}
 	return nil
+}
+
+func getMongoDBVer(ExecutablePath string) (*semver.Version, error) {
+	cmd := exec.Command(ExecutablePath, "--version")
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	rep := strings.Replace(string(stdout), "\n", " ", -1)
+	ver := strings.Split(rep, " ")[2][1:]
+	return semver.New(ver), err
 }
