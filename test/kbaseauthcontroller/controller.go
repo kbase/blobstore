@@ -124,15 +124,11 @@ func getClassPath(jarsDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cp := []string(nil)
-	for _, j := range jars { // global variable, yech
-		jpath := path.Join(jarsDir, j)
-		if _, err := os.Stat(jpath); os.IsNotExist(err) {
-			return "", fmt.Errorf("Jar %v does not exist", jpath)
-		}
-		cp = append(cp, jpath)
+	jpath := path.Join(jarsDir, authShadowAllJar)
+	if _, err := os.Stat(jpath); os.IsNotExist(err) {
+		return "", fmt.Errorf("Jar %v does not exist", jpath)
 	}
-	return strings.Join(cp, ":"), nil
+	return jpath, nil
 }
 
 func installTemplates(jarsDir string, templateDir string) error {
