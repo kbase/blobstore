@@ -96,6 +96,12 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// test mongo connection
+	res := client.Database("foo").RunCommand(context.TODO(), map[string]int{"buildinfo": 1})
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
 	// wired tiger will also not include index names for 3.0, but we're not going to test
 	// that so screw it
 	return &Controller{port, tdir, cmd, ver.LessThan(*semver.New("3.2.1000"))}, nil
@@ -128,8 +134,8 @@ func (c *Controller) Destroy(deleteTempDir bool) error {
 	return nil
 }
 
-func getMongoDBVer(ExecutablePath string) (*semver.Version, error) {
-	cmd := exec.Command(ExecutablePath, "--version")
+func getMongoDBVer(executablePath string) (*semver.Version, error) {
+	cmd := exec.Command(executablePath, "--version")
 	stdout, err := cmd.Output()
 	if err != nil {
 		return nil, err
