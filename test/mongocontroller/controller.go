@@ -2,6 +2,7 @@ package mongocontroller
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,6 +102,15 @@ func New(p Params) (*Controller, error) {
 	res := client.Database("foo").RunCommand(context.TODO(), map[string]int{"buildinfo": 1})
 	if res.Err() != nil {
 		return nil, res.Err()
+	}
+	var doc map[string]interface{}
+	err = res.Decode(&doc)
+	if err != nil {
+		return nil, err
+	}
+	if ver.String() != doc["version"].(string) {
+		return nil, fmt.Errorf("the two mongo versions should be the same: %s != %s",
+		ver.String(), doc["version"].(string))
 	}
 	// wired tiger will also not include index names for 3.0, but we're not going to test
 	// that so screw it
