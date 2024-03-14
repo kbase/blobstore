@@ -153,6 +153,8 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 		fmt.Println(f.Name())
 	}
 
+	time.Sleep(1 * time.Second)
+
 	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
 	if _, err := os.Stat(tpath); os.IsNotExist(err) {
 		return "", fmt.Errorf("the template folder %v does not exist", tpath)
