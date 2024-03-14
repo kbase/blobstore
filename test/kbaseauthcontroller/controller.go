@@ -23,6 +23,9 @@ import (
 
 const (
 	serverClass = "us.kbase.test.auth2.StandaloneAuthServer"
+
+	// The max number of attempts to check if templates have been pulled out of the shadow jar
+	attempts = 10
 )
 
 // Params are Parameters for creating a KBase Auth2 service (https://github.com/kbase/auth2)
@@ -148,15 +151,17 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 		return "", err
 	}
 
-	files, _ := ioutil.ReadDir(dirPath)
-	for _, f := range files {
-		fmt.Println(f.Name())
-	}
-
-	time.Sleep(1 * time.Second)
-
+	i := 0
 	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
-	if _, err := os.Stat(tpath); os.IsNotExist(err) {
+	for i < attempts {
+		if _, err := os.Stat(tpath); os.IsNotExist(err) {
+			time.Sleep(1 * time.Second)
+			i += 1
+			continue
+		}
+		break
+    }
+	if i == attempts {
 		return "", fmt.Errorf("the template folder %v does not exist", tpath)
 	}
 	return tpath, err
