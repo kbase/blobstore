@@ -131,6 +131,7 @@ func getClassPath(auth2Jar string) (string, error) {
 
 func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 	dirPath := filepath.Dir(classPath)
+	fmt.Printf("the parent dir of auth2 is located at %v", dirPath)
 	outfile, err := os.Create(filepath.Join(dirPath, "output.txt"))
 	if err != nil {
 		return "", err
@@ -145,6 +146,11 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 		return "", err
 	}
 
+	files, _ := ioutil.ReadDir(dirPath)
+	for _, f := range files {
+		fmt.Print(f.Name())
+	}
+
 	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
 	if _, err := os.Stat(tpath); os.IsNotExist(err) {
 		return "", fmt.Errorf("the template folder %v does not exist", tpath)
@@ -153,6 +159,7 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 }
 
 func installTemplates(classPath string, templateDir string) error {
+	fmt.Printf("the auth2 is located at %v", classPath)
 	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
 	if err != nil {
 		return err
