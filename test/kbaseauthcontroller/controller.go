@@ -57,7 +57,7 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = installTemplates(p.Auth2Jar, templateDir)
+	err = installTemplates(classPath, templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +136,8 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 		return "", err
 	}
 
-	cmdargs := []string{"xf", classPath}
-	cmd := exec.Command("jar", cmdargs...)
+	cmdargs := []string{classPath, "-d", dirPath}
+	cmd := exec.Command("unzip", cmdargs...)
 	cmd.Stdout = outfile
 	cmd.Stderr = outfile
 	err = cmd.Start()
