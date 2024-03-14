@@ -131,7 +131,9 @@ func getClassPath(auth2Jar string) (string, error) {
 
 func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 	dirPath := filepath.Dir(classPath)
+	fmt.Println("------------------------------")
 	fmt.Printf("the parent dir of auth2 is located at %v", dirPath)
+	fmt.Println("------------------------------")
 	outfile, err := os.Create(filepath.Join(dirPath, "output.txt"))
 	if err != nil {
 		return "", err
@@ -148,7 +150,7 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 
 	files, _ := ioutil.ReadDir(dirPath)
 	for _, f := range files {
-		fmt.Print(f.Name())
+		fmt.Println(f.Name())
 	}
 
 	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
@@ -159,7 +161,9 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 }
 
 func installTemplates(classPath string, templateDir string) error {
+	fmt.Println("------------------------------")
 	fmt.Printf("the auth2 is located at %v", classPath)
+	fmt.Println("------------------------------")
 	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
 	if err != nil {
 		return err
