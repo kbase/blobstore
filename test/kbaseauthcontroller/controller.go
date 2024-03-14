@@ -54,13 +54,17 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
+	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
+	if err != nil {
+		return nil, err
+	}
 	tdir := filepath.Join(p.RootTempDir, "AuthController-"+uuid.New().String())
 	templateDir := filepath.Join(tdir, "templates")
 	err = os.MkdirAll(templateDir, 0700)
 	if err != nil {
 		return nil, err
 	}
-	err = installTemplates(classPath, templateDir)
+	err = installTemplates(tpath, templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -165,11 +169,7 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 	return tpath, err
 }
 
-func installTemplates(classPath string, templateDir string) error {
-	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
-	if err != nil {
-		return err
-	}
+func installTemplates(tpath string, templateDir string) error {
 	files, err := ioutil.ReadDir(tpath)
 	if err != nil {
         return err
