@@ -157,7 +157,7 @@ func installTemplates(classPath string, templateDir string) error {
 	if err != nil {
 		return err
 	}
-	files, err := os.ReadDir(tpath)
+	files, err := ioutil.ReadDir(tpath)
 	if err != nil {
         return err
     }
