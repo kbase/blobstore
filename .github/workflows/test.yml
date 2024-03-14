@@ -14,6 +14,9 @@ on:
       - master
       - develop
 
+env:
+  AUTH2_JAR_NAME: kbase-auth2-test-shadow-all-0.7.0.jar
+
 jobs:
   workspace_deluxe_tests:
     runs-on: ubuntu-latest
@@ -46,10 +49,9 @@ jobs:
           # move to parent dir to install binaries etc
           cd ..
 
-          # set up jars
-          # TODO switch to the auth shadow jar
-          git clone https://github.com/kbase/jars
-          export JARSDIR=`pwd`/jars/lib/jars/
+          # set up auth2 jar
+          wget -q https://github.com/kbase/jars/raw/master/lib/jars/kbase/auth2/$AUTH2_JAR_NAME
+          export AUTH2JAR=`pwd`/$AUTH2_JAR_NAME
 
           # set up mongo
           wget -q http://fastdl.mongodb.org/linux/${{matrix.mongo}}.tgz
@@ -68,7 +70,7 @@ jobs:
           sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
           sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIO#" test.cfg
           sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=${{matrix.wired_tiger}}#" test.cfg
-          sed -i "s#^test.jars.dir.*#test.jars.dir=$JARSDIR#" test.cfg
+          sed -i "s#^test.auth2jar.*#test.auth2jar=$AUTH2JAR#" test.cfg
           cat test.cfg
 
       - name: Run tests

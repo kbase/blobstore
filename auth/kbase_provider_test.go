@@ -53,7 +53,7 @@ func (t *TestSuite) SetupSuite() {
 	t.mongo = mongoctl
 
 	auth, err := kbaseauthcontroller.New(kbaseauthcontroller.Params{
-		JarsDir:       tcfg.JarsDir,
+		Auth2Jar:      tcfg.Auth2JarPath,
 		MongoHost:     "localhost:" + strconv.Itoa(mongoctl.GetPort()),
 		MongoDatabase: "test_kb_auth_provider_authdb",
 		RootTempDir:   tcfg.TempDir,

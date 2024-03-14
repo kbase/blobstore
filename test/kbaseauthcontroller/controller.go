@@ -1,7 +1,6 @@
 package kbaseauthcontroller
 
 import (
-	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -22,20 +21,15 @@ import (
 	"github.com/phayes/freeport"
 )
 
-// The following are required to run the KBase auth server in test mode.
 const (
 	serverClass = "us.kbase.test.auth2.StandaloneAuthServer"
-	// authTemplates is the zip file containing templates for the server
-	authTemplates = "kbase/auth2/kbase-auth2templates-0.2.4.zip"
-	// auth2ShadowAllJar is the jar required for the server
-	authShadowAllJar = "kbase/auth2/kbase-auth2-test-shadow-all-0.7.0.jar"
 )
 
 // Params are Parameters for creating a KBase Auth2 service (https://github.com/kbase/auth2)
 // controller.
 type Params struct {
-	// JarsDir is the path to the /lib/jars directory of the
-	JarsDir string
+	// Auth2Jar is the path to the kbase auth2 jar.
+	Auth2Jar string
 	// MongoHost is the mongo host.
 	MongoHost string
 	// MongoDatabase is the database to use for auth data.
@@ -53,7 +47,7 @@ type Controller struct {
 
 // New creates a new controller.
 func New(p Params) (*Controller, error) {
-	classPath, err := getClassPath(p.JarsDir)
+	classPath, err := getClassPath(p.Auth2Jar)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +57,7 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = installTemplates(p.JarsDir, templateDir)
+	err = installTemplates(p.Auth2Jar, templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -124,46 +118,77 @@ func waitForStartup(port string) error {
 	return startupErr
 }
 
-func getClassPath(jarsDir string) (string, error) {
-	jarsDir, err := filepath.Abs(jarsDir)
+func getClassPath(auth2Jar string) (string, error) {
+	jpath, err := filepath.Abs(auth2Jar)
 	if err != nil {
 		return "", err
 	}
-	jpath := path.Join(jarsDir, authShadowAllJar)
 	if _, err := os.Stat(jpath); os.IsNotExist(err) {
-		return "", fmt.Errorf("Jar %v does not exist", jpath)
+		return "", fmt.Errorf("jar %v does not exist", jpath)
 	}
 	return jpath, nil
 }
 
-func installTemplates(jarsDir string, templateDir string) error {
-	templateZip := path.Join(jarsDir, authTemplates)
-	arch, err := zip.OpenReader(templateZip) // global variable, yech
+func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
+	dirPath := filepath.Dir(classPath)
+	outfile, err := os.Create(filepath.Join(dirPath, "output.txt"))
+	if err != nil {
+		return "", err
+	}
+
+	cmdargs := []string{classPath, "-d", dirPath}
+	cmd := exec.Command("unzip", cmdargs...)
+	cmd.Stdout = outfile
+	cmd.Stderr = outfile
+	err = cmd.Start()
+	if err != nil {
+		return "", err
+	}
+
+	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
+	if _, err := os.Stat(tpath); os.IsNotExist(err) {
+		return "", fmt.Errorf("the template folder %v does not exist", tpath)
+	}
+	return tpath, err
+}
+
+func installTemplates(classPath string, templateDir string) error {
+	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
 	if err != nil {
 		return err
 	}
-	for _, f := range arch.File {
-		name := f.FileHeader.Name
+    files, err := os.ReadDir(tpath)
+    if err != nil {
+        return err
+    }
+	for _, f := range files {
+		name := f.Name()
 		if !strings.HasSuffix(name, "/") { // not a directory
 			name = path.Clean(name)
 			if path.IsAbs(name) || strings.HasPrefix(name, "..") {
-				return fmt.Errorf("Zip file %v contains files outside the zip directory - "+
-					"this is a sign of a malicious zip file", templateZip)
+				return fmt.Errorf("template folder %v contains files outside the directory - "+
+					"this is a sign of a malicious template folder", tpath)
 			}
-			target, err := filepath.Abs(path.Join(templateDir, name))
+			dst, err := filepath.Abs(path.Join(templateDir, name))
 			if err != nil {
 				return err
 			}
-			os.MkdirAll(path.Dir(target), 0600)
-			r, err := f.Open()
-			if err != nil {
-				return err
-			}
-			f, err := os.Create(target)
+			os.MkdirAll(path.Dir(dst), 0600)
 
-			io.Copy(f, r)
-			r.Close()
-			f.Close()
+			src := filepath.Join(tpath, name)
+			source, err := os.Open(src)
+			if err != nil {
+				return err
+			}
+			defer source.Close()
+
+			destination, err := os.Create(dst)
+			if err != nil {
+				return err
+			}
+			defer destination.Close()
+
+			io.Copy(destination, source)
 		}
 	}
 	return nil
