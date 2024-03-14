@@ -136,8 +136,8 @@ func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
 		return "", err
 	}
 
-	cmdargs := []string{classPath, "-d", dirPath}
-	cmd := exec.Command("unzip", cmdargs...)
+	cmdargs := []string{"xf", classPath}
+	cmd := exec.Command("jar", cmdargs...)
 	cmd.Stdout = outfile
 	cmd.Stderr = outfile
 	err = cmd.Start()
