@@ -99,7 +99,7 @@ func New(p Params) (*Controller, error) {
 	}
 
 	// test mongo connection
-	res := client.Database("foo").RunCommand(context.TODO(), map[string]int{"buildinfo": 1})
+	res := client.Database("foo").RunCommand(context.Background(), map[string]int{"buildinfo": 1})
 	if res.Err() != nil {
 		return nil, res.Err()
 	}
