@@ -21,8 +21,8 @@ const (
 	TestMongoExe = "test.mongo.exe"
 	// TestUseWiredTiger denotes that the MongoDB WiredTiger storage engine should be used.
 	TestUseWiredTiger = "test.mongo.wired_tiger"
-	// TestJarsDir is the key in the config file for the path to the KBase jars directory.
-	TestJarsDir = "test.jars.dir"
+	// TestAuth2Jar is the key in the config file for the path to the KBase auth2 shadow test jar.
+	TestAuth2Jar = "test.auth2jar"
 	// TestTempDir is the key in the config file for the temporary directory.
 	TestTempDir = "test.temp.dir"
 	// TestDeleteTempDir is the key in the config file for whether the temporary directory
@@ -36,7 +36,7 @@ type TestConfig struct {
 	MinioExePath  string
 	MongoExePath  string
 	UseWiredTiger bool
-	JarsDir       string
+	Auth2JarPath  string
 	TempDir       string
 	DeleteTempDir bool
 }
@@ -71,7 +71,7 @@ func GetConfig() (*TestConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	jarsdir, err := getValue(sec, TestJarsDir, configfile, true)
+	auth2Jar, err := getValue(sec, TestAuth2Jar, configfile, true)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func GetConfig() (*TestConfig, error) {
 			MinioExePath:  minio,
 			MongoExePath:  mongo,
 			UseWiredTiger: wiredTiger == "true",
-			JarsDir:       jarsdir,
+			Auth2JarPath:  auth2Jar,
 			TempDir:       tempDir,
 			DeleteTempDir: del != "false",
 		},

@@ -191,7 +191,7 @@ func (t *TestSuite) addTestRole(username string, role string) {
 func (t *TestSuite) setupAuth(cfg *testhelpers.TestConfig,
 ) (*kbaseauthcontroller.Controller, url.URL) {
 	auth, err := kbaseauthcontroller.New(kbaseauthcontroller.Params{
-		JarsDir:       cfg.JarsDir,
+		Auth2Jar:      cfg.Auth2JarPath,
 		MongoHost:     "localhost:" + strconv.Itoa(t.mongo.GetPort()),
 		MongoDatabase: "test_kb_auth_provider_authdb",
 		RootTempDir:   cfg.TempDir,
