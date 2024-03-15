@@ -131,22 +131,17 @@ func checkAuthJarExists(auth2Jar string) (string, error) {
 }
 
 func installTemplates(authJarPath string, templateDir string) error {
-	buff, err := ioutil.ReadFile(authJarPath)  //read the content of file
+	jar, err := zip.OpenReader(authJarPath)
 	if err != nil {
 		return err
 	}
 
-	r, err := zip.NewReader(bytes.NewReader(buff), int64(len(buff)))
-	if err != nil {
-		return err
-	}
-
-	for _, f := range r.File {
+	for _, f := range jar.File {
 		name := f.Name
 		// not a directory
 		if !strings.HasSuffix(name, "/") && strings.HasPrefix(name, "kbase_auth2_templates") {
 			name = path.Clean(name)
-			if path.IsAbs(name) {
+			if filepath.Dir(name) != "kbase_auth2_templates" {
 				return fmt.Errorf("jar file %v contains files outside the directory - "+
 					"this is a sign of a malicious jar file", authJarPath)
 			}
