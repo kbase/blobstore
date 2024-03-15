@@ -150,7 +150,7 @@ func installTemplates(authJarPath string, templateDir string) error {
 				return fmt.Errorf("jar file %v contains files outside the directory - "+
 					"this is a sign of a malicious jar file", authJarPath)
 			}
-			dst, err := filepath.Abs(path.Join(templateDir, name))
+			dst, err := filepath.Abs(path.Join(templateDir, filepath.Base(name)))
 			if err != nil {
 				return err
 			}
@@ -168,7 +168,6 @@ func installTemplates(authJarPath string, templateDir string) error {
 			}
 			defer destination.Close()
 
-			fmt.Println("pass this line")
 			io.Copy(destination, source)
 		}
 	}
