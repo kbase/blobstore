@@ -10,7 +10,7 @@ test.mongo.exe=mongod
 # no.
 test.mongo.wired_tiger=false
 
-# The path to the auth2 jar
+# The path to the kbase auth2 service shadow test jar
 test.auth2jar=
 
 # Where to store temporary files generated during the test.

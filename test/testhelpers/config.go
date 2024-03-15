@@ -21,7 +21,7 @@ const (
 	TestMongoExe = "test.mongo.exe"
 	// TestUseWiredTiger denotes that the MongoDB WiredTiger storage engine should be used.
 	TestUseWiredTiger = "test.mongo.wired_tiger"
-	// TestAuth2Jar is the key in the config file for the path to the KBase auth2 jar.
+	// TestAuth2Jar is the key in the config file for the path to the KBase auth2 shadow test jar.
 	TestAuth2Jar = "test.auth2jar"
 	// TestTempDir is the key in the config file for the temporary directory.
 	TestTempDir = "test.temp.dir"

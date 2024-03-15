@@ -1,6 +1,7 @@
 package kbaseauthcontroller
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -23,9 +24,6 @@ import (
 
 const (
 	serverClass = "us.kbase.test.auth2.StandaloneAuthServer"
-
-	// The max number of attempts to check if templates have been pulled out of the shadow jar
-	attempts = 10
 )
 
 // Params are Parameters for creating a KBase Auth2 service (https://github.com/kbase/auth2)
@@ -50,11 +48,7 @@ type Controller struct {
 
 // New creates a new controller.
 func New(p Params) (*Controller, error) {
-	classPath, err := getClassPath(p.Auth2Jar)
-	if err != nil {
-		return nil, err
-	}
-	tpath, err := pullTemplatesOutofAuth2Jar(classPath)
+	authJarPath, err := checkAuthJarExists(p.Auth2Jar)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +58,7 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = installTemplates(tpath, templateDir)
+	err = installTemplates(authJarPath, templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +72,7 @@ func New(p Params) (*Controller, error) {
 	}
 	strport := strconv.Itoa(port)
 	cmdargs := []string{
-		"-classpath", classPath,
+		"-classpath", authJarPath,
 		"-DAUTH2_TEST_MONGOHOST=" + p.MongoHost,
 		"-DAUTH2_TEST_MONGODB=" + p.MongoDatabase,
 		"-DAUTH2_TEST_TEMPLATE_DIR=" + templateDir,
@@ -125,7 +119,7 @@ func waitForStartup(port string) error {
 	return startupErr
 }
 
-func getClassPath(auth2Jar string) (string, error) {
+func checkAuthJarExists(auth2Jar string) (string, error) {
 	jpath, err := filepath.Abs(auth2Jar)
 	if err != nil {
 		return "", err
@@ -136,51 +130,25 @@ func getClassPath(auth2Jar string) (string, error) {
 	return jpath, nil
 }
 
-func pullTemplatesOutofAuth2Jar(classPath string) (string, error) {
-	dirPath := filepath.Dir(classPath)
-	outfile, err := os.Create(filepath.Join(dirPath, "output.txt"))
+func installTemplates(authJarPath string, templateDir string) error {
+	buff, err := ioutil.ReadFile(authJarPath)  //read the content of file
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	cmdargs := []string{classPath, "-d", dirPath}
-	cmd := exec.Command("unzip", cmdargs...)
-	cmd.Stdout = outfile
-	cmd.Stderr = outfile
-	err = cmd.Start()
+	r, err := zip.NewReader(bytes.NewReader(buff), int64(len(buff)))
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	tpath := filepath.Join(dirPath, "kbase_auth2_templates")
-
-	i := 0
-	for i < attempts {
-		if _, err := os.Stat(tpath); os.IsNotExist(err) {
-			time.Sleep(1 * time.Second)
-			i += 1
-			continue
-		}
-		break
-    }
-	if i == attempts {
-		return "", fmt.Errorf("the template folder %v does not exist", tpath)
-	}
-	return tpath, err
-}
-
-func installTemplates(tpath string, templateDir string) error {
-	files, err := ioutil.ReadDir(tpath)
-	if err != nil {
-        return err
-    }
-	for _, f := range files {
-		name := f.Name()
-		if !strings.HasSuffix(name, "/") { // not a directory
+	for _, f := range r.File {
+		name := f.Name
+		// not a directory
+		if !strings.HasSuffix(name, "/") && strings.HasPrefix(name, "kbase_auth2_templates") {
 			name = path.Clean(name)
-			if path.IsAbs(name) || strings.HasPrefix(name, "..") {
-				return fmt.Errorf("template folder %v contains files outside the directory - "+
-					"this is a sign of a malicious template folder", tpath)
+			if path.IsAbs(name) {
+				return fmt.Errorf("jar file %v contains files outside the directory - "+
+					"this is a sign of a malicious jar file", authJarPath)
 			}
 			dst, err := filepath.Abs(path.Join(templateDir, name))
 			if err != nil {
@@ -188,8 +156,7 @@ func installTemplates(tpath string, templateDir string) error {
 			}
 			os.MkdirAll(path.Dir(dst), 0600)
 
-			src := filepath.Join(tpath, name)
-			source, err := os.Open(src)
+			source, err := f.Open()
 			if err != nil {
 				return err
 			}
