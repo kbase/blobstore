@@ -168,6 +168,7 @@ func installTemplates(authJarPath string, templateDir string) error {
 			}
 			defer destination.Close()
 
+			fmt.Println("pass this line")
 			io.Copy(destination, source)
 		}
 	}
