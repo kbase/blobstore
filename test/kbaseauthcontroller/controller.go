@@ -29,8 +29,8 @@ const (
 // Params are Parameters for creating a KBase Auth2 service (https://github.com/kbase/auth2)
 // controller.
 type Params struct {
-	// JarsDir is the path to the /lib/jars directory of the
-	JarsDir string
+	// Auth2Jar is the path to the kbase auth2 jar.
+	Auth2Jar string
 	// MongoHost is the mongo host.
 	MongoHost string
 	// MongoDatabase is the database to use for auth data.
@@ -48,7 +48,7 @@ type Controller struct {
 
 // New creates a new controller.
 func New(p Params) (*Controller, error) {
-	classPath, err := getClassPath(p.JarsDir)
+	authJarPath, err := checkAuthJarExists(p.Auth2Jar)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func New(p Params) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = installTemplates(p.JarsDir, templateDir)
+	err = installTemplates(authJarPath, templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func New(p Params) (*Controller, error) {
 	}
 	strport := strconv.Itoa(port)
 	cmdargs := []string{
-		"-classpath", classPath,
+		"-classpath", authJarPath,
 		"-DAUTH2_TEST_MONGOHOST=" + p.MongoHost,
 		"-DAUTH2_TEST_MONGODB=" + p.MongoDatabase,
 		"-DAUTH2_TEST_TEMPLATE_DIR=" + templateDir,
@@ -119,50 +119,51 @@ func waitForStartup(port string) error {
 	return startupErr
 }
 
-func getClassPath(jarsDir string) (string, error) {
-	jarsDir, err := filepath.Abs(jarsDir)
+func checkAuthJarExists(auth2Jar string) (string, error) {
+	jpath, err := filepath.Abs(auth2Jar)
 	if err != nil {
 		return "", err
 	}
-	cp := []string(nil)
-	for _, j := range jars { // global variable, yech
-		jpath := path.Join(jarsDir, j)
-		if _, err := os.Stat(jpath); os.IsNotExist(err) {
-			return "", fmt.Errorf("Jar %v does not exist", jpath)
-		}
-		cp = append(cp, jpath)
+	if _, err := os.Stat(jpath); os.IsNotExist(err) {
+		return "", fmt.Errorf("jar %v does not exist", jpath)
 	}
-	return strings.Join(cp, ":"), nil
+	return jpath, nil
 }
 
-func installTemplates(jarsDir string, templateDir string) error {
-	templateZip := path.Join(jarsDir, authTemplates)
-	arch, err := zip.OpenReader(templateZip) // global variable, yech
+func installTemplates(authJarPath string, templateDir string) error {
+	jar, err := zip.OpenReader(authJarPath)
 	if err != nil {
 		return err
 	}
-	for _, f := range arch.File {
-		name := f.FileHeader.Name
-		if !strings.HasSuffix(name, "/") { // not a directory
-			name = path.Clean(name)
-			if path.IsAbs(name) || strings.HasPrefix(name, "..") {
-				return fmt.Errorf("Zip file %v contains files outside the zip directory - "+
-					"this is a sign of a malicious zip file", templateZip)
-			}
-			target, err := filepath.Abs(path.Join(templateDir, name))
-			if err != nil {
-				return err
-			}
-			os.MkdirAll(path.Dir(target), 0600)
-			r, err := f.Open()
-			if err != nil {
-				return err
-			}
-			f, err := os.Create(target)
 
-			io.Copy(f, r)
-			r.Close()
-			f.Close()
+	for _, f := range jar.File {
+		name := f.Name
+		// not a directory
+		if !strings.HasSuffix(name, "/") && strings.HasPrefix(name, "kbase_auth2_templates") {
+			name = path.Clean(name)
+			if filepath.Dir(name) != "kbase_auth2_templates" {
+				return fmt.Errorf("jar file %v contains files outside the directory - "+
+					"this is a sign of a malicious jar file", authJarPath)
+			}
+			dst, err := filepath.Abs(path.Join(templateDir, filepath.Base(name)))
+			if err != nil {
+				return err
+			}
+			os.MkdirAll(path.Dir(dst), 0600)
+
+			source, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer source.Close()
+
+			destination, err := os.Create(dst)
+			if err != nil {
+				return err
+			}
+			defer destination.Close()
+
+			io.Copy(destination, source)
 		}
 	}
 	return nil

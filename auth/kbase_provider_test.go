@@ -53,7 +53,7 @@ func (t *TestSuite) SetupSuite() {
 	t.mongo = mongoctl
 
 	auth, err := kbaseauthcontroller.New(kbaseauthcontroller.Params{
-		JarsDir:       tcfg.JarsDir,
+		Auth2Jar:      tcfg.Auth2JarPath,
 		MongoHost:     "localhost:" + strconv.Itoa(mongoctl.GetPort()),
 		MongoDatabase: "test_kb_auth_provider_authdb",
 		RootTempDir:   tcfg.TempDir,
@@ -260,7 +260,6 @@ func (t *TestSuite) TestGetUserFailBadURL() {
 				"<!DOCTYPE html>",
 				"<head>",
 				"<title>1944 Birthday Honours/api/V2/token - Wikipedia</title>",
-				"February",
 			},
 			1000,
 		},
@@ -382,7 +381,6 @@ func (t *TestSuite) TestValidateUserNameFailBadURL() {
 				"<!DOCTYPE html>",
 				"<head>",
 				"<title>1944 Birthday Honours/api/V2/users - Wikipedia</title>",
-				"February",
 			},
 			1000,
 		},

@@ -1,0 +1,87 @@
+name: KBase Blobstore test
+
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
+  push:
+    # run workflow when merging to main or develop
+    branches:
+      - main
+      - master
+      - develop
+
+env:
+  AUTH2_JAR_NAME: kbase-auth2-test-shadow-all-0.7.0.jar
+
+jobs:
+  workspace_deluxe_tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - go: '1.12'
+            mongo: 'mongodb-linux-x86_64-3.6.12'
+            minio: '2019-05-23T00-29-34Z'
+            wired_tiger: 'false'
+          - go: '1.12'
+            mongo: 'mongodb-linux-x86_64-ubuntu2204-7.0.4'
+            minio: '2019-05-23T00-29-34Z'
+            wired_tiger: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{matrix.go}}
+
+      - name: Install dependencies and set up test config
+        shell: bash
+        run: |
+
+          # set HOMEDIR
+          export HOMEDIR=`pwd`
+
+          # move to parent dir to install binaries etc
+          cd ..
+
+          # set up auth2 jar
+          wget -q https://github.com/kbase/jars/raw/master/lib/jars/kbase/auth2/$AUTH2_JAR_NAME
+          export AUTH2JAR=`pwd`/$AUTH2_JAR_NAME
+
+          # set up mongo
+          wget -q http://fastdl.mongodb.org/linux/${{matrix.mongo}}.tgz
+          tar xfz ${{matrix.mongo}}.tgz
+          export MONGOD=`pwd`/${{matrix.mongo}}/bin/mongod
+
+          # set up minio
+          export MINIO=$HOMEDIR/test_dependencies/minio/${{matrix.minio}}/minio
+          gunzip $MINIO.gz 
+          chmod a+x $MINIO
+
+          # set up test config
+          cd $HOMEDIR
+          cp -n test.cfg.example test.cfg
+          sed -i "s#^test.temp.dir =.*#test.temp.dir=temp_test_dir#" test.cfg
+          sed -i "s#^test.mongo.exe.*#test.mongo.exe=$MONGOD#" test.cfg
+          sed -i "s#^test.minio.exe.*#test.minio.exe=$MINIO#" test.cfg
+          sed -i "s#^test.mongo.wired_tiger.*#test.mongo.wired_tiger=${{matrix.wired_tiger}}#" test.cfg
+          sed -i "s#^test.auth2jar.*#test.auth2jar=$AUTH2JAR#" test.cfg
+          cat test.cfg
+
+      - name: Run tests
+        shell: bash
+        run: |
+          export GO111MODULE=on
+          go build app/blobstore.go
+          export TCFG=`pwd`/test.cfg
+          BLOBSTORE_TEST_CFG=$TCFG go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true

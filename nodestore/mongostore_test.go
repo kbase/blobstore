@@ -105,7 +105,8 @@ func (t *TestSuite) TestConstructFailAddConfigIndex() {
 	t.Contains(err.Error(), "E11000 duplicate key error", "incorrect error")
 	t.Contains(err.Error(), testDB+".config", "incorrect error")
 	t.Contains(err.Error(), "schema_1", "incorrect error")
-	t.Contains(err.Error(), "dup key: { : \"schema\" }", "incorrect error")
+	t.Contains(err.Error(), "dup key: { ", "incorrect error")
+	t.Contains(err.Error(), ": \"schema\" }", "incorrect error")
 }
 
 func (t *TestSuite) TestConstructFailTwoConfigDocs() {
@@ -773,7 +774,7 @@ func (t *TestSuite) TestConfigIndexes() {
 		"_id_":     false,
 		"schema_1": true,
 	}
-	t.checkIndexes("config", testDB+".config", expected)
+	t.checkIndexes("config", expected)
 }
 
 func (t *TestSuite) TestUserIndexes() {
@@ -782,7 +783,7 @@ func (t *TestSuite) TestUserIndexes() {
 		"user_1": true,
 		"id_1":   true,
 	}
-	t.checkIndexes("users", testDB+".users", expected)
+	t.checkIndexes("users", expected)
 }
 
 func (t *TestSuite) TestNodeIndexes() {
@@ -790,12 +791,11 @@ func (t *TestSuite) TestNodeIndexes() {
 		"_id_": false,
 		"id_1": true,
 	}
-	t.checkIndexes("nodes", testDB+".nodes", expected)
+	t.checkIndexes("nodes", expected)
 }
 
 func (t *TestSuite) checkIndexes(
 	collection string,
-	expectedNamespace string,
 	expectedIndexes map[string]bool) {
 	_, err := NewMongoNodeStore(t.client.Database(testDB))
 	if err != nil {
@@ -815,7 +815,6 @@ func (t *TestSuite) checkIndexes(
 			t.Fail(err.Error())
 		}
 		m := elem.Map()
-		t.Equal(expectedNamespace, m["ns"], "incorrect name space")
 		if un, ok := m["unique"]; ok {
 			names[m["name"].(string)] = un.(bool)
 		} else {
