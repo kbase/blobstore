@@ -18,7 +18,7 @@ env:
   AUTH2_JAR_NAME: kbase-auth2-test-shadow-all-0.7.0.jar
 
 jobs:
-  workspace_deluxe_tests:
+  blobstore_tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -84,4 +84,5 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
