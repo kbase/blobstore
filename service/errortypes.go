@@ -18,13 +18,27 @@ const (
 // special explanation in the error string.
 type UnauthorizedCustomError string
 
-// UnauthorizedCustomError creates a new UnauthorizedCustomError.
+// NewUnauthorizedCustomError creates a new UnauthorizedCustomError.
 func NewUnauthorizedCustomError(err string) *UnauthorizedCustomError {
 	e := UnauthorizedCustomError(err)
 	return &e
 }
 
 func (e *UnauthorizedCustomError) Error() string {
+	return string(*e)
+}
+
+// InvalidTokenCustomError denotes that an invalid token was submitted and special explanation
+// is needed in the error string.
+type InvalidTokenCustomError string
+
+// NewInvalidTokenCustomError creates a new InvalidTokenCustomError.
+func NewInvalidTokenCustomError(err string) *InvalidTokenCustomError {
+	e := InvalidTokenCustomError(err)
+	return &e
+}
+
+func (e *InvalidTokenCustomError) Error() string {
 	return string(*e)
 }
 
@@ -35,6 +49,8 @@ func translateError(err error) (code int, errstr string) {
 	case *auth.InvalidTokenError:
 		// Shock compatibility, should be 401
 		return http.StatusBadRequest, invalidAuthHeader
+	case *InvalidTokenCustomError:
+		return http.StatusUnauthorized, t.Error()
 	case *core.NoBlobError:
 		return http.StatusNotFound, "Node not found"
 	case *core.UnauthorizedError:
@@ -45,7 +61,7 @@ func translateError(err error) (code int, errstr string) {
 		return http.StatusBadRequest, "Users that are not node owners can only delete " +
 			"themselves from ACLs."
 	case *UnauthorizedCustomError:
-		return http.StatusUnauthorized, t.Error()
+		return http.StatusForbidden, t.Error()
 	case *auth.InvalidUserError:
 		// no equivalent shock error, it accepts any string as a username
 		return http.StatusBadRequest, t.Error()

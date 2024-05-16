@@ -28,6 +28,9 @@ s3-disable-ssl-verify = {{ default .Env.s3_disable_ssl_verify "false" }}
 kbase-auth-url = {{ default .Env.kbase_auth_url "https://ci.kbase.us/services/auth" }}
 # KBase auth server custom roles that denote the user is a blobstore admin. Comma delimited.
 kbase-auth-admin-roles = {{ default .Env.kbase_auth_admin_roles "KBASE_ADMIN, BLOBSTORE_ADMIN" }}
+# A list of comma separated cookie names to check for authentication tokens.
+# The authentication header is checked first, then each cookie in the list in order.
+kbase-auth-token-cookies = {{ default .Env.kbase_auth_token_cookies "kbase_session, kbase_session_backup" }}
 
 # If "true", make the server ignore the X-Forwarded-For and X-Real-IP headers. Otherwise
 # (the default behavior), the logged IP address for a request, in order of precedence, is

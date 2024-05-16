@@ -101,8 +101,17 @@ This data structure is identical to Shock's error data structure.
 
 # API
 
-Requests are authenticated by including the header `Authorization: OAuth <kbase token>` in the
-request.
+## Authentication
+
+Requests are authenticated by including the header `Authorization: OAuth <kbase token>` or
+including a cookie with the value of `<kbase token>` in the request.
+
+The names of cookies that the server will check are set in the deployment configuration file.
+
+The header takes precedence, then each cookie in the list in the configuration file in order.
+
+Note that for backwards compatibility, incorrect or invalid authentication headers respond with a
+400 HTTP code. Invalid cookies respond with the appropriate 401 code.
 
 ## Root
 

@@ -1,6 +1,7 @@
 # 0.1.4
 
 * Added the `del` param when downloading the file from a node.
+* The Blobstore will now look for auth tokens in cookies specified in the deployment configuration.
 
 # 0.1.3
 

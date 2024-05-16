@@ -68,6 +68,7 @@ type Server struct {
 	auth             *authcache.Cache
 	store            *core.BlobStore
 	ignoreXIPheaders bool
+	authCookieNames  *[]string
 }
 
 // New create a new server.
@@ -88,6 +89,7 @@ func New(cfg *config.Config, sconf ServerStaticConf) (*Server, error) {
 		auth:             deps.AuthCache,
 		store:            deps.BlobStore,
 		ignoreXIPheaders: cfg.DontTrustXIPHeaders,
+		authCookieNames:  cfg.AuthTokenCookies,
 	}
 	router.NotFoundHandler = http.HandlerFunc(s.notFoundHandler)
 	router.MethodNotAllowedHandler = http.HandlerFunc(s.notAllowedHandler)
@@ -218,11 +220,25 @@ func (s *Server) authLogMiddleWare(next http.Handler) http.Handler {
 			writeErrorWithCode(le, err.Error(), 400, w)
 			return
 		}
+		cookieName := ""
+		if token == "" {
+			for _, cn := range *s.authCookieNames {
+				cookie, err := r.Cookie(cn)
+				if err == nil && strings.TrimSpace(cookie.Value) != "" {
+					token = cookie.Value
+					cookieName = cn
+					break
+				}
+			}
+		}
 		var user *auth.User
 		if token != "" {
 			var err error
 			user, err = s.auth.GetUser(le, token)
 			if err != nil {
+				if cookieName != "" {
+					err = NewInvalidTokenCustomError(err.Error()+" from cookie "+cookieName)
+				}
 				writeError(le, err, w)
 				return
 			}
