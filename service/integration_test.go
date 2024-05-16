@@ -72,9 +72,7 @@ func (t *TestSuite) SetupSuite() {
 
 	t.mongo, t.mongoclient = t.setupMongo(tcfg)
 	t.minio = t.setupMinio(tcfg)
-	auth, authurl := t.setupAuth(tcfg)
-	t.auth = auth
-	t.authurl = authurl
+	t.auth, t.authurl = t.setupAuth(tcfg)
 	t.setUpUsersAndRoles()
 
 	logrus.SetOutput(ioutil.Discard)
@@ -91,7 +89,7 @@ func (t *TestSuite) SetupSuite() {
 			S3AccessSecret:   "sooporsecret",
 			S3Region:         "us-west-1",
 			S3DisableSSL:     true,
-			AuthURL:          &authurl,
+			AuthURL:          &t.authurl,
 			AuthAdminRoles:   &[]string{adminRole, blobstoreRole},
 			AuthTokenCookies: &[]string{"cookie1", "cookie2", "cookie3"},
 		},
@@ -543,8 +541,8 @@ func (t *TestSuite) TestAuthenticationMiddleWareFailBadCookie() {
 
 func (t *TestSuite) TestStoreAndGetWithFilename() {
 	// check whitespace
-	body := t.req("POST", t.url+"/node?filename=%20%20myfile%20%20",
-		strings.NewReader("foobarbaz"), "     OAuth    "+t.noRole.token+"      ", 380, 200)
+	body := t.req("POST", t.url+"/node?filename=%20%20my_fileթ%20%20",
+		strings.NewReader("foobarbaz"), "     OAuth    "+t.noRole.token+"      ", 383, 200)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.noRole.user,
 		"request complete", mtmap(), false},
@@ -565,7 +563,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 			"format":     "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name":     "myfile",
+				"name":     "my_fileթ",
 				"size":     float64(9),
 			},
 		},
@@ -583,26 +581,26 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 			"format":        "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name":     "myfile",
+				"name":     "my_fileթ",
 				"size":     float64(9),
 			},
 		},
 		"error":  nil,
 		"status": float64(200),
 	}
-	t.checkNode(id, &t.noRole, 380, expected2)
+	t.checkNode(id, &t.noRole, 383, expected2)
 
 	path1 := "/node/" + id
 	path2 := path1 + "/"
-	t.checkFile(t.url+path1+"?download", path1, &t.noRole, 9, "myfile", []byte("foobarbaz"))
-	t.checkFile(t.url+path2+"?download", path2, &t.noRole, 9, "myfile", []byte("foobarbaz"))
+	t.checkFile(t.url+path1+"?download", path1, &t.noRole, 9, "my_fileթ", []byte("foobarbaz"))
+	t.checkFile(t.url+path2+"?download", path2, &t.noRole, 9, "my_fileթ", []byte("foobarbaz"))
 	t.checkFile(t.url+path1+"?download_raw", path1, &t.noRole, 9, "", []byte("foobarbaz"))
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
 func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekAndLength() {
-	body := t.req("POST", t.url+"/node/?format=JSON", strings.NewReader("foobarbaz"),
-		"oauth "+t.noRole.token, 378, 200)
+	body := t.req("POST", t.url+"/node/?format=J-SONթ", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 381, 200)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
@@ -617,7 +615,7 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 			"created_on":    time,
 			"last_modified": time,
 			"id":            id,
-			"format":        "JSON",
+			"format":        "J-SONթ",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
 				"name":     "",
@@ -628,7 +626,7 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 		"status": float64(200),
 	}
 	path := "/node/" + id
-	t.checkNode(id, &t.stdRole, 378, expected)
+	t.checkNode(id, &t.stdRole, 381, expected)
 	dl := fmt.Sprintf("?download&seek=2&length=5")
 	dlnolen := fmt.Sprintf("?download&seek=6")
 	dlr := fmt.Sprintf("?download_raw&seek=7&length=100")
@@ -637,7 +635,7 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 	t.checkFile(t.url+path+dl, path, &t.stdRole, 5, id, []byte("obarb"))
 	t.checkFile(t.url+path+dlnolen, path, &t.stdRole, 3, id, []byte("baz"))
 	t.checkFile(t.url+path+dlr, path, &t.stdRole, 2, "", []byte("az"))
-	t.checkNode(id, &t.kBaseAdmin, 378, expected)
+	t.checkNode(id, &t.kBaseAdmin, 381, expected)
 	t.checkFile(t.url+path+noopdl, path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
 	t.checkFile(t.url+path+dlrlen, path, &t.kBaseAdmin, 7, "", []byte("foobarb"))
 }
@@ -660,9 +658,9 @@ func (t *TestSuite) testGetFileWithDelete(deleter User) {
 }
 
 func (t *TestSuite) TestStoreMIMEMultipartFilenameFormat() {
-	partsuffix := ` filename="myfile.txt"`
-	format := "gasbomb"
-	t.storeMIMEMultipart(partsuffix, &format, "myfile.txt", 392)
+	partsuffix := ` filename="my-file.txt"`
+	format := "gas_bomb"
+	t.storeMIMEMultipart(partsuffix, &format, "my-file.txt", 394)
 }
 
 func (t *TestSuite) TestStoreMIMEMultipartWhitespaceFileNameFormat() {
@@ -768,6 +766,53 @@ func (t *TestSuite) storeMIMEMultipart(
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 11, "", []byte("foobarbazba"))
 }
 
+
+func (t *TestSuite) TestGetNodeAndFileWithIllegalFileNameAndFormat() {
+	// In versions of the Blobstore before 0.1.4, filename and format strings were unconstrained
+	// other than they couldn't contain control characters.
+	// That data may still exist in older systems, so we need to test that the data can be
+	// returned, regardless of whether it meets the now stricter criteria for incoming data.
+	body := t.req("POST", t.url+"/node/", strings.NewReader("f"),
+		"oauth "+t.noRole.token, 374, 200)
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, &t.noRole.user,
+		"request complete", mtmap(), false},
+	)
+
+	data := body["data"].(map[string]interface{})
+	id := data["id"].(string)
+	
+	for _, ch := range []string{"*", "|", ":", "¥"} {
+		updatedoc := map[string]interface{}{
+			"$set": map[string]string{
+				"fname": "abc"+ch+"def",
+				"fmt": "uvw"+ch+"xyz",
+			},
+		}
+		t.mongoclient.Database(testDB).Collection("nodes").UpdateOne(
+			nil,
+			map[string]string{"id": id},
+			updatedoc,
+		)
+		req, err := http.NewRequest(http.MethodGet, t.url+"/node/"+id, nil)
+		t.Nil(err, "unexpected error")
+		req.Header.Set("authorization", "oauth "+t.noRole.token)
+		resp, err := http.DefaultClient.Do(req)
+		t.Nil(err, "unexpected error")
+		b, err := ioutil.ReadAll(resp.Body)
+		t.Nil(err, "unexpected error")
+		var body map[string]interface{}
+		json.Unmarshal(b, &body)
+		data = body["data"].(map[string]interface{})
+		t.Equal("uvw"+ch+"xyz", data["format"], "incorrect format")
+		file := data["file"].(map[string]interface{})
+		t.Equal("abc"+ch+"def", file["name"], "incorrect filename")
+		t.loggerhook.Reset()
+		t.checkFile(
+			t.url+"/node/"+id+"?download", "/node/"+id, &t.noRole, 1, "abc"+ch+"def", []byte("f"),
+		)
+	}
+}
+
 func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
 	// don't load MIME this way, sticks everything in memory
 	for _, cl := range []string{"", "not a number", "-1"} {
@@ -858,7 +903,7 @@ func (t *TestSuite) TestFormNodeFailEarlyEOFAfterFormat() {
 		"--supahboundary\n"+
 			`Content-Disposition: form-data; name="format"`+"\n"+
 			"\n"+
-			"format here\n",
+			"formathere\n",
 	))
 	t.Nil(err, "unexpected error")
 	req.Header.Set("Content-Type", "multipart/form-data; boundary=supahboundary")
@@ -1112,6 +1157,13 @@ func (t *TestSuite) TestStoreBadFileName() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
 		"File name contains control characters", mtmap(), false},
 	)
+
+	body = t.req("POST", t.url+"/node?filename=foo☃bar", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 124, 400)
+	t.checkError(body, 400, "File name string foo☃bar contains an illegal character: '☃'")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File name string foo☃bar contains an illegal character: '☃'", mtmap(), false},
+)
 }
 
 func (t *TestSuite) TestStoreBadFileFormat() {
@@ -1121,6 +1173,13 @@ func (t *TestSuite) TestStoreBadFileFormat() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
 		"File format contains control characters", mtmap(), false},
 	)
+
+	body = t.req("POST", t.url+"/node?format=foo∑bar", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 126, 400)
+	t.checkError(body, 400, "File format string foo∑bar contains an illegal character: '∑'")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File format string foo∑bar contains an illegal character: '∑'", mtmap(), false},
+)
 }
 
 func (t *TestSuite) TestGetNodeBadID() {

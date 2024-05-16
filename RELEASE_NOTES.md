@@ -2,6 +2,9 @@
 
 * Added the `del` param when downloading the file from a node.
 * The Blobstore will now look for auth tokens in cookies specified in the deployment configuration.
+* The filename and format strings are now much more restrictive in regard to allowed contents.
+  See the API documenation for details.
+  * Any extant data is not affected and will be returned when requested as normal.
 
 # 0.1.3
 
