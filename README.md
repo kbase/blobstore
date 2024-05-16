@@ -171,7 +171,7 @@ RETURNS: an ACL.
 ## Download a file from a node
 ```
 AUTHORIZATION OPTIONAL
-GET /node/<id>?download[_raw][&seek=#][&length=#]
+GET /node/<id>?download[_raw][&seek=#][&length=#][&del]
 
 RETURNS: the file content.
 ```
@@ -185,6 +185,10 @@ to the file size is an error. Defaults to 0.
 `length` determines the number of bytes of the file to return after skipping `seek` bytes.
 `length` may be greater than the remaining file length. Defaults to 0, which indicates that the
 remainder of the file should be returned.
+
+`del` causes the node to be deleted once the file contents have been streamed. The user must
+be the node owner or a service administrator. Note this is playing very fast and loose with the
+semantics of an HTTP GET.
 
 ## Set a node to be publicly readable
 ```

@@ -544,6 +544,23 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 	t.checkFile(t.url+path+dlrlen, path, &t.kBaseAdmin, 7, "", []byte("foobarb"))
 }
 
+func (t *TestSuite) TestGetFileWithDelete() {
+	t.testGetFileWithDelete(t.noRole)
+	t.testGetFileWithDelete(t.stdRole)
+}
+
+func (t *TestSuite) testGetFileWithDelete(deleter User) {
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"OAuth "+t.noRole.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	path := "/node/" + id
+	dl := "?download&del"
+	t.checkFile(t.url+path+dl, path, &deleter, 9, id, []byte("foobarbaz"))
+	t.checkNodeDeleted(id, t.noRole)
+}
+
 func (t *TestSuite) TestStoreMIMEMultipartFilenameFormat() {
 	partsuffix := ` filename="myfile.txt"`
 	format := "gasbomb"
@@ -1065,7 +1082,7 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	)
 }
 
-func (t *TestSuite) TestGetNodeFailSeekAndLength() {
+func (t *TestSuite) TestGetFileFailSeekAndLength() {
 	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
 		"OAuth "+t.kBaseAdmin.token, 374, 200)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -1101,6 +1118,49 @@ func (t *TestSuite) TestGetNodeFailSeekAndLength() {
 	t.checkError(nodeb5, 400, "Cannot parse length param totallyanumber to non-negative integer")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
 		"Cannot parse length param totallyanumber to non-negative integer", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestGetFileFailDelete() {
+	// only tests differences between the standard path and the delete path
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"OAuth "+t.noRole.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	uid := uuid.New()
+	body2 := t.get(t.url+"/node/"+uid.String()+"?download&del", &t.noRole, 75, 404)
+	t.checkError(body2, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/"+uid.String(), 404, &t.noRole.user,
+		"Node not found", mtmap(), false},
+	)
+	body3 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 78, 401)
+	t.checkError(body3, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole2.user,
+		"User Unauthorized", mtmap(), false},
+	)
+	body4 := t.get(t.url+"/node/"+id+"?download&del", nil, 78, 401)
+	t.checkError(body4, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
+		"User Unauthorized", mtmap(), false},
+	)
+	// add user 2 to read acl
+	t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
+		"Oauth "+t.noRole.token, 441, 200)
+	t.loggerhook.Reset()
+	body5 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 94, 401)
+	t.checkError(body5, 401, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole2.user,
+		"Only node owners can delete nodes", mtmap(), false},
+	)
+	// make node public
+	t.req("PUT", t.url+"/node/"+id+"/acl/public_read", nil,
+		"Oauth "+t.noRole.token, 440, 200)
+	t.loggerhook.Reset()
+	body6 := t.get(t.url+"/node/"+id+"?download&del", nil, 94, 401)
+	t.checkError(body6, 401, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
+		"Only node owners can delete nodes", mtmap(), false},
 	)
 }
 
@@ -1150,6 +1210,7 @@ func (t *TestSuite) TestDeleteNode() {
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id, 200, &t.noRole.user,
 		"request complete", mtmap(), true},
 	)
+	t.checkNodeDeleted(id, t.noRole)
 
 	// test delete as admin and with trailing slash
 	body = t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
@@ -1163,6 +1224,15 @@ func (t *TestSuite) TestDeleteNode() {
 	t.Equal(expected, body, "incorrect response")
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), true},
+	)
+	t.checkNodeDeleted(id, t.noRole)
+}
+
+func (t *TestSuite) checkNodeDeleted(id string, user User) {
+	body := t.get(t.url+"/node/"+id, &user, 75, 404)
+	t.checkError(body, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 404, &user.user,
+		"Node not found", mtmap(), false},
 	)
 }
 

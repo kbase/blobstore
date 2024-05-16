@@ -14,6 +14,20 @@ const (
 	invalidAuthHeader = "Invalid authorization header or content"
 )
 
+// UnauthorizedCustomError denotes that an unauthorized operation was requested that needs
+// special explanation in the error string.
+type UnauthorizedCustomError string
+
+// UnauthorizedCustomError creates a new UnauthorizedCustomError.
+func NewUnauthorizedCustomError(err string) *UnauthorizedCustomError {
+	e := UnauthorizedCustomError(err)
+	return &e
+}
+
+func (e *UnauthorizedCustomError) Error() string {
+	return string(*e)
+}
+
 func translateError(err error) (code int, errstr string) {
 	// not sure about this approach. Alternative is to add some state to every error that
 	// can be mapped to a code, and I'm not super thrilled about that either.
@@ -30,6 +44,8 @@ func translateError(err error) (code int, errstr string) {
 		// Shock compatibility, really should be 403 forbidden
 		return http.StatusBadRequest, "Users that are not node owners can only delete " +
 			"themselves from ACLs."
+	case *UnauthorizedCustomError:
+		return http.StatusUnauthorized, t.Error()
 	case *auth.InvalidUserError:
 		// no equivalent shock error, it accepts any string as a username
 		return http.StatusBadRequest, t.Error()

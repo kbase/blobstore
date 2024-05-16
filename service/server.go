@@ -514,6 +514,11 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 	user := getUser(r)
 	download := download(r.URL)
 	if download != "" {
+		del, err := checkDel(s, user, id, r.URL)
+		if err != nil {
+			writeError(le, err, w)
+			return
+		}
 		seek, length, err := getSeekAndLengthFromQuery(r.URL)
 		if err != nil {
 			writeError(le, err, w)
@@ -534,6 +539,9 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-length", strconv.FormatInt(size, 10))
 		w.Header().Set("content-type", "application/octet-stream")
 		io.Copy(w, datareader)
+		if del {
+			s.store.DeleteNode(*user, *id) // ignore errors since file is written to output
+		}
 	} else {
 		node, err := s.store.Get(user, *id)
 		if err != nil {
@@ -542,6 +550,29 @@ func (s *Server) getNode(w http.ResponseWriter, r *http.Request) {
 		}
 		writeNode(w, node)
 	}
+}
+
+func checkDel(s *Server, user *auth.User, id *uuid.UUID, u *url.URL) (del bool, err error) {
+	delete := false
+	if _, ok := u.Query()["del"]; ok {
+		delete = true
+		// If we want to move the deletion into the core logic it could go like this:
+		// * pass in deletion flag and a pre-write function that accepts a node
+		// * do the ACL checks, etc.
+		// * the pre-write function is called, which writes the headers to the writer
+		//   * the core logic should not know the writer is a http.ResponseWriter
+		// * stream the file
+		// * delete the node
+		// not worth the trouble for now
+		node, err := s.store.Get(user, *id)
+		if err != nil {
+			return false, err
+		}
+		if user == nil || (user.GetUserName() != node.Owner.AccountName && !user.IsAdmin()) {
+			return false, NewUnauthorizedCustomError("Only node owners can delete nodes")
+		}
+	}
+	return delete, nil
 }
 
 func getSeekAndLengthFromQuery(u *url.URL) (uint64, uint64, error) {
