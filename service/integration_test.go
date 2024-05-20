@@ -80,20 +80,20 @@ func (t *TestSuite) SetupSuite() {
 	logrus.SetOutput(ioutil.Discard)
 	t.loggerhook = logrust.NewGlobal()
 
-	roles := []string{adminRole, blobstoreRole}
 	serv, err := New(
 		&config.Config{
-			Host:           "foo", // not used
-			MongoHost:      "localhost:" + strconv.Itoa(t.mongo.GetPort()),
-			MongoDatabase:  testDB,
-			S3Host:         "localhost:" + strconv.Itoa(t.minio.GetPort()),
-			S3Bucket:       testBucket,
-			S3AccessKey:    "ackey",
-			S3AccessSecret: "sooporsecret",
-			S3Region:       "us-west-1",
-			S3DisableSSL:   true,
-			AuthURL:        &authurl,
-			AuthAdminRoles: &roles,
+			Host:             "foo", // not used
+			MongoHost:        "localhost:" + strconv.Itoa(t.mongo.GetPort()),
+			MongoDatabase:    testDB,
+			S3Host:           "localhost:" + strconv.Itoa(t.minio.GetPort()),
+			S3Bucket:         testBucket,
+			S3AccessKey:      "ackey",
+			S3AccessSecret:   "sooporsecret",
+			S3Region:         "us-west-1",
+			S3DisableSSL:     true,
+			AuthURL:          &authurl,
+			AuthAdminRoles:   &[]string{adminRole, blobstoreRole},
+			AuthTokenCookies: &[]string{"cookie1", "cookie2", "cookie3"},
 		},
 		ServerStaticConf{
 			ServerName:          "servn",
@@ -441,6 +441,104 @@ func (t *TestSuite) checkXIPLogs(xFF, xRIP, ip string) {
 	t.Equal(expectedfields, fields2, "incorrect fields")
 
 	t.loggerhook.Reset()
+}
+
+// Since the middleware applies to every method, testing it exhaustively is unreasonable.
+// Here we test it using a node get for simpliciaty.
+// These tests are expected to exercise the middleware, not the specific data method.
+
+func (t *TestSuite) TestAuthenticationMiddleWare() {
+	fake := "fake"
+	mt := ""
+	ws := "      "
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &t.noRole.token, &fake, &fake, &fake,
+		t.noRole2.user, nil, &t.noRole2.token, &fake, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, nil, &t.noRole.token, &fake, &fake,
+		t.noRole2.user, &t.noRole2.token, &fake, &fake, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, nil, &t.noRole.token, &fake,
+		t.noRole2.user, nil, nil, nil, &t.noRole2.token,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, &ws, nil, &t.noRole.token,
+		t.noRole2.user, &mt, &ws, &t.noRole2.token, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, &mt, &ws, &t.noRole.token,
+		t.noRole2.user, &mt, &mt, &t.noRole2.token, &fake,
+	)
+}
+
+func (t *TestSuite) testAuthenticationMiddleWare(
+	pstUser string, pstHeader *string, pstCookie1 *string, pstCookie2 *string, pstCookie3 *string,
+	getUser string, getHeader *string, getCookie1 *string, getCookie2 *string, getCookie3 *string,
+) {
+	req1, err := http.NewRequest("POST", t.url+"/node", strings.NewReader("d"))
+	t.Nil(err, "unexpected error")
+	addAuthHeader(req1, pstHeader)
+	addCookie(req1, "cookie1", pstCookie1)
+	addCookie(req1, "cookie2", pstCookie2)
+	addCookie(req1, "cookie3", pstCookie3)
+	body := t.requestToJSON(req1, 374, 200)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &pstUser,
+		"request complete", mtmap(), false},
+	)
+	data := body["data"].(map[string]interface{})
+	id := data["id"].(string)
+	t.Equal(body["status"], float64(200), "incorrect status")
+
+	// add read for a different user
+	body = t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
+		"Oauth "+t.noRole.token, 441, 200)
+	t.loggerhook.Reset()
+
+	// now get the node with a different user
+	req2, err := http.NewRequest("GET", t.url+"/node/" + id, nil)
+	t.Nil(err, "unexpected error")
+	addAuthHeader(req2, getHeader)
+	addCookie(req2, "cookie1", getCookie1)
+	addCookie(req2, "cookie2", getCookie2)
+	addCookie(req2, "cookie3", getCookie3)
+	body = t.requestToJSON(req2, 374, 200)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id, 200, &getUser,
+		"request complete", mtmap(), false},
+	)
+	t.Equal(body["status"], float64(200), "incorrect status")
+}
+
+func addCookie(req *http.Request, name string, val *string) {
+	if val != nil {
+		req.AddCookie(&http.Cookie{Name: name, Value: *val})
+	}
+}
+
+func addAuthHeader(req *http.Request, token *string) {
+	if token != nil {
+		if *token == "" {
+			req.Header.Set("authorization", "")
+		} else {
+			req.Header.Set("authorization", "Oauth "+*token)
+		}
+	}
+}
+
+func (t *TestSuite) TestAuthenticationMiddleWareFailBadCookie() {
+	req1, err := http.NewRequest("POST", t.url+"/node", strings.NewReader("d"))
+	t.Nil(err, "unexpected error")
+	c := "fake"
+	addCookie(req1, "cookie2", &c)
+	addCookie(req1, "cookie3", &c)
+	body := t.requestToJSON(req1, 125, 401)
+	t.checkError(body, 401, "KBase auth server reported token was invalid from cookie cookie2")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
+		"KBase auth server reported token was invalid from cookie cookie2", mtmap(), false},
+	)
 }
 
 func (t *TestSuite) TestStoreAndGetWithFilename() {
@@ -1148,18 +1246,18 @@ func (t *TestSuite) TestGetFileFailDelete() {
 	t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
 		"Oauth "+t.noRole.token, 441, 200)
 	t.loggerhook.Reset()
-	body5 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 94, 401)
-	t.checkError(body5, 401, "Only node owners can delete nodes")
-	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole2.user,
+	body5 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 94, 403)
+	t.checkError(body5, 403, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 403, &t.noRole2.user,
 		"Only node owners can delete nodes", mtmap(), false},
 	)
 	// make node public
 	t.req("PUT", t.url+"/node/"+id+"/acl/public_read", nil,
 		"Oauth "+t.noRole.token, 440, 200)
 	t.loggerhook.Reset()
-	body6 := t.get(t.url+"/node/"+id+"?download&del", nil, 94, 401)
-	t.checkError(body6, 401, "Only node owners can delete nodes")
-	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
+	body6 := t.get(t.url+"/node/"+id+"?download&del", nil, 94, 403)
+	t.checkError(body6, 403, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 403, nil,
 		"Only node owners can delete nodes", mtmap(), false},
 	)
 }
