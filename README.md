@@ -150,8 +150,10 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" -T mylittlefile
   "http://<host>/node?filename=mylittlefile&format=text"
 ```
 
-`filename` can be at most 256 characters with no control characters.  
-`format` can be at most 100 characters with no control characters.
+`filename` can be at most 256 characters consisting of only unicode alphanumerics, space, and
+the characters `[ ] ( ) = . - _`.  
+`format` can be at most 100 characters consisting of only unicode alphanumerics and
+the characters `- _`. 
 
 ## Copy a node
 ```
@@ -265,8 +267,8 @@ The form **may** contain a part called `format` where the part contents are the 
 file, equivalent to the `format` query parameter for the standard upload method and with the same
 restrictions. The `format` part **MUST** come before the `upload` part.
 
-Any file name provided in the `Content-Disposition` header can be at most 256 characters with no
-control characters.
+Any file name provided in the `Content-Disposition` header has the same restrictions as the
+filename parameter for the standard upload method.
 
 ### Curl example
 
