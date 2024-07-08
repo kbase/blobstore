@@ -72,28 +72,26 @@ func (t *TestSuite) SetupSuite() {
 
 	t.mongo, t.mongoclient = t.setupMongo(tcfg)
 	t.minio = t.setupMinio(tcfg)
-	auth, authurl := t.setupAuth(tcfg)
-	t.auth = auth
-	t.authurl = authurl
+	t.auth, t.authurl = t.setupAuth(tcfg)
 	t.setUpUsersAndRoles()
 
 	logrus.SetOutput(ioutil.Discard)
 	t.loggerhook = logrust.NewGlobal()
 
-	roles := []string{adminRole, blobstoreRole}
 	serv, err := New(
 		&config.Config{
-			Host:           "foo", // not used
-			MongoHost:      "localhost:" + strconv.Itoa(t.mongo.GetPort()),
-			MongoDatabase:  testDB,
-			S3Host:         "localhost:" + strconv.Itoa(t.minio.GetPort()),
-			S3Bucket:       testBucket,
-			S3AccessKey:    "ackey",
-			S3AccessSecret: "sooporsecret",
-			S3Region:       "us-west-1",
-			S3DisableSSL:   true,
-			AuthURL:        &authurl,
-			AuthAdminRoles: &roles,
+			Host:             "foo", // not used
+			MongoHost:        "localhost:" + strconv.Itoa(t.mongo.GetPort()),
+			MongoDatabase:    testDB,
+			S3Host:           "localhost:" + strconv.Itoa(t.minio.GetPort()),
+			S3Bucket:         testBucket,
+			S3AccessKey:      "ackey",
+			S3AccessSecret:   "sooporsecret",
+			S3Region:         "us-west-1",
+			S3DisableSSL:     true,
+			AuthURL:          &t.authurl,
+			AuthAdminRoles:   &[]string{adminRole, blobstoreRole},
+			AuthTokenCookies: &[]string{"cookie1", "cookie2", "cookie3"},
 		},
 		ServerStaticConf{
 			ServerName:          "servn",
@@ -443,10 +441,108 @@ func (t *TestSuite) checkXIPLogs(xFF, xRIP, ip string) {
 	t.loggerhook.Reset()
 }
 
+// Since the middleware applies to every method, testing it exhaustively is unreasonable.
+// Here we test it using a node get for simpliciaty.
+// These tests are expected to exercise the middleware, not the specific data method.
+
+func (t *TestSuite) TestAuthenticationMiddleWare() {
+	fake := "fake"
+	mt := ""
+	ws := "      "
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &t.noRole.token, &fake, &fake, &fake,
+		t.noRole2.user, nil, &t.noRole2.token, &fake, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, nil, &t.noRole.token, &fake, &fake,
+		t.noRole2.user, &t.noRole2.token, &fake, &fake, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, nil, &t.noRole.token, &fake,
+		t.noRole2.user, nil, nil, nil, &t.noRole2.token,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, &ws, nil, &t.noRole.token,
+		t.noRole2.user, &mt, &ws, &t.noRole2.token, &fake,
+	)
+	t.testAuthenticationMiddleWare(
+		t.noRole.user, &mt, &mt, &ws, &t.noRole.token,
+		t.noRole2.user, &mt, &mt, &t.noRole2.token, &fake,
+	)
+}
+
+func (t *TestSuite) testAuthenticationMiddleWare(
+	pstUser string, pstHeader *string, pstCookie1 *string, pstCookie2 *string, pstCookie3 *string,
+	getUser string, getHeader *string, getCookie1 *string, getCookie2 *string, getCookie3 *string,
+) {
+	req1, err := http.NewRequest("POST", t.url+"/node", strings.NewReader("d"))
+	t.Nil(err, "unexpected error")
+	addAuthHeader(req1, pstHeader)
+	addCookie(req1, "cookie1", pstCookie1)
+	addCookie(req1, "cookie2", pstCookie2)
+	addCookie(req1, "cookie3", pstCookie3)
+	body := t.requestToJSON(req1, 374, 200)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &pstUser,
+		"request complete", mtmap(), false},
+	)
+	data := body["data"].(map[string]interface{})
+	id := data["id"].(string)
+	t.Equal(body["status"], float64(200), "incorrect status")
+
+	// add read for a different user
+	body = t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
+		"Oauth "+t.noRole.token, 441, 200)
+	t.loggerhook.Reset()
+
+	// now get the node with a different user
+	req2, err := http.NewRequest("GET", t.url+"/node/" + id, nil)
+	t.Nil(err, "unexpected error")
+	addAuthHeader(req2, getHeader)
+	addCookie(req2, "cookie1", getCookie1)
+	addCookie(req2, "cookie2", getCookie2)
+	addCookie(req2, "cookie3", getCookie3)
+	body = t.requestToJSON(req2, 374, 200)
+
+	t.checkLogs(logEvent{logrus.InfoLevel, "GET", "/node/" + id, 200, &getUser,
+		"request complete", mtmap(), false},
+	)
+	t.Equal(body["status"], float64(200), "incorrect status")
+}
+
+func addCookie(req *http.Request, name string, val *string) {
+	if val != nil {
+		req.AddCookie(&http.Cookie{Name: name, Value: *val})
+	}
+}
+
+func addAuthHeader(req *http.Request, token *string) {
+	if token != nil {
+		if *token == "" {
+			req.Header.Set("authorization", "")
+		} else {
+			req.Header.Set("authorization", "Oauth "+*token)
+		}
+	}
+}
+
+func (t *TestSuite) TestAuthenticationMiddleWareFailBadCookie() {
+	req1, err := http.NewRequest("POST", t.url+"/node", strings.NewReader("d"))
+	t.Nil(err, "unexpected error")
+	c := "fake"
+	addCookie(req1, "cookie2", &c)
+	addCookie(req1, "cookie3", &c)
+	body := t.requestToJSON(req1, 125, 401)
+	t.checkError(body, 401, "KBase auth server reported token was invalid from cookie cookie2")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 401, nil,
+		"KBase auth server reported token was invalid from cookie cookie2", mtmap(), false},
+	)
+}
+
 func (t *TestSuite) TestStoreAndGetWithFilename() {
 	// check whitespace
-	body := t.req("POST", t.url+"/node?filename=%20%20myfile%20%20",
-		strings.NewReader("foobarbaz"), "     OAuth    "+t.noRole.token+"      ", 380, 200)
+	body := t.req("POST", t.url+"/node?filename=%20%20my_fileթ%20%20",
+		strings.NewReader("foobarbaz"), "     OAuth    "+t.noRole.token+"      ", 383, 200)
 
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node", 200, &t.noRole.user,
 		"request complete", mtmap(), false},
@@ -467,7 +563,7 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 			"format":     "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name":     "myfile",
+				"name":     "my_fileթ",
 				"size":     float64(9),
 			},
 		},
@@ -485,26 +581,26 @@ func (t *TestSuite) TestStoreAndGetWithFilename() {
 			"format":        "",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
-				"name":     "myfile",
+				"name":     "my_fileթ",
 				"size":     float64(9),
 			},
 		},
 		"error":  nil,
 		"status": float64(200),
 	}
-	t.checkNode(id, &t.noRole, 380, expected2)
+	t.checkNode(id, &t.noRole, 383, expected2)
 
 	path1 := "/node/" + id
 	path2 := path1 + "/"
-	t.checkFile(t.url+path1+"?download", path1, &t.noRole, 9, "myfile", []byte("foobarbaz"))
-	t.checkFile(t.url+path2+"?download", path2, &t.noRole, 9, "myfile", []byte("foobarbaz"))
+	t.checkFile(t.url+path1+"?download", path1, &t.noRole, 9, "my_fileթ", []byte("foobarbaz"))
+	t.checkFile(t.url+path2+"?download", path2, &t.noRole, 9, "my_fileթ", []byte("foobarbaz"))
 	t.checkFile(t.url+path1+"?download_raw", path1, &t.noRole, 9, "", []byte("foobarbaz"))
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 9, "", []byte("foobarbaz"))
 }
 
 func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekAndLength() {
-	body := t.req("POST", t.url+"/node/?format=JSON", strings.NewReader("foobarbaz"),
-		"oauth "+t.noRole.token, 378, 200)
+	body := t.req("POST", t.url+"/node/?format=J-SONթ", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 381, 200)
 	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, ptr("noroles"),
 		"request complete", mtmap(), false},
 	)
@@ -519,7 +615,7 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 			"created_on":    time,
 			"last_modified": time,
 			"id":            id,
-			"format":        "JSON",
+			"format":        "J-SONթ",
 			"file": map[string]interface{}{
 				"checksum": map[string]interface{}{"md5": "6df23dc03f9b54cc38a0fc1483df6e21"},
 				"name":     "",
@@ -530,7 +626,7 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 		"status": float64(200),
 	}
 	path := "/node/" + id
-	t.checkNode(id, &t.stdRole, 378, expected)
+	t.checkNode(id, &t.stdRole, 381, expected)
 	dl := fmt.Sprintf("?download&seek=2&length=5")
 	dlnolen := fmt.Sprintf("?download&seek=6")
 	dlr := fmt.Sprintf("?download_raw&seek=7&length=100")
@@ -539,15 +635,32 @@ func (t *TestSuite) TestStoreAndGetNodeAsAdminWithFormatAndTrailingSlashAndSeekA
 	t.checkFile(t.url+path+dl, path, &t.stdRole, 5, id, []byte("obarb"))
 	t.checkFile(t.url+path+dlnolen, path, &t.stdRole, 3, id, []byte("baz"))
 	t.checkFile(t.url+path+dlr, path, &t.stdRole, 2, "", []byte("az"))
-	t.checkNode(id, &t.kBaseAdmin, 378, expected)
+	t.checkNode(id, &t.kBaseAdmin, 381, expected)
 	t.checkFile(t.url+path+noopdl, path, &t.kBaseAdmin, 9, id, []byte("foobarbaz"))
 	t.checkFile(t.url+path+dlrlen, path, &t.kBaseAdmin, 7, "", []byte("foobarb"))
 }
 
+func (t *TestSuite) TestGetFileWithDelete() {
+	t.testGetFileWithDelete(t.noRole)
+	t.testGetFileWithDelete(t.stdRole)
+}
+
+func (t *TestSuite) testGetFileWithDelete(deleter User) {
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"OAuth "+t.noRole.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	path := "/node/" + id
+	dl := "?download&del"
+	t.checkFile(t.url+path+dl, path, &deleter, 9, id, []byte("foobarbaz"))
+	t.checkNodeDeleted(id, t.noRole)
+}
+
 func (t *TestSuite) TestStoreMIMEMultipartFilenameFormat() {
-	partsuffix := ` filename="myfile.txt"`
-	format := "gasbomb"
-	t.storeMIMEMultipart(partsuffix, &format, "myfile.txt", 392)
+	partsuffix := ` filename="my-file.txt"`
+	format := "gas_bomb"
+	t.storeMIMEMultipart(partsuffix, &format, "my-file.txt", 394)
 }
 
 func (t *TestSuite) TestStoreMIMEMultipartWhitespaceFileNameFormat() {
@@ -653,6 +766,53 @@ func (t *TestSuite) storeMIMEMultipart(
 	t.checkFile(t.url+path2+"?download_raw", path2, &t.noRole, 11, "", []byte("foobarbazba"))
 }
 
+
+func (t *TestSuite) TestGetNodeAndFileWithIllegalFileNameAndFormat() {
+	// In versions of the Blobstore before 0.1.4, filename and format strings were unconstrained
+	// other than they couldn't contain control characters.
+	// That data may still exist in older systems, so we need to test that the data can be
+	// returned, regardless of whether it meets the now stricter criteria for incoming data.
+	body := t.req("POST", t.url+"/node/", strings.NewReader("f"),
+		"oauth "+t.noRole.token, 374, 200)
+	t.checkLogs(logEvent{logrus.InfoLevel, "POST", "/node/", 200, &t.noRole.user,
+		"request complete", mtmap(), false},
+	)
+
+	data := body["data"].(map[string]interface{})
+	id := data["id"].(string)
+	
+	for _, ch := range []string{"*", "|", ":", "¥"} {
+		updatedoc := map[string]interface{}{
+			"$set": map[string]string{
+				"fname": "abc"+ch+"def",
+				"fmt": "uvw"+ch+"xyz",
+			},
+		}
+		t.mongoclient.Database(testDB).Collection("nodes").UpdateOne(
+			nil,
+			map[string]string{"id": id},
+			updatedoc,
+		)
+		req, err := http.NewRequest(http.MethodGet, t.url+"/node/"+id, nil)
+		t.Nil(err, "unexpected error")
+		req.Header.Set("authorization", "oauth "+t.noRole.token)
+		resp, err := http.DefaultClient.Do(req)
+		t.Nil(err, "unexpected error")
+		b, err := ioutil.ReadAll(resp.Body)
+		t.Nil(err, "unexpected error")
+		var body map[string]interface{}
+		json.Unmarshal(b, &body)
+		data = body["data"].(map[string]interface{})
+		t.Equal("uvw"+ch+"xyz", data["format"], "incorrect format")
+		file := data["file"].(map[string]interface{})
+		t.Equal("abc"+ch+"def", file["name"], "incorrect filename")
+		t.loggerhook.Reset()
+		t.checkFile(
+			t.url+"/node/"+id+"?download", "/node/"+id, &t.noRole, 1, "abc"+ch+"def", []byte("f"),
+		)
+	}
+}
+
 func (t *TestSuite) TestStoreMIMEMultipartFailContentLength() {
 	// don't load MIME this way, sticks everything in memory
 	for _, cl := range []string{"", "not a number", "-1"} {
@@ -743,7 +903,7 @@ func (t *TestSuite) TestFormNodeFailEarlyEOFAfterFormat() {
 		"--supahboundary\n"+
 			`Content-Disposition: form-data; name="format"`+"\n"+
 			"\n"+
-			"format here\n",
+			"formathere\n",
 	))
 	t.Nil(err, "unexpected error")
 	req.Header.Set("Content-Type", "multipart/form-data; boundary=supahboundary")
@@ -997,6 +1157,13 @@ func (t *TestSuite) TestStoreBadFileName() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
 		"File name contains control characters", mtmap(), false},
 	)
+
+	body = t.req("POST", t.url+"/node?filename=foo☃bar", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 124, 400)
+	t.checkError(body, 400, "File name string foo☃bar contains an illegal character: '☃'")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File name string foo☃bar contains an illegal character: '☃'", mtmap(), false},
+)
 }
 
 func (t *TestSuite) TestStoreBadFileFormat() {
@@ -1006,6 +1173,13 @@ func (t *TestSuite) TestStoreBadFileFormat() {
 	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
 		"File format contains control characters", mtmap(), false},
 	)
+
+	body = t.req("POST", t.url+"/node?format=foo∑bar", strings.NewReader("foobarbaz"),
+		"oauth "+t.noRole.token, 126, 400)
+	t.checkError(body, 400, "File format string foo∑bar contains an illegal character: '∑'")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "POST", "/node", 400, &t.noRole.user,
+		"File format string foo∑bar contains an illegal character: '∑'", mtmap(), false},
+)
 }
 
 func (t *TestSuite) TestGetNodeBadID() {
@@ -1065,7 +1239,7 @@ func (t *TestSuite) TestGetNodeFailPerms() {
 	)
 }
 
-func (t *TestSuite) TestGetNodeFailSeekAndLength() {
+func (t *TestSuite) TestGetFileFailSeekAndLength() {
 	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
 		"OAuth "+t.kBaseAdmin.token, 374, 200)
 	id := (body["data"].(map[string]interface{}))["id"].(string)
@@ -1101,6 +1275,49 @@ func (t *TestSuite) TestGetNodeFailSeekAndLength() {
 	t.checkError(nodeb5, 400, "Cannot parse length param totallyanumber to non-negative integer")
 	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 400, &t.kBaseAdmin.user,
 		"Cannot parse length param totallyanumber to non-negative integer", mtmap(), false},
+	)
+}
+
+func (t *TestSuite) TestGetFileFailDelete() {
+	// only tests differences between the standard path and the delete path
+	body := t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
+		"OAuth "+t.noRole.token, 374, 200)
+	id := (body["data"].(map[string]interface{}))["id"].(string)
+	t.loggerhook.Reset()
+
+	uid := uuid.New()
+	body2 := t.get(t.url+"/node/"+uid.String()+"?download&del", &t.noRole, 75, 404)
+	t.checkError(body2, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/"+uid.String(), 404, &t.noRole.user,
+		"Node not found", mtmap(), false},
+	)
+	body3 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 78, 401)
+	t.checkError(body3, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, &t.noRole2.user,
+		"User Unauthorized", mtmap(), false},
+	)
+	body4 := t.get(t.url+"/node/"+id+"?download&del", nil, 78, 401)
+	t.checkError(body4, 401, "User Unauthorized")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 401, nil,
+		"User Unauthorized", mtmap(), false},
+	)
+	// add user 2 to read acl
+	t.req("PUT", t.url+"/node/"+id+"/acl/read?users="+t.noRole2.user, nil,
+		"Oauth "+t.noRole.token, 441, 200)
+	t.loggerhook.Reset()
+	body5 := t.get(t.url+"/node/"+id+"?download&del", &t.noRole2, 94, 403)
+	t.checkError(body5, 403, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 403, &t.noRole2.user,
+		"Only node owners can delete nodes", mtmap(), false},
+	)
+	// make node public
+	t.req("PUT", t.url+"/node/"+id+"/acl/public_read", nil,
+		"Oauth "+t.noRole.token, 440, 200)
+	t.loggerhook.Reset()
+	body6 := t.get(t.url+"/node/"+id+"?download&del", nil, 94, 403)
+	t.checkError(body6, 403, "Only node owners can delete nodes")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 403, nil,
+		"Only node owners can delete nodes", mtmap(), false},
 	)
 }
 
@@ -1150,6 +1367,7 @@ func (t *TestSuite) TestDeleteNode() {
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id, 200, &t.noRole.user,
 		"request complete", mtmap(), true},
 	)
+	t.checkNodeDeleted(id, t.noRole)
 
 	// test delete as admin and with trailing slash
 	body = t.req("POST", t.url+"/node", strings.NewReader("foobarbaz"),
@@ -1163,6 +1381,15 @@ func (t *TestSuite) TestDeleteNode() {
 	t.Equal(expected, body, "incorrect response")
 	t.checkLogs(logEvent{logrus.InfoLevel, "DELETE", "/node/" + id + "/", 200, &t.kBaseAdmin.user,
 		"request complete", mtmap(), true},
+	)
+	t.checkNodeDeleted(id, t.noRole)
+}
+
+func (t *TestSuite) checkNodeDeleted(id string, user User) {
+	body := t.get(t.url+"/node/"+id, &user, 75, 404)
+	t.checkError(body, 404, "Node not found")
+	t.checkLogs(logEvent{logrus.ErrorLevel, "GET", "/node/" + id, 404, &user.user,
+		"Node not found", mtmap(), false},
 	)
 }
 

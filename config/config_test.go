@@ -93,6 +93,7 @@ func (t *TestSuite) TestMinimalConfig() {
 		S3DisableSSLVerify:  false,
 		AuthURL:             u,
 		AuthAdminRoles:      &[]string{},
+		AuthTokenCookies:    &[]string{},
 		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
@@ -114,6 +115,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		"s3-region =       us-west-1    \t   ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ",
+		"kbase-auth-token-cookies =    \t     ",
 		"dont-trust-x-ip-headers =      \t     ",
 	)
 	cfg, err := New(filePath)
@@ -132,6 +134,7 @@ func (t *TestSuite) TestMinimalConfigWhitespaceFields() {
 		S3DisableSSLVerify:  false,
 		AuthURL:             u,
 		AuthAdminRoles:      &[]string{},
+		AuthTokenCookies:    &[]string{},
 		DontTrustXIPHeaders: false,
 	}
 	t.Equal(&expected, cfg, "incorrect config")
@@ -153,6 +156,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		"s3-disable-ssl-verify=     true    ",
 		"kbase-auth-url = https://kbase.us/authyauth",
 		"kbase-auth-admin-roles =    \t     ,    foo   , \tbar\t , ,  baz ,,",
+		"kbase-auth-token-cookies =    \t   , chokkiechip   , \toreoinmilk\t , , earwaxNsnot ,,",
 		"dont-trust-x-ip-headers =     true   \t  ",
 	)
 	cfg, err := New(filePath)
@@ -173,6 +177,7 @@ func (t *TestSuite) TestMaximalConfig() {
 		S3Region:            "us-west-1",
 		AuthURL:             u,
 		AuthAdminRoles:      &[]string{"foo", "bar", "baz"},
+		AuthTokenCookies:    &[]string{"chokkiechip", "oreoinmilk", "earwaxNsnot"},
 		DontTrustXIPHeaders: true,
 	}
 	t.Equal(&expected, cfg, "incorrect config")

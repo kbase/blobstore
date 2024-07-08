@@ -101,8 +101,17 @@ This data structure is identical to Shock's error data structure.
 
 # API
 
-Requests are authenticated by including the header `Authorization: OAuth <kbase token>` in the
-request.
+## Authentication
+
+Requests are authenticated by including the header `Authorization: OAuth <kbase token>` or
+including a cookie with the value of `<kbase token>` in the request.
+
+The names of cookies that the server will check are set in the deployment configuration file.
+
+The header takes precedence, then each cookie in the list in the configuration file in order.
+
+Note that for backwards compatibility, incorrect or invalid authentication headers respond with a
+400 HTTP code. Invalid cookies respond with the appropriate 401 code.
 
 ## Root
 
@@ -141,8 +150,10 @@ curl -H "Authorization: OAuth $KBASE_TOKEN" -T mylittlefile
   "http://<host>/node?filename=mylittlefile&format=text"
 ```
 
-`filename` can be at most 256 characters with no control characters.  
-`format` can be at most 100 characters with no control characters.
+`filename` can be at most 256 characters consisting of only unicode alphanumerics, space, and
+the characters `[ ] ( ) = . - _`.  
+`format` can be at most 100 characters consisting of only unicode alphanumerics and
+the characters `- _`. 
 
 ## Copy a node
 ```
@@ -171,7 +182,7 @@ RETURNS: an ACL.
 ## Download a file from a node
 ```
 AUTHORIZATION OPTIONAL
-GET /node/<id>?download[_raw][&seek=#][&length=#]
+GET /node/<id>?download[_raw][&seek=#][&length=#][&del]
 
 RETURNS: the file content.
 ```
@@ -185,6 +196,10 @@ to the file size is an error. Defaults to 0.
 `length` determines the number of bytes of the file to return after skipping `seek` bytes.
 `length` may be greater than the remaining file length. Defaults to 0, which indicates that the
 remainder of the file should be returned.
+
+`del` causes the node to be deleted once the file contents have been streamed. The user must
+be the node owner or a service administrator. Note this is playing very fast and loose with the
+semantics of an HTTP GET.
 
 ## Set a node to be publicly readable
 ```
@@ -252,8 +267,8 @@ The form **may** contain a part called `format` where the part contents are the 
 file, equivalent to the `format` query parameter for the standard upload method and with the same
 restrictions. The `format` part **MUST** come before the `upload` part.
 
-Any file name provided in the `Content-Disposition` header can be at most 256 characters with no
-control characters.
+Any file name provided in the `Content-Disposition` header has the same restrictions as the
+filename parameter for the standard upload method.
 
 ### Curl example
 

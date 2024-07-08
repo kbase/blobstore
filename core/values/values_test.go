@@ -51,7 +51,7 @@ func TestFileName(t *testing.T) {
 }
 
 func fileNameString() string {
-	s := "ab9 8&#']K[1*(&)ꢇ]" // 20 bytes
+	s := "ab9_8४.[]( )1=-ꢇ" // 20 bytes
 
 	b := strings.Builder{}
 	for i := 0; i < 12; i++ {
@@ -72,18 +72,34 @@ func TestFileNameFail(t *testing.T) {
 	assert.Nil(t, fn, "expected error")
 	assert.Equal(t, NewIllegalInputError("File name contains control characters"), err,
 		"incorrect error")
+	for _, ch := range []string{"*", ":", "?", "|", "✈", "🐱", "∞", "€", "◊"} {
+		fn, err = NewFileName("abc"+ch+"neg")
+		assert.Nil(t, fn, "expected error")
+		errstr := "File name string abc"+ch+"neg contains an illegal character: '"+ch+"'"
+		assert.Equal(t, NewIllegalInputError(errstr), err, "incorrect error")
+	}
 }
 
 func TestFileFormat(t *testing.T) {
-	fns := fileNameString()[:100]
+	fns := formatString()
 	assert.Equal(t, 100, len(fns), "incorrect length")
 	fn, err := NewFileFormat("    \t       " + fns + "    \t       ")
 	assert.Nil(t, err, "unexpected error")
 	assert.Equal(t, fns, fn.GetFileFormat())
 }
 
+func formatString() string {
+	s := "ab9_8४K3Z23o1n-ꢇ" // 20 bytes
+
+	b := strings.Builder{}
+	for i := 0; i < 5; i++ {
+		b.Write([]byte(s))
+	}
+	return b.String()
+}
+
 func TestFileFormatFail(t *testing.T) {
-	fns := fileNameString()[:100]
+	fns := formatString()
 	assert.Equal(t, 100, len(fns), "incorrect length")
 	fn, err := NewFileFormat(fns + "a")
 	assert.Nil(t, fn, "expected error")
@@ -93,4 +109,11 @@ func TestFileFormatFail(t *testing.T) {
 	assert.Nil(t, fn, "expected error")
 	assert.Equal(t, NewIllegalInputError("File format contains control characters"), err,
 		"incorrect error")
+	badchrs := []string{"*", ":", "?", "|", "✈", "🐱", "∞", "€", "◊", "=", "[", "]", "(", ")", "."}
+	for _, ch := range badchrs {
+		fn, err = NewFileFormat("abc"+ch+"neg")
+		assert.Nil(t, fn, "expected error")
+		errstr := "File format string abc"+ch+"neg contains an illegal character: '"+ch+"'"
+		assert.Equal(t, NewIllegalInputError(errstr), err, "incorrect error")
+	}
 }

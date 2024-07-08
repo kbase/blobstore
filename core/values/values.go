@@ -9,11 +9,23 @@ import (
 )
 
 const (
-	maxFileNameSize = 256
-	maxFormatSize   = 100
+	maxFileNameSize    = 256
+	maxFormatSize      = 100
+	allowedFileChars   = "[]()=-_. "
+	allowedFormatChars = "_-"
 )
 
 var md5regex = regexp.MustCompile("^[a-fA-F0-9]{32}$")
+var fileCharsSet = createAllowedCharsSet(allowedFileChars)
+var formatCharsSet = createAllowedCharsSet(allowedFormatChars)
+
+func createAllowedCharsSet(allowedSpecialChars string) map[rune]struct{} {
+	allowedCharsSet := make(map[rune]struct{})
+	for _, char := range allowedSpecialChars {
+		allowedCharsSet[char] = struct{}{}
+	}
+	return allowedCharsSet
+}
 
 // MD5 contains a valid MD5 string.
 type MD5 struct {
@@ -53,7 +65,7 @@ type FileName struct {
 
 // NewFileName creates a new filename.
 func NewFileName(name string) (*FileName, error) {
-	name, err := checkString(name, "File name", maxFileNameSize)
+	name, err := checkString(name, "File name", maxFileNameSize, fileCharsSet)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +84,7 @@ type FileFormat struct {
 
 // NewFileFormat creates a new filename.
 func NewFileFormat(name string) (*FileFormat, error) {
-	name, err := checkString(name, "File format", maxFormatSize)
+	name, err := checkString(name, "File format", maxFormatSize, formatCharsSet)
 	if err != nil {
 		return nil, err
 	}
@@ -84,15 +96,35 @@ func (fn *FileFormat) GetFileFormat() string {
 	return fn.fileFormat
 }
 
-func checkString(s string, name string, maxSize int) (string, error) {
+func checkString(
+	s string, name string, maxSize int, allowedSpcChars map[rune]struct{},
+) (string, error) {
 	s = strings.TrimSpace(s)
 	if len(s) > maxSize {
 		return "", NewIllegalInputError(fmt.Sprintf("%s is > %d bytes", name, maxSize))
 	}
+	// check for control characters first to avoid returning / logging a string with control chars
 	if containsControlChar(s) {
 		return "", NewIllegalInputError(fmt.Sprintf("%s contains control characters", name))
 	}
+	for _, r := range(s) {
+		if !isAllowedChar(r, allowedSpcChars) {
+			return "", NewIllegalInputError(
+				fmt.Sprintf("%s string %s contains an illegal character: %q", name, s, r),
+			)
+		}
+	}
 	return s, nil
+}
+
+func isAllowedChar(r rune, allowedSpcChars map[rune]struct{}) bool {
+	if unicode.IsLetter(r) || unicode.IsDigit(r) {
+		return true
+	}
+	if _, exists := allowedSpcChars[r]; exists {
+		return true
+	}
+	return false
 }
 
 func containsControlChar(s string) bool {
