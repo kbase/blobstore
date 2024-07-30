@@ -1,3 +1,9 @@
+# 0.1.5
+
+* Upgraded from go 1.12 to 1.16
+* Changed build base image from FROM `golang:1.12.5-alpine3.9` to `golang:1.16.15-alpine3.15`
+
+
 # 0.1.4
 
 * Added the `del` param when downloading the file from a node.
