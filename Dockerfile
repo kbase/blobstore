@@ -1,4 +1,4 @@
-FROM golang:1.12.5-alpine3.9 as build
+FROM golang:1.16.15-alpine3.15 as build
 
 # git is not included, weirdly, so nothing with ext deps can build
 RUN apk add git
