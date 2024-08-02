@@ -24,11 +24,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - go: '1.12'
+          - go: '1.16'
             mongo: 'mongodb-linux-x86_64-3.6.12'
             minio: '2019-05-23T00-29-34Z'
             wired_tiger: 'false'
-          - go: '1.12'
+          - go: '1.16'
             mongo: 'mongodb-linux-x86_64-ubuntu2204-7.0.4'
             minio: '2019-05-23T00-29-34Z'
             wired_tiger: 'true'

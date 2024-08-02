@@ -510,7 +510,7 @@ func (t *TestSuite) TestConfigFailBadAuthURL() {
 	cfg, err := New(f)
 	t.Nil(cfg, "expected error")
 	t.Equal(fmt.Errorf("Value for key kbase-auth-url in section BlobStore of config file %s "+
-		"is not a valid url: parse ://kbase.us/authyauth: missing protocol scheme", f),
+		"is not a valid url: parse \"://kbase.us/authyauth\": missing protocol scheme", f),
 		err, "incorrect error")
 }
 
