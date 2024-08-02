@@ -19,7 +19,7 @@ import (
 
 const (
 	name        = "blobstore"
-	version     = "0.1.4"
+	version     = "0.1.5"
 	shockname   = "Shock"
 	shockver    = "0.9.6" // do not increment
 	deprecation = "The id and version fields are deprecated."
