@@ -151,6 +151,7 @@ func (fs *S3FileStore) StoreFile(le *logrus.Entry, p *StoreFileParams) (out *Fil
 		return nil, errors.New("s3 store request: " + errstr)
 	}
 	defer resp.Body.Close()
+	defer io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode > 399 { // don't worry about 100s, shouldn't happen
 		buffer := make([]byte, 1000)
 		n, err := resp.Body.Read(buffer)
