@@ -8,7 +8,7 @@ RUN cd /tmp/blobstore \
     && export GIT_COMMIT=$(git rev-list -1 HEAD) \
     && go build -ldflags "-X main.gitCommit=$GIT_COMMIT" app/blobstore.go
 
-FROM alpine:3.9.4
+FROM alpine:3.21.3
 
 # These ARGs values are passed in via the docker build command
 ARG BUILD_DATE
