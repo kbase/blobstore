@@ -15,8 +15,9 @@ require (
 	github.com/minio/minio-go v0.0.0-20190430232750-10b3660b8f09
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
-	github.com/sirupsen/logrus v1.4.1
-	github.com/stretchr/testify v1.3.0
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/objx v0.1.1 // indirect
+	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/pretty v0.0.0-20190325153808-1166b9ac2b65 // indirect
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
